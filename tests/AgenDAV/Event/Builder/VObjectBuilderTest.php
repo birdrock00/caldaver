@@ -18,14 +18,11 @@ class VObjectBuilderTest  extends TestCase
 
     protected $builder;
 
-    public function __construct()
+    public function setUp(): void
     {
+        parent::setUp();
         $this->utc = new \DateTimeZone('UTC');
         $this->timezone = new \DateTimeZone('Europe/Madrid');
-    }
-
-    public function setUp()
-    {
         $this->builder = new VObjectBuilder($this->timezone);
     }
 

@@ -4,12 +4,12 @@
 </div>
 {% endif %}
 <div id="shortcuts" class="block">
-   <button id="shortcut_add_event" class="btn btn-default btn-block">
+   <button id="shortcut_add_event" class="btn btn-default btn-block create-event-button">
      <i class="fa fa-plus"></i> {% trans %}labels.createevent{% endtrans %}
    </button>
  </div>
 
- <div class="block calendar_list panel panel-default" id="own_calendar_list">
+ <div class="block calendar_list panel panel-default calendar-sidebar-section" id="own_calendar_list">
   <div class="panel-heading">
     <h3 class="panel-title">{% trans %}labels.calendars{% endtrans %}</h3>
   </div>
@@ -22,7 +22,7 @@
   </div><!-- panel-body -->
  </div><!-- panel -->
 
- <div class="block calendar_list panel panel-default shared_calendars " id="shared_calendar_list">
+ <div class="block calendar_list panel panel-default shared_calendars calendar-sidebar-section" id="shared_calendar_list">
   <div class="panel-heading">
     <h3 class="panel-title">{% trans %}labels.shared_calendars{% endtrans %}</h3>
   </div>
