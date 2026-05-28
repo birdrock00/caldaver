@@ -10,11 +10,11 @@ class PlainSerializer extends ArraySerializer
     /**
      * Serialize a collection
      *
-     * @param  string  $resourceKey
+     * @param  ?string  $resourceKey
      * @param  array  $data
      * @return array
      **/
-    public function collection($resourceKey, array $data)
+    public function collection(?string $resourceKey, array $data): array
     {
         return $data;
     }
