@@ -1,0 +1,41 @@
+#!/bin/bash
+set -euo pipefail
+
+CONFIG_FILE="/var/www/agendav/web/config/settings.php"
+CONFIG_TEMPLATE="/var/www/agendav/web/config/settings.php.template"
+PHP_CONFIG_FILE="${PHP_INI_DIR}/php.ini"
+
+: "${AGENDAV_CALDAV_PUBLIC_URL:=$AGENDAV_CALDAV_SERVER}"
+
+escape_sed() {
+    printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
+}
+
+replace_config() {
+    local token="$1"
+    local value="$2"
+    sed -i -e "s/${token}/$(escape_sed "$value")/g" "$CONFIG_FILE"
+}
+
+cp "$CONFIG_TEMPLATE" "$CONFIG_FILE"
+
+replace_config "AGENDAV_TITLE" "$AGENDAV_TITLE"
+replace_config "AGENDAV_FOOTER" "$AGENDAV_FOOTER"
+replace_config "AGENDAV_CALDAV_SERVER" "$AGENDAV_CALDAV_SERVER"
+replace_config "AGENDAV_CALDAV_PUBLIC_URL" "$AGENDAV_CALDAV_PUBLIC_URL"
+replace_config "AGENDAV_CALDAV_AUTHMETHOD" "$AGENDAV_CALDAV_AUTHMETHOD"
+replace_config "AGENDAV_CALDAV_CERTIFICATE_VERIFY" "$AGENDAV_CALDAV_CERTIFICATE_VERIFY"
+replace_config "AGENDAV_CALENDAR_SHARING" "$AGENDAV_CALENDAR_SHARING"
+replace_config "AGENDAV_CSRF_SECRET" "$AGENDAV_CSRF_SECRET"
+replace_config "AGENDAV_TIMEZONE" "$AGENDAV_TIMEZONE"
+replace_config "AGENDAV_LANG" "$AGENDAV_LANG"
+replace_config "AGENDAV_LOG_DIR" "$AGENDAV_LOG_DIR"
+replace_config "AGENDAV_WEEKSTART" "$AGENDAV_WEEKSTART"
+
+sed -i -e "s/AGENDAV_TIMEZONE/$(escape_sed "$AGENDAV_TIMEZONE")/g" "$PHP_CONFIG_FILE"
+
+if [ "${1:-}" = "apache2" ]; then
+    exec /usr/sbin/apache2ctl -D FOREGROUND
+fi
+
+exec "$@"
