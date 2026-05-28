@@ -3,6 +3,8 @@
   <img src="{{ asset(logo, 'img') }}" alt="Logo">
 </div>
 {% endif %}
+{% set active_section = 'calendar' %}
+{% include 'parts/appnav.html' %}
 <div id="shortcuts" class="block">
    <button id="shortcut_add_event" class="btn btn-default btn-block create-event-button">
      <i class="fa fa-plus"></i> {% trans %}labels.createevent{% endtrans %}

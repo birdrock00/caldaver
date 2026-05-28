@@ -26,6 +26,11 @@ $controllers->get('/', function () use ($app) {
 })
 ->bind('calendar');
 
+$controllers->get('/cards', '\AgenDAV\Controller\Cards::indexAction')->bind('cards');
+$controllers->get('/cards/list', '\AgenDAV\Controller\Cards::listAction')->bind('cards.list');
+$controllers->post('/cards/save', '\AgenDAV\Controller\Cards::saveAction')->bind('cards.save');
+$controllers->post('/cards/delete', '\AgenDAV\Controller\Cards::deleteAction')->bind('cards.delete');
+
 $controllers->get('/preferences', '\AgenDAV\Controller\Preferences::indexAction')->bind('preferences');
 $controllers->post('/preferences', '\AgenDAV\Controller\Preferences::saveAction')->bind('preferences.save');
 

@@ -1,0 +1,119 @@
+{% extends 'layout.html' %}
+
+{% block body_class %}agendav-cards-page{% endblock %}
+
+{% block content %}
+{% include 'parts/navbar.html' %}
+<div class="container-fluid cards-shell">
+  <aside class="cards-sidebar">
+    {% if logo %}
+    <div id="logo" class="block">
+      <img src="{{ asset(logo, 'img') }}" alt="Logo">
+    </div>
+    {% endif %}
+    {% set active_section = 'cards' %}
+    {% include 'parts/appnav.html' %}
+    <button id="contact_create" class="btn btn-default create-contact-button">
+      <i class="fa fa-plus"></i> {% trans %}labels.createcontact{% endtrans %}
+    </button>
+    <nav class="contacts-nav" aria-label="Contact lists">
+      <a class="contacts-nav-item active" href="{{ app.url_generator.generate('cards') }}">
+        <i class="fa fa-user"></i>
+        <span>{% trans %}labels.contacts{% endtrans %}</span>
+        <span id="contact_count_nav" class="contacts-nav-count">0</span>
+      </a>
+      <span class="contacts-nav-item muted">
+        <i class="fa fa-history"></i>
+        <span>{% trans %}labels.frequent{% endtrans %}</span>
+      </span>
+      <span class="contacts-nav-item muted">
+        <i class="fa fa-tags"></i>
+        <span>{% trans %}labels.labels{% endtrans %}</span>
+      </span>
+    </nav>
+  </aside>
+
+  <main class="cards-content">
+    <div class="contacts-search-row">
+      <div class="contacts-search">
+        <i class="fa fa-search"></i>
+        <input id="contacts_search" type="search" placeholder="{% trans %}labels.search{% endtrans %}">
+      </div>
+      <div class="contacts-view-switch" role="group" aria-label="Contact view">
+        <button type="button" class="active" data-view="list">{% trans %}labels.list{% endtrans %}</button>
+        <button type="button" data-view="cards">{% trans %}labels.cards{% endtrans %}</button>
+      </div>
+    </div>
+
+    <section class="contacts-panel">
+      <div class="contacts-heading">
+        <h1>{% trans %}labels.contacts{% endtrans %} <span id="contact_count">(0)</span></h1>
+        <div class="contacts-actions">
+          <button type="button" id="contacts_refresh" title="{% trans %}labels.refresh{% endtrans %}">
+            <i class="fa fa-refresh"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="contacts_empty" class="contacts-empty" hidden>
+        <h2>{% trans %}labels.nocontacts{% endtrans %}</h2>
+      </div>
+
+      <div id="contacts_list" class="contacts-list-view">
+        <div class="contacts-table-header">
+          <span>{% trans %}labels.name{% endtrans %}</span>
+          <span>{% trans %}labels.email{% endtrans %}</span>
+          <span>{% trans %}labels.phone{% endtrans %}</span>
+          <span>{% trans %}labels.jobcompany{% endtrans %}</span>
+          <span>{% trans %}labels.labels{% endtrans %}</span>
+        </div>
+        <div id="contacts_rows"></div>
+      </div>
+
+      <div id="contacts_cards" class="contacts-card-grid" hidden></div>
+    </section>
+  </main>
+</div>
+
+<div id="contact_dialog" class="contact-dialog" hidden>
+  <form id="contact_form" action="{{ app.url_generator.generate('cards.save') }}" method="post">
+    <input type="hidden" name="_token" value="{{ csrf_token.getValue() }}">
+    <div class="contact-dialog-panel">
+      <div class="contact-dialog-header">
+        <h2>{% trans %}labels.createcontact{% endtrans %}</h2>
+        <button type="button" id="contact_cancel_icon" aria-label="{% trans %}labels.cancel{% endtrans %}">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <label>
+        <span>{% trans %}labels.name{% endtrans %}</span>
+        <input required name="full_name" type="text" autocomplete="name">
+      </label>
+      <label>
+        <span>{% trans %}labels.email{% endtrans %}</span>
+        <input name="email" type="email" autocomplete="email">
+      </label>
+      <label>
+        <span>{% trans %}labels.phone{% endtrans %}</span>
+        <input name="phone" type="tel" autocomplete="tel">
+      </label>
+      <label>
+        <span>{% trans %}labels.company{% endtrans %}</span>
+        <input name="organization" type="text" autocomplete="organization">
+      </label>
+      <label>
+        <span>{% trans %}labels.jobtitle{% endtrans %}</span>
+        <input name="job_title" type="text" autocomplete="organization-title">
+      </label>
+      <div class="contact-dialog-footer">
+        <button type="button" id="contact_cancel" class="btn btn-default">{% trans %}labels.cancel{% endtrans %}</button>
+        <button type="submit" class="btn btn-primary">{% trans %}labels.save{% endtrans %}</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block bottom %}
+{% include 'parts/cardsjs.html' %}
+{% endblock %}

@@ -88,12 +88,16 @@ class Toolkit
         switch ($request) {
             case 'MKCALENDAR':
                 return $this->generator->mkCalendarBody($parameters);
+            case 'MKADDRESSBOOK':
+                return $this->generator->mkAddressBookBody($parameters);
             case 'PROPFIND':
                 return $this->generator->propfindBody($parameters);
             case 'PROPPATCH':
                 return $this->generator->proppatchBody($parameters);
             case 'REPORT-CALENDAR':
                 return $this->generator->calendarQueryBody($parameters);
+            case 'REPORT-ADDRESSBOOK':
+                return $this->generator->addressBookQueryBody();
             case 'REPORT-PRINCIPAL-SEARCH':
                 return $this->generator->principalPropertySearchBody($parameters);
             case 'ACL':
@@ -105,4 +109,3 @@ class Toolkit
         }
     }
 }
-

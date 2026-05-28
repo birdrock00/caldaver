@@ -124,6 +124,69 @@ test('created events are persisted through the configured local CalDAV server', 
   }
 });
 
+test('contacts section opens from the left tab and supports card view', async ({ page }) => {
+  await login(page);
+  const listResponsePromise = page.waitForResponse(response => response.url().includes('/cards/list'));
+
+  await page.getByRole('link', { name: /contacts/i }).click();
+  await expect(page).toHaveURL(/\/cards$/);
+  await expect(page.locator('.contacts-panel')).toBeVisible();
+  await expect(page.locator('#contact_create')).toBeVisible();
+  await expect(page.locator('#contacts_list')).toBeVisible();
+
+  const listResponse = await listResponsePromise;
+  expect(listResponse.status()).toBe(200);
+
+  await page.locator('.contacts-view-switch button[data-view="cards"]').click();
+  await expect(page.locator('#contacts_cards')).toBeVisible();
+});
+
+test('created contacts are persisted through the configured local CardDAV server', async ({ page }) => {
+  await login(page);
+  await page.goto(`${baseURL}/cards`);
+  await expect(page.locator('#contact_form input[name="_token"]')).toHaveCount(1);
+
+  const csrf = await page.locator('#contact_form input[name="_token"]').inputValue();
+  const fullName = `CalDAVer Contact Smoke ${Date.now()}`;
+  let createdContact = null;
+
+  const saveResponse = await page.request.post(`${baseURL}/cards/save`, {
+    form: {
+      _token: csrf,
+      full_name: fullName,
+      email: 'caldaver-smoke@example.com',
+      phone: '+14155550199',
+      organization: 'CalDAVer',
+      job_title: 'Smoke Test'
+    },
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  });
+  expect(saveResponse.status()).toBe(200);
+
+  try {
+    const listResponse = await page.request.get(`${baseURL}/cards/list`);
+    expect(listResponse.status()).toBe(200);
+
+    const payload = await listResponse.json();
+    createdContact = payload.data.find(contact => contact.full_name === fullName);
+    expect(createdContact).toBeTruthy();
+    expect(createdContact.email).toBe('caldaver-smoke@example.com');
+    expect(createdContact.phone).toBe('+14155550199');
+  } finally {
+    if (createdContact) {
+      const deleteResponse = await page.request.post(`${baseURL}/cards/delete`, {
+        form: {
+          _token: csrf,
+          url: createdContact.url,
+          etag: createdContact.etag
+        },
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      expect(deleteResponse.status()).toBe(200);
+    }
+  }
+});
+
 test('preferences page remains vertically scrollable', async ({ page }) => {
   await login(page);
   await page.goto(`${baseURL}/preferences`);

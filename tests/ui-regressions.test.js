@@ -129,3 +129,55 @@ test('plain Fractal serializer keeps PHP 8 compatible method signatures', () => 
     'old untyped PlainSerializer::collection signature causes a fatal when loading events'
   );
 });
+
+test('cards section exposes CardDAV routes and a left navigation tab', () => {
+  const controllers = read('web/app/controllers.php');
+  const services = read('web/app/services.php');
+  const appNav = read('web/templates/parts/appnav.html');
+  const sidebar = read('web/templates/parts/sidebar.html');
+
+  assert.match(controllers, /->get\('\/cards', '\\AgenDAV\\Controller\\Cards::indexAction'\)->bind\('cards'\)/);
+  assert.match(controllers, /->get\('\/cards\/list', '\\AgenDAV\\Controller\\Cards::listAction'\)->bind\('cards\.list'\)/);
+  assert.match(controllers, /->post\('\/cards\/save', '\\AgenDAV\\Controller\\Cards::saveAction'\)->bind\('cards\.save'\)/);
+  assert.match(controllers, /->post\('\/cards\/delete', '\\AgenDAV\\Controller\\Cards::deleteAction'\)->bind\('cards\.delete'\)/);
+  assert.match(services, /\$app\['carddav\.client'\]/);
+  assert.match(appNav, /app\.url_generator\.generate\('cards'\)/);
+  assert.match(sidebar, /include 'parts\/appnav\.html'/);
+});
+
+test('cards page renders list and card views without loading the calendar bundle', () => {
+  const cards = read('web/templates/cards.html');
+  const cardsJs = read('web/templates/parts/cardsjs.html');
+  const less = read('assets/less/agendav.less');
+
+  assert.match(cards, /id="contacts_list"/);
+  assert.match(cards, /id="contacts_cards"/);
+  assert.match(cards, /data-view="cards"/);
+  assert.match(cards, /id="contact_form"/);
+  assert.match(cardsJs, /fetch\('\{\{ app\.url_generator\.generate\('cards\.list'\) \}\}'/);
+  assert.match(cardsJs, /fetch\(event\.target\.action/);
+  assert.doesNotMatch(cards, /parts\/bottom\.html/, 'cards page must not initialize FullCalendar app.js');
+  assert.match(less, /\.contacts-card-grid/);
+  assert.match(less, /\.contact-row/);
+});
+
+test('CardDAV support can discover, create, query, and write local addressbooks', () => {
+  const auth = read('web/src/Controller/Authentication.php');
+  const client = read('web/src/CardDAV/Client.php');
+  const contact = read('web/src/CardDAV/Contact.php');
+  const generator = read('web/src/XML/Generator.php');
+  const parser = read('web/src/XML/Parser.php');
+  const http = read('web/src/Http/Client.php');
+
+  assert.match(auth, /addressbook_home_set/);
+  assert.match(client, /getAddressBookHomeSet/);
+  assert.match(client, /getOrCreateDefaultAddressBook/);
+  assert.match(client, /REPORT-ADDRESSBOOK/);
+  assert.match(client, /setContentTypeVCard/);
+  assert.match(client, /deleteContact/);
+  assert.match(contact, /Sabre\\VObject\\Component\\VCard/);
+  assert.match(generator, /mkAddressBookBody/);
+  assert.match(generator, /addressBookQueryBody/);
+  assert.match(parser, /\{urn:ietf:params:xml:ns:carddav\}addressbook-home-set/);
+  assert.match(http, /function setContentTypeVCard\(\)/);
+});
