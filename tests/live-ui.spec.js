@@ -31,6 +31,13 @@ async function login(page) {
   return pageErrors;
 }
 
+async function eventResponses(page) {
+  return page.waitForResponse(
+    response => response.url().includes('/events?'),
+    { timeout: 15000 }
+  ).catch(() => null);
+}
+
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
   const pageErrors = await login(page);
 
@@ -45,6 +52,19 @@ test('calendar create and event create controls open usable dialogs', async ({ p
   await expect(page.locator('#event_edit_dialog')).toBeVisible();
   await expect(page.locator('#event_edit_dialog input.summary')).toBeVisible();
 
+  expect(pageErrors).toEqual([]);
+});
+
+test('calendar event feed loads without server errors', async ({ page }) => {
+  const eventResponsePromise = eventResponses(page);
+  const pageErrors = await login(page);
+  const eventResponse = await eventResponsePromise;
+
+  if (eventResponse) {
+    expect(eventResponse.status()).toBeLessThan(500);
+  }
+
+  await expect(page.locator('.freeow')).not.toContainText(/error loading events/i);
   expect(pageErrors).toEqual([]);
 });
 
