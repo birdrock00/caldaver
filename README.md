@@ -40,7 +40,39 @@ See [installation guide](https://agendav.readthedocs.io/en/latest/admin/installa
 
 ### Docker Image
 
-Agendav offers no official Docker image. However, you may use unofficial docker images provided by the community instead, for example https://ghcr.io/nagimov/agendav-docker.
+This fork includes a Docker image published to GitHub Container Registry as
+`ghcr.io/birdrock00/caldaver`. Daily builds are tagged with the UTC date in
+`YYYY-MM-DD` format and the newest build is also tagged as `latest`.
+
+The Docker packaging is based on
+[nagimov/agendav-docker](https://github.com/nagimov/agendav-docker). Thank you
+to Ruslan Nagimov for making that work available as a basis for this image.
+
+Required runtime configuration:
+
+- `AGENDAV_CALDAV_SERVER`, for example `https://baikal.example.com/cal.php`
+- `AGENDAV_CSRF_SECRET`, set to a unique secret value
+
+Common optional runtime configuration:
+
+- `AGENDAV_SERVER_NAME`, defaults to `localhost`
+- `AGENDAV_TITLE`, defaults to `AgenDAV`
+- `AGENDAV_FOOTER`, defaults to `AgenDAV`
+- `AGENDAV_CALDAV_PUBLIC_URL`, defaults to `AGENDAV_CALDAV_SERVER`
+- `AGENDAV_TIMEZONE`, defaults to `UTC`
+- `AGENDAV_LANG`, defaults to `en`
+- `AGENDAV_WEEKSTART`, defaults to `0`
+- `AGENDAV_CALENDAR_SHARING`, defaults to `false`
+
+Example:
+
+```sh
+docker run -d --name caldaver \
+  -p 8080:8080 \
+  -e AGENDAV_CALDAV_SERVER=https://baikal.example.com/cal.php \
+  -e AGENDAV_CSRF_SECRET="$(openssl rand -hex 32)" \
+  ghcr.io/birdrock00/caldaver:latest
+```
 
 ## Source
 
@@ -50,6 +82,10 @@ https://github.com/agendav/agendav
 
 GNU General Public License v3.0 or later
 https://spdx.org/licenses/GPL-3.0-or-later.html
+
+Docker packaging derived from `nagimov/agendav-docker` is additionally covered
+by Ruslan Nagimov's MIT license notice in
+[`LICENSES/NAGIMOV-AGENDAV-DOCKER-MIT.txt`](./LICENSES/NAGIMOV-AGENDAV-DOCKER-MIT.txt).
 
 ## Changelog
 
