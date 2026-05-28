@@ -425,14 +425,24 @@ body.agendav-calendar-page {
 
   .navbar-nav {
     display: flex;
+    flex-direction: row;
     align-items: center;
     float: none;
+    gap: 4px;
+    margin: 0 0 0 auto;
+    padding-left: 0;
+    list-style: none;
 
     > li {
       float: none;
+      display: flex;
+      align-items: center;
     }
 
     > li > a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       color: #5f6368;
       padding: 10px 12px;
       border-radius: 50%;
