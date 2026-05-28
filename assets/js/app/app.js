@@ -322,6 +322,7 @@ $(document).ready(function() {
       var start = $('#calendar_view').fullCalendar('getDate');
       var data = {
           start: start,
+          end: moment(start).add(1, 'hours'),
           allDay: false,
           view: 'month'
       };
@@ -829,7 +830,7 @@ var calculate_event_duration = function calculate_event_duration() {
 // Triggers a dialog for creating calendars
 var calendar_create_dialog = function calendar_create_dialog() {
 
-  var form_url = AgenDAVConf.base_app_url + 'calendars';
+  var form_url = AgenDAVConf.base_app_url + 'calendars/save';
   var title = t('labels', 'newcalendar');
 
   var data = {
