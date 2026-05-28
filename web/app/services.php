@@ -99,6 +99,15 @@ $app['monolog.http'] = function($app) {
 
 // Guzzle HTTP client
 $app['guzzle'] = function($app) {
+    return $app['guzzle.factory']($app['caldav.baseurl']);
+};
+
+// Guzzle HTTP client for CardDAV requests
+$app['carddav.guzzle'] = function($app) {
+    return $app['guzzle.factory']($app['carddav.baseurl']);
+};
+
+$app['guzzle.factory'] = $app->protect(function($baseurl) use ($app) {
     // Generate Guzzle default stack handler
     $stack = GuzzleHttp\HandlerStack::create();
 
@@ -114,25 +123,31 @@ $app['guzzle'] = function($app) {
         );
     }
 
-    $baseurl = $app['caldav.baseurl'];
-    // Pass username of logged-in user to baseurl to select calendar dynamically
+    // Pass username of logged-in user to baseurl to select collections dynamically.
     $baseurl = str_replace('%u', $app['session']->get('username'), $baseurl);
 
-    $client = new \GuzzleHttp\Client([
+    return new \GuzzleHttp\Client([
         'base_uri' => $baseurl,
         'handler' => $stack,
         'connect_timeout' => $app['caldav.connect.timeout'],
         'timeout' => $app['caldav.response.timeout'],
         'verify' => $app['caldav.certificate.verify'],
     ]);
-
-    return $client;
-};
+});
 
 // AgenDAV HTTP client, based on Guzzle
 $app['http.client'] = function($app) {
     return \AgenDAV\Http\ClientFactory::create(
         $app['guzzle'],
+        $app['session'],
+        $app['caldav.authmethod']
+    );
+};
+
+// AgenDAV HTTP client for CardDAV requests
+$app['carddav.http.client'] = function($app) {
+    return \AgenDAV\Http\ClientFactory::create(
+        $app['carddav.guzzle'],
         $app['session'],
         $app['caldav.authmethod']
     );
@@ -173,7 +188,7 @@ $app['caldav.client'] = function($app) {
 // CardDAV client
 $app['carddav.client'] = function($app) {
     return new \AgenDAV\CardDAV\Client(
-        $app['http.client'],
+        $app['carddav.http.client'],
         $app['xml.toolkit']
     );
 };
