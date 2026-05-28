@@ -96,3 +96,20 @@ test('calendar page emits a concrete translation catalogue for frontend startup'
     'the old expression can emit null and break all calendar click handlers'
   );
 });
+
+test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
+  const navbar = read('web/templates/parts/navbar.html');
+  const less = read('assets/less/agendav.less');
+
+  assert.match(
+    navbar,
+    /<ul class="nav navbar-nav navbar-right topbar-actions" id="usermenu">/,
+    'user menu should have an explicit topbar action class instead of relying only on Bootstrap navbar classes'
+  );
+
+  assert.match(
+    less,
+    /\.navbar-nav\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*row;[\s\S]*align-items:\s*center;/,
+    'Bootstrap 5 makes navbar-nav a column by default, so the topbar must force the user actions back into a row'
+  );
+});

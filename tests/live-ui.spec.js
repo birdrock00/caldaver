@@ -69,3 +69,33 @@ test('preferences page remains vertically scrollable', async ({ page }) => {
   const afterScrollY = await page.evaluate(() => window.scrollY);
   expect(afterScrollY).toBeGreaterThan(before.scrollY);
 });
+
+test('preferences topbar actions stay in one horizontal row', async ({ page }) => {
+  await login(page);
+  await page.goto(`${baseURL}/preferences`);
+
+  const prefs = page.locator('#usermenu .prefs');
+  const logout = page.locator('#usermenu .logout');
+  const user = page.locator('#usermenu .user-pill');
+
+  await expect(prefs).toBeVisible();
+  await expect(logout).toBeVisible();
+  await expect(user).toBeVisible();
+
+  const boxes = await Promise.all([
+    prefs.boundingBox(),
+    logout.boundingBox(),
+    user.boundingBox()
+  ]);
+
+  expect(boxes.every(Boolean)).toBe(true);
+
+  const centers = boxes.map(box => ({
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2
+  }));
+
+  expect(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y))).toBeLessThan(8);
+  expect(centers[0].x).toBeLessThan(centers[1].x);
+  expect(centers[1].x).toBeLessThan(centers[2].x);
+});
