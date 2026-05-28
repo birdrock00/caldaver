@@ -1,7 +1,13 @@
-<div class="navbar navbar-default" role="navigation">
+<div class="navbar navbar-default agendav-topbar" role="navigation">
   <div class="container-fluid">
     <div class="navbar-header">
-      <span class="navbar-brand">{{ title }}</span>
+      <button class="topbar-menu" type="button" aria-label="Menu">
+        <i class="fa fa-bars"></i>
+      </button>
+      <span class="navbar-brand">
+        <span class="agendav-brand-icon">31</span>
+        <span class="agendav-brand-title">{{ title }}</span>
+      </span>
    </div>
    <p class="navbar-text navbar-right" id="loading">
    <img src="{{ asset('loading.gif', 'img') }}" alt="">
@@ -17,7 +23,7 @@
          <i title="{% trans %}labels.logout{% endtrans %}" class="fa fa-lg fa-power-off"></i>
        </a>
        </li>
-       <li><a href="javascript:void(0)">
+       <li><a class="user-pill" href="javascript:void(0)">
        {{ app.session.get('displayname') }}
        </a>
        </li>
