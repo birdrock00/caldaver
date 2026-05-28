@@ -113,3 +113,19 @@ test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
     'Bootstrap 5 makes navbar-nav a column by default, so the topbar must force the user actions back into a row'
   );
 });
+
+test('plain Fractal serializer keeps PHP 8 compatible method signatures', () => {
+  const serializer = read('web/src/Data/Serializer/PlainSerializer.php');
+
+  assert.match(
+    serializer,
+    /public function collection\(\?string \$resourceKey, array \$data\): array/,
+    'PlainSerializer::collection must match League Fractal ArraySerializer on PHP 8+'
+  );
+
+  assert.doesNotMatch(
+    serializer,
+    /public function collection\(\$resourceKey, array \$data\)/,
+    'old untyped PlainSerializer::collection signature causes a fatal when loading events'
+  );
+});
