@@ -42,6 +42,9 @@ $app['log.level'] = 'INFO';
 // Base URL
 $app['caldav.baseurl'] = 'http://localhost:81/';
 
+// Base URL for CardDAV requests. Defaults to the CalDAV URL when omitted.
+$app['carddav.baseurl'] = $app['caldav.baseurl'];
+
 // Authentication method required by CalDAV server (basic or digest)
 $app['caldav.authmethod'] = 'basic';
 
