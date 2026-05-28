@@ -38,6 +38,10 @@ async function eventResponses(page) {
   ).catch(() => null);
 }
 
+function isoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
   const pageErrors = await login(page);
 
@@ -66,6 +70,58 @@ test('calendar event feed loads without server errors', async ({ page }) => {
 
   await expect(page.locator('.freeow')).not.toContainText(/error loading events/i);
   expect(pageErrors).toEqual([]);
+});
+
+test('created events are persisted through the configured local CalDAV server', async ({ page }) => {
+  await login(page);
+  await page.waitForFunction(() => document.querySelectorAll('div.calendar_list li.available_calendar').length > 0);
+
+  const title = `CalDAVer storage smoke ${Date.now()}`;
+  let createdEvent = null;
+  let csrf = null;
+
+  await page.locator('#shortcut_add_event').click();
+  await expect(page.locator('#event_edit_dialog')).toBeVisible();
+  await page.locator('#event_edit_dialog input.summary').fill(title);
+
+  csrf = await page.locator('#event_edit_form input[name="_token"]').inputValue();
+  const calendar = await page.locator('#event_edit_form select[name="calendar"]').inputValue();
+  const saveResponsePromise = page.waitForResponse(response => response.url().includes('/events/save'));
+
+  await page.getByRole('button', { name: /^save$/i }).click();
+  const saveResponse = await saveResponsePromise;
+  expect(saveResponse.status()).toBe(200);
+  await expect(page.locator('#event_edit_dialog')).toHaveCount(0);
+
+  const start = new Date();
+  start.setUTCDate(start.getUTCDate() - 7);
+  const end = new Date();
+  end.setUTCDate(end.getUTCDate() + 7);
+
+  try {
+    const eventsResponse = await page.request.get(
+      `${baseURL}/events?calendar=${encodeURIComponent(calendar)}&start=${isoDate(start)}&end=${isoDate(end)}&timezone=America%2FLos_Angeles`
+    );
+    expect(eventsResponse.status()).toBe(200);
+
+    const events = await eventsResponse.json();
+    createdEvent = events.find(event => event.title === title);
+    expect(createdEvent).toBeTruthy();
+  } finally {
+    if (createdEvent) {
+      const deleteResponse = await page.request.post(`${baseURL}/events/delete`, {
+        form: {
+          _token: csrf,
+          calendar: createdEvent.calendar,
+          uid: createdEvent.uid,
+          href: createdEvent.href,
+          etag: createdEvent.etag
+        },
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      expect(deleteResponse.status()).toBe(200);
+    }
+  }
 });
 
 test('preferences page remains vertically scrollable', async ({ page }) => {
