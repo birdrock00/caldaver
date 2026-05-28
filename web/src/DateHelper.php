@@ -43,7 +43,7 @@ class DateHelper
         // Check for errors
         $err = \DateTimeImmutable::getLastErrors();
 
-        if (false === $result || $err['warning_count']>0) {
+        if (false === $result || ($err !== false && $err['warning_count'] > 0)) {
             throw new \InvalidArgumentException('Error building DateTimeImmutable object');
         }
 
@@ -60,7 +60,7 @@ class DateHelper
      * @return \DateTimeImmutable Date and time parsed from initial string
      * @throws \InvalidArgumentException
      */
-    public static function frontEndToDateTime($str, \DateTimeZone $tz = null)
+    public static function frontEndToDateTime($str, ?\DateTimeZone $tz = null)
     {
         $format = 'Y-m-d\TH:i:s.u\Z';
 

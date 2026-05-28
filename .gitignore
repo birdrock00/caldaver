@@ -26,4 +26,6 @@ web/public/dist/js/*.js
 /node_modules/
 /bower_components/
 /dist/
+.phpunit.cache/
+.phpunit.result.cache
 .idea
