@@ -39,7 +39,6 @@ class Generator
      public static $default_ns = [
          'DAV:' => 'd',
          'urn:ietf:params:xml:ns:caldav' => 'C',
-         'urn:ietf:params:xml:ns:carddav' => 'CARD',
          'http://apple.com/ns/ical/' => 'A',
      ];
 
@@ -66,7 +65,7 @@ class Generator
      **/
     public function propfindBody(array $properties)
     {
-        $writer = $this->createNewWriter();
+        $writer = $this->createNewWriter(['urn:ietf:params:xml:ns:carddav' => 'CARD']);
         $writer->startElement('{DAV:}propfind');
         $this->addPropertiesList($writer, '{DAV:}prop', $properties, false);
         $writer->endElement();
@@ -82,7 +81,7 @@ class Generator
      */
     public function mkCalendarBody(array $properties)
     {
-        $writer = $this->createNewWriter();
+        $writer = $this->createNewWriter(['urn:ietf:params:xml:ns:carddav' => 'CARD']);
         $writer->startElement('{urn:ietf:params:xml:ns:caldav}mkcalendar');
 
         if (count($properties) != 0) {
@@ -253,13 +252,13 @@ class Generator
      *
      * @return \Sabre\Xml\Writer     Base document to start working on
      **/
-    protected function createNewWriter()
+    protected function createNewWriter(array $namespaces = [])
     {
         $writer = new Writer();
         $writer->openMemory();
         $writer->startDocument('1.0', 'UTF-8');
         $writer->setIndent($this->formatted);
-        $writer->namespaceMap = self::$default_ns;
+        $writer->namespaceMap = array_merge(self::$default_ns, $namespaces);
 
         return $writer;
     }
