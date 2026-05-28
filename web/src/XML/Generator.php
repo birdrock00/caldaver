@@ -39,6 +39,7 @@ class Generator
      public static $default_ns = [
          'DAV:' => 'd',
          'urn:ietf:params:xml:ns:caldav' => 'C',
+         'urn:ietf:params:xml:ns:carddav' => 'CARD',
          'http://apple.com/ns/ical/' => 'A',
      ];
 
@@ -95,6 +96,26 @@ class Generator
         return $writer->outputMemory();
     }
 
+    public function mkAddressBookBody(array $properties)
+    {
+        $writer = $this->createNewWriter();
+        $writer->startElement('{DAV:}mkcol');
+        $writer->startElement('{DAV:}set');
+        $writer->startElement('{DAV:}prop');
+        $writer->write([
+            '{DAV:}resourcetype' => [
+                '{DAV:}collection' => [],
+                '{urn:ietf:params:xml:ns:carddav}addressbook' => [],
+            ],
+        ]);
+        $writer->write($properties);
+        $writer->endElement(); // d:prop
+        $writer->endElement(); // d:set
+        $writer->endElement(); // d:mkcol
+
+        return $writer->outputMemory();
+    }
+
     /**
      * Generates the XML body for a PROPPATCH request
      *
@@ -146,6 +167,24 @@ class Generator
 
         $writer->endElement(); // C:filter
         $writer->endElement(); // C:calendar-query
+
+        return $writer->outputMemory();
+    }
+
+    public function addressBookQueryBody()
+    {
+        $writer = $this->createNewWriter();
+        $writer->startElement('{urn:ietf:params:xml:ns:carddav}addressbook-query');
+        $this->addPropertiesList(
+            $writer,
+            '{DAV:}prop',
+            [
+                '{DAV:}getetag',
+                '{urn:ietf:params:xml:ns:carddav}address-data',
+            ],
+            false
+        );
+        $writer->endElement();
 
         return $writer->outputMemory();
     }
