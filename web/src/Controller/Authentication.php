@@ -102,6 +102,7 @@ class Authentication
 
         $app['session']->set('principal_url', $principal_url);
         $app['session']->set('calendar_home_set', $caldav_client->getCalendarHomeSet($principal));
+        $app['session']->set('addressbook_home_set', $app['carddav.client']->getAddressBookHomeSet($principal));
         $app['session']->set('displayname', $principal->getDisplayName());
 
         return true;
