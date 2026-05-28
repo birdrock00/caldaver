@@ -40,6 +40,7 @@ class Parser
         $this->xml = new XMLService();
         $this->xml->elementMap['{DAV:}current-user-principal'] = Href::class;
         $this->xml->elementMap['{urn:ietf:params:xml:ns:caldav}calendar-home-set'] = Href::class;
+        $this->xml->elementMap['{urn:ietf:params:xml:ns:carddav}addressbook-home-set'] = Href::class;
     }
 
     /**
@@ -137,4 +138,3 @@ class Parser
         return $result;
     }
 }
-
