@@ -61,8 +61,25 @@ class Reminder
      */
     public static function createFromInput(array $input)
     {
-        $string = $input['count'] . ' ' . $input['unit'];
-        $interval = \DateInterval::createFromDateString($string);
+        $count = (int) $input['count'];
+        switch ($input['unit']) {
+            case 'months':
+                $interval = new \DateInterval('P' . $count . 'M');
+                break;
+            case 'weeks':
+                $interval = new \DateInterval('P' . $count . 'W');
+                break;
+            case 'days':
+                $interval = new \DateInterval('P' . $count . 'D');
+                break;
+            case 'hours':
+                $interval = new \DateInterval('PT' . $count . 'H');
+                break;
+            case 'minutes':
+            default:
+                $interval = new \DateInterval('PT' . $count . 'M');
+                break;
+        }
 
         $position = !empty($input['position']) ? $input['position'] : null;
 
