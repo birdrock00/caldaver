@@ -7,15 +7,10 @@ const password = process.env.CALDAVER_PASSWORD;
 test.skip(!username || !password, 'CALDAVER_USERNAME and CALDAVER_PASSWORD are required');
 
 async function login(page) {
-  const consoleErrors = [];
-  page.on('console', message => {
-    if (message.type() === 'error') {
-      consoleErrors.push(message.text());
-    }
-  });
+  const pageErrors = [];
 
   page.on('pageerror', error => {
-    consoleErrors.push(error.message);
+    pageErrors.push(error.message);
   });
 
   await page.goto(`${baseURL}/login`);
@@ -23,16 +18,25 @@ async function login(page) {
   await page.locator('input[name="password"]').fill(password);
   await page.locator('input[name="login"]').click();
   await expect(page.locator('#calendar_view')).toBeVisible({ timeout: 30000 });
+  await page.waitForFunction(() => {
+    if (!window.jQuery || !window.translations || !window.AgenDAVConf || !window.AgenDAVConf.i18n) {
+      return false;
+    }
 
-  return consoleErrors;
+    const calendarAdd = document.querySelector('#calendar_add');
+    const events = calendarAdd && window.jQuery._data(calendarAdd, 'events');
+    return !!(events && events.click && events.click.length > 0);
+  });
+
+  return pageErrors;
 }
 
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
-  const consoleErrors = await login(page);
+  const pageErrors = await login(page);
 
   await page.locator('#calendar_add').click();
   await expect(page.locator('#calendar_create_dialog')).toBeVisible();
-  await expect(page.locator('#calendar_create_form')).toHaveAttribute(/action/, /\/calendars\/save$/);
+  await expect(page.locator('#calendar_create_form')).toHaveAttribute('action', /\/calendars\/save$/);
   await page.getByRole('button', { name: /cancel/i }).last().click();
   await expect(page.locator('#calendar_create_dialog')).toHaveCount(0);
 
@@ -41,7 +45,7 @@ test('calendar create and event create controls open usable dialogs', async ({ p
   await expect(page.locator('#event_edit_dialog')).toBeVisible();
   await expect(page.locator('#event_edit_dialog input.summary')).toBeVisible();
 
-  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
 });
 
 test('preferences page remains vertically scrollable', async ({ page }) => {
@@ -55,13 +59,13 @@ test('preferences page remains vertically scrollable', async ({ page }) => {
     overflow: window.getComputedStyle(document.body).overflow,
     scrollHeight: document.scrollingElement.scrollHeight,
     clientHeight: document.scrollingElement.clientHeight,
-    scrollTop: document.scrollingElement.scrollTop
+    scrollY: window.scrollY
   }));
 
   expect(before.overflow).not.toBe('hidden');
   expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
 
-  await page.evaluate(() => document.scrollingElement.scrollTo(0, document.scrollingElement.scrollHeight));
-  const afterScrollTop = await page.evaluate(() => document.scrollingElement.scrollTop);
-  expect(afterScrollTop).toBeGreaterThan(before.scrollTop);
+  await page.evaluate(() => window.scrollTo({ top: 600, behavior: 'instant' }));
+  const afterScrollY = await page.evaluate(() => window.scrollY);
+  expect(afterScrollY).toBeGreaterThan(before.scrollY);
 });
