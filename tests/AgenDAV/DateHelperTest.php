@@ -10,16 +10,15 @@ class DateHelperTest extends TestCase
      */
     private $utc;
 
-    public function __construct()
+    public function setUp(): void
     {
+        parent::setUp();
         $this->utc = new \DateTimeZone('UTC');
     }
 
-    /**
-     * @expectedException \InvalidArgumentException
-     */
     public function testCreateDateTimeFail()
     {
+        $this->expectException(\InvalidArgumentException::class);
         $dt = DateHelper::createDateTime('m/d/Y H:i', '99/99/99 99:99', $this->utc);
     }
 

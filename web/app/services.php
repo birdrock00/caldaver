@@ -29,7 +29,10 @@ $app['orm'] = function($app) {
 
     $setup = \Doctrine\ORM\Tools\Setup::createAnnotationMetadataConfiguration(
         [ __DIR__ . '/../src/Data' ],
-        $development_mode
+        $development_mode,
+        null,
+        null,
+        false
     );
 
     return Doctrine\ORM\EntityManager::create($app['db.options'], $setup);
@@ -81,7 +84,7 @@ $app['principals.repository'] = function($app) {
 // Sessions handler
 $app['session.storage.handler'] = function($app) {
     $pdo_handler = new Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler(
-        $app['db']->getWrappedConnection(),
+        $app['db']->getNativeConnection(),
         $app['session.storage.options']
     );
 

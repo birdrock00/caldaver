@@ -1,7 +1,7 @@
 <?php
 
-use Symfony\Component\Debug\Debug;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\ErrorHandler\Debug;
 
 // Available environments: prod, dev
 $environment = getenv('AGENDAV_ENVIRONMENT');
@@ -37,6 +37,6 @@ require __DIR__.'/../app/controllers.php';
 require __DIR__.'/../config/' . $environment . '.php';
 
 // Trust configured proxies
-Request::setTrustedProxies($app['proxies']);
+Request::setTrustedProxies($app['proxies'], Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_HOST | Request::HEADER_X_FORWARDED_PORT | Request::HEADER_X_FORWARDED_PROTO);
 
 $app->run();
