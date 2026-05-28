@@ -51,6 +51,20 @@ $translations = array(
 
 
     'labels.calendar' => 'Calendar',
+    'labels.cards' => 'Cards',
+    'labels.contacts' => 'Contacts',
+    'labels.createcontact' => 'Create contact',
+    'labels.frequent' => 'Frequent',
+    'labels.labels' => 'Labels',
+    'labels.search' => 'Search',
+    'labels.list' => 'List',
+    'labels.name' => 'Name',
+    'labels.email' => 'Email',
+    'labels.phone' => 'Phone number',
+    'labels.company' => 'Company',
+    'labels.jobtitle' => 'Job title',
+    'labels.jobcompany' => 'Job title & company',
+    'labels.nocontacts' => 'No contacts',
     'labels.location' => 'Location',
     'labels.description' => 'Description',
 
