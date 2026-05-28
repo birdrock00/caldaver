@@ -170,6 +170,14 @@ $app['caldav.client'] = function($app) {
     );
 };
 
+// CardDAV client
+$app['carddav.client'] = function($app) {
+    return new \AgenDAV\CardDAV\Client(
+        $app['http.client'],
+        $app['xml.toolkit']
+    );
+};
+
 // Calendar finder
 $app['calendar.finder'] = function($app) {
 

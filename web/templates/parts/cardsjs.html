@@ -1,0 +1,184 @@
+<script>
+(function() {
+  var contacts = [];
+  var view = 'list';
+  var colors = ['#3367d6', '#188038', '#9334e6', '#d93025', '#00897b', '#5f6368', '#c5221f', '#7b1fa2'];
+
+  function $(selector) {
+    return document.querySelector(selector);
+  }
+
+  function text(value) {
+    return value || '';
+  }
+
+  function initials(contact) {
+    return contact.initial || text(contact.full_name).charAt(0).toUpperCase() || '?';
+  }
+
+  function contactMatches(contact, filter) {
+    if (!filter) {
+      return true;
+    }
+
+    var haystack = [
+      contact.full_name,
+      contact.email,
+      contact.phone,
+      contact.organization,
+      contact.job_title
+    ].join(' ').toLowerCase();
+
+    return haystack.indexOf(filter.toLowerCase()) !== -1;
+  }
+
+  function filteredContacts() {
+    var filter = $('#contacts_search').value.trim();
+    return contacts.filter(function(contact) {
+      return contactMatches(contact, filter);
+    });
+  }
+
+  function contactAvatar(contact) {
+    var avatar = document.createElement('span');
+    avatar.className = 'contact-avatar';
+    avatar.style.background = contact.avatar_color || colors[Math.abs(text(contact.full_name).length) % colors.length];
+    avatar.textContent = initials(contact);
+    return avatar;
+  }
+
+  function renderList(data) {
+    var rows = $('#contacts_rows');
+    rows.innerHTML = '';
+    data.forEach(function(contact) {
+      var row = document.createElement('div');
+      row.className = 'contact-row';
+      row.innerHTML =
+        '<div class="contact-name-cell"><span class="contact-name"></span></div>' +
+        '<div></div><div></div><div></div><div class="contact-labels"></div>';
+      row.children[0].insertBefore(contactAvatar(contact), row.children[0].firstChild);
+      row.querySelector('.contact-name').textContent = contact.full_name;
+      row.children[1].textContent = text(contact.email);
+      row.children[2].textContent = text(contact.phone);
+      row.children[3].textContent = text(contact.company_line);
+      row.children[4].textContent = (contact.labels || []).join(', ');
+      rows.appendChild(row);
+    });
+  }
+
+  function renderCards(data) {
+    var grid = $('#contacts_cards');
+    grid.innerHTML = '';
+    data.forEach(function(contact) {
+      var card = document.createElement('article');
+      card.className = 'contact-card';
+      card.appendChild(contactAvatar(contact));
+
+      var name = document.createElement('h2');
+      name.textContent = contact.full_name;
+      card.appendChild(name);
+
+      var meta = document.createElement('p');
+      meta.textContent = text(contact.email) || text(contact.phone) || text(contact.company_line);
+      card.appendChild(meta);
+
+      var detail = document.createElement('dl');
+      detail.innerHTML =
+        '<dt>Email</dt><dd></dd>' +
+        '<dt>Phone</dt><dd></dd>' +
+        '<dt>Company</dt><dd></dd>';
+      detail.children[1].textContent = text(contact.email);
+      detail.children[3].textContent = text(contact.phone);
+      detail.children[5].textContent = text(contact.company_line);
+      card.appendChild(detail);
+      grid.appendChild(card);
+    });
+  }
+
+  function render() {
+    var data = filteredContacts();
+    $('#contact_count').textContent = '(' + data.length + ')';
+    $('#contact_count_nav').textContent = contacts.length;
+    $('#contacts_empty').hidden = data.length > 0;
+    $('#contacts_list').hidden = view !== 'list';
+    $('#contacts_cards').hidden = view !== 'cards';
+
+    renderList(data);
+    renderCards(data);
+  }
+
+  function loadContacts() {
+    return fetch('{{ app.url_generator.generate('cards.list') }}', {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Unable to load contacts');
+        }
+        return response.json();
+      })
+      .then(function(payload) {
+        contacts = payload.data || [];
+        render();
+      })
+      .catch(function(error) {
+        $('#contacts_rows').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
+      });
+  }
+
+  function openDialog() {
+    $('#contact_form').reset();
+    $('#contact_dialog').hidden = false;
+    $('#contact_form input[name="full_name"]').focus();
+  }
+
+  function closeDialog() {
+    $('#contact_dialog').hidden = true;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#contact_create').addEventListener('click', openDialog);
+    $('#contact_cancel').addEventListener('click', closeDialog);
+    $('#contact_cancel_icon').addEventListener('click', closeDialog);
+    $('#contacts_refresh').addEventListener('click', loadContacts);
+    $('#contacts_search').addEventListener('input', render);
+
+    document.querySelectorAll('.contacts-view-switch button').forEach(function(button) {
+      button.addEventListener('click', function() {
+        view = button.dataset.view;
+        document.querySelectorAll('.contacts-view-switch button').forEach(function(item) {
+          item.classList.toggle('active', item === button);
+        });
+        render();
+      });
+    });
+
+    $('#contact_form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      fetch(event.target.action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+        body: new FormData(event.target)
+      })
+        .then(function(response) {
+          if (!response.ok) {
+            throw new Error('Unable to save contact');
+          }
+          return response.json();
+        })
+        .then(function(payload) {
+          contacts.push(payload.data);
+          contacts.sort(function(a, b) {
+            return text(a.full_name).localeCompare(text(b.full_name));
+          });
+          closeDialog();
+          render();
+        });
+    });
+
+    loadContacts();
+  });
+})();
+</script>
