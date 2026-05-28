@@ -210,4 +210,12 @@ class Client
         $this->setHeader('Content-Type', 'text/calendar');
     }
 
+    /**
+     * Sets Content-Type for next request to be a vCard resource
+     */
+    public function setContentTypeVCard()
+    {
+        $this->setHeader('Content-Type', 'text/vcard; charset=utf-8');
+    }
+
 }
