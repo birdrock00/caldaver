@@ -16,6 +16,7 @@ $app['log.path'] = 'AGENDAV_LOG_DIR';
 $app['log.level'] = 'INFO';
 
 $app['caldav.baseurl'] = 'AGENDAV_CALDAV_SERVER';
+$app['carddav.baseurl'] = 'AGENDAV_CARDDAV_SERVER';
 $app['caldav.authmethod'] = 'AGENDAV_CALDAV_AUTHMETHOD';
 $app['caldav.publicurls'] = true;
 $app['caldav.baseurl.public'] = 'AGENDAV_CALDAV_PUBLIC_URL';
