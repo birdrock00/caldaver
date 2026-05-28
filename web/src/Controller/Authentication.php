@@ -86,6 +86,7 @@ class Authentication
     public function processLogin($user, $password, Application $app)
     {
         $app['http.client']->setAuthentication($user, $password, $app['caldav.authmethod']);
+        $app['carddav.http.client']->setAuthentication($user, $password, $app['caldav.authmethod']);
 
         $caldav_client = $app['caldav.client'];
 
