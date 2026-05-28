@@ -10,6 +10,9 @@
     "clean": "rm -rf node_modules && rm -rf web/public/dist/js/* && rm -rf web/public/dist/css/*",
     "composer": "cd web && composer install --no-dev --prefer-dist",
     "composer-dev": "cd web && composer install --dev --prefer-source",
+    "test": "npm run test:ui",
+    "test:ui": "node --test tests/ui-regressions.test.js",
+    "test:live-ui": "playwright test tests/live-ui.spec.js",
     "build:templates": "dustc --pwd assets/templates -o assets/templates/templates.js assets/templates/*.dust",
     "prebuild:css": "lessc assets/less/agendav.less web/public/dist/css/app.css",
     "build:css": "cat node_modules/bootstrap/dist/css/bootstrap.css web/public/dist/css/app.css assets/css/*.css | cleancss -o web/public/dist/css/agendav.css && cat assets/print-css/*.css | cleancss -o web/public/dist/css/agendav.print.css",
@@ -34,6 +37,7 @@
   },
   "homepage": "https://github.com/adobo/agendav",
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "bootstrap": "5.3.8",
     "clean-css": "~3.4.22",
     "dustjs-helpers": "~1.7.0",
