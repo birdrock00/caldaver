@@ -1,0 +1,10 @@
+<nav class="app-nav" aria-label="Application sections">
+  <a class="app-nav-item{% if active_section == 'calendar' %} active{% endif %}" href="{{ app.url_generator.generate('calendar') }}">
+    <i class="fa fa-calendar"></i>
+    <span>{% trans %}labels.calendar{% endtrans %}</span>
+  </a>
+  <a class="app-nav-item{% if active_section == 'cards' %} active{% endif %}" href="{{ app.url_generator.generate('cards') }}">
+    <i class="fa fa-book"></i>
+    <span>{% trans %}labels.contacts{% endtrans %}</span>
+  </a>
+</nav>
