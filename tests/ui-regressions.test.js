@@ -164,12 +164,20 @@ test('cards page renders list and card views without loading the calendar bundle
 test('CardDAV support can discover, create, query, and write local addressbooks', () => {
   const auth = read('web/src/Controller/Authentication.php');
   const client = read('web/src/CardDAV/Client.php');
+  const services = read('web/app/services.php');
+  const settings = read('docker/settings.php');
+  const run = read('docker/run.sh');
   const contact = read('web/src/CardDAV/Contact.php');
   const generator = read('web/src/XML/Generator.php');
   const parser = read('web/src/XML/Parser.php');
   const http = read('web/src/Http/Client.php');
 
   assert.match(auth, /addressbook_home_set/);
+  assert.match(auth, /carddav\.http\.client/);
+  assert.match(services, /\$app\['carddav\.baseurl'\]/);
+  assert.match(services, /\$app\['carddav\.http\.client'\]/);
+  assert.match(settings, /\$app\['carddav\.baseurl'\] = 'AGENDAV_CARDDAV_SERVER';/);
+  assert.match(run, /AGENDAV_CARDDAV_SERVER:=\$AGENDAV_CALDAV_SERVER/);
   assert.match(client, /getAddressBookHomeSet/);
   assert.match(client, /getOrCreateDefaultAddressBook/);
   assert.match(client, /REPORT-ADDRESSBOOK/);
