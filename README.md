@@ -59,6 +59,7 @@ Common optional runtime configuration:
 - `AGENDAV_TITLE`, defaults to `AgenDAV`
 - `AGENDAV_FOOTER`, defaults to `AgenDAV`
 - `AGENDAV_CALDAV_PUBLIC_URL`, defaults to `AGENDAV_CALDAV_SERVER`
+- `AGENDAV_CARDDAV_SERVER`, defaults to `AGENDAV_CALDAV_SERVER`
 - `AGENDAV_TIMEZONE`, defaults to `UTC`
 - `AGENDAV_LANG`, defaults to `en`
 - `AGENDAV_WEEKSTART`, defaults to `0`
