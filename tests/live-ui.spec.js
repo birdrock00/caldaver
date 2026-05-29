@@ -41,6 +41,34 @@ function isoDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
+function parsePostedForm(request) {
+  const body = request.postData() || '';
+  const contentType = request.headers()['content-type'] || '';
+
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    return Object.fromEntries(new URLSearchParams(body));
+  }
+
+  const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/);
+  if (!boundaryMatch) {
+    return {};
+  }
+
+  const boundary = boundaryMatch[1] || boundaryMatch[2];
+  const values = {};
+  body.split('--' + boundary).forEach(part => {
+    const nameMatch = part.match(/Content-Disposition:[^\n]*name="([^"]+)"/i);
+    const separator = part.indexOf('\r\n\r\n');
+    if (!nameMatch || separator === -1) {
+      return;
+    }
+
+    values[nameMatch[1]] = part.slice(separator + 4).replace(/\r\n$/, '');
+  });
+
+  return values;
+}
+
 async function mockMailApi(page, options = {}) {
   const accounts = options.accounts || [];
   const messagesByAccount = options.messagesByAccount || {};
@@ -551,11 +579,10 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
   const savedAccounts = [];
-  const postedBodies = [];
+  const postedForms = [];
   await mockMailApi(page, { accounts: [] });
   await page.route('**/mail/accounts/save', async route => {
-    const postedBody = route.request().postData() || '';
-    postedBodies.push(postedBody);
+    postedForms.push(parsePostedForm(route.request()));
     const fixtures = [
       {
         label: 'Test Inbox',
@@ -621,12 +648,51 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await expect(page.locator('.mail-account-tab')).toHaveCount(2);
   await expect(page.locator('.mail-account-tab[data-account-id="100"]')).toBeVisible();
   await expect(page.locator('#mail_account_title')).toHaveText('Second Inbox');
-  expect(postedBodies).toHaveLength(2);
-  expect(postedBodies[0]).toContain('label');
-  expect(postedBodies[0]).toContain('email_address');
-  expect(postedBodies[0]).toContain('imap_host');
-  expect(postedBodies[0]).toContain('password');
+  expect(postedForms).toHaveLength(2);
+  expect(postedForms[0]).toMatchObject({
+    label: 'Test Inbox',
+    email_address: 'test@example.com',
+    imap_host: 'imap.example.test',
+    imap_port: '993',
+    encryption: 'ssl',
+    username: 'test@example.com',
+    password: 'secret-password'
+  });
+  expect(postedForms[1]).toMatchObject({
+    label: 'Second Inbox',
+    email_address: 'second@example.com',
+    imap_host: 'imap2.example.test',
+    imap_port: '993',
+    encryption: 'ssl',
+    username: 'second@example.com',
+    password: 'second-secret'
+  });
   expect(savedAccounts.map(account => account.label)).toEqual(['Test Inbox', 'Second Inbox']);
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail add-account stalled backend response times out visibly', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  await mockMailApi(page, { accounts: [] });
+  await page.route('**/mail/accounts/save', async () => new Promise(() => {}));
+
+  await page.goto(`${baseURL}/mail`);
+  await page.evaluate(() => {
+    window.CALDAVER_MAIL_REQUEST_TIMEOUT_MS = 250;
+  });
+  await page.locator('#mail_account_create').click();
+  await page.locator('#mail_account_form input[name="label"]').fill('Slow Inbox');
+  await page.locator('#mail_account_form input[name="email_address"]').fill('slow@example.com');
+  await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
+  await page.locator('#mail_account_form input[name="username"]').fill('slow@example.com');
+  await page.locator('#mail_account_form input[name="password"]').fill('secret-password');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+
+  await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await expect(page.locator('#mail_account_error')).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('#mail_account_error')).toContainText('server did not respond in time');
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
