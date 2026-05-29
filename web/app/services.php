@@ -123,8 +123,12 @@ $app['guzzle.factory'] = $app->protect(function($baseurl) use ($app) {
         );
     }
 
-    // Pass username of logged-in user to baseurl to select collections dynamically.
-    $baseurl = str_replace('%u', $app['session']->get('username'), $baseurl);
+    // Pass DAV username to baseurl to select collections dynamically.
+    $baseurl = str_replace(
+        '%u',
+        $app['session']->get('dav_username', $app['session']->get('username')),
+        $baseurl
+    );
 
     return new \GuzzleHttp\Client([
         'base_uri' => $baseurl,

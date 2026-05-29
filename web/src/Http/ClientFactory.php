@@ -29,7 +29,13 @@ class ClientFactory
     public static function create(GuzzleClient $guzzle, Session $session, $auth_type)
     {
         $client = new Client($guzzle);
-        if ($session->has('username') && $session->has('password')) {
+        if ($session->has('dav_username') && $session->has('dav_password')) {
+            $client->setAuthentication(
+                $session->get('dav_username'),
+                $session->get('dav_password'),
+                $auth_type
+            );
+        } elseif ($session->has('username') && $session->has('password')) {
             $client->setAuthentication(
                 $session->get('username'),
                 $session->get('password'),
