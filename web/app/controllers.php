@@ -31,6 +31,11 @@ $controllers->get('/cards/list', '\AgenDAV\Controller\Cards::listAction')->bind(
 $controllers->post('/cards/save', '\AgenDAV\Controller\Cards::saveAction')->bind('cards.save');
 $controllers->post('/cards/delete', '\AgenDAV\Controller\Cards::deleteAction')->bind('cards.delete');
 
+$controllers->get('/mail', '\AgenDAV\Controller\Mail::indexAction')->bind('mail');
+$controllers->get('/mail/accounts', '\AgenDAV\Controller\Mail::accountsAction')->bind('mail.accounts');
+$controllers->post('/mail/accounts/save', '\AgenDAV\Controller\Mail::saveAccountAction')->bind('mail.accounts.save');
+$controllers->get('/mail/messages', '\AgenDAV\Controller\Mail::messagesAction')->bind('mail.messages');
+
 $controllers->get('/preferences', '\AgenDAV\Controller\Preferences::indexAction')->bind('preferences');
 $controllers->post('/preferences', '\AgenDAV\Controller\Preferences::saveAction')->bind('preferences.save');
 

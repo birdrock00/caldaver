@@ -7,4 +7,8 @@
     <i class="fa fa-book"></i>
     <span>{% trans %}labels.contacts{% endtrans %}</span>
   </a>
+  <a class="app-nav-item{% if active_section == 'mail' %} active{% endif %}" href="{{ app.url_generator.generate('mail') }}">
+    <i class="fa fa-envelope"></i>
+    <span>{% trans %}labels.mail{% endtrans %}</span>
+  </a>
 </nav>
