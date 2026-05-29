@@ -11,7 +11,9 @@ class Mail
 {
     public function indexAction(Request $request, Application $app)
     {
-        return $app['twig']->render('mail.html');
+        return $app['twig']->render('mail.html', [
+            'mail_javascript_enabled' => $this->javascriptEnabled($request, $app),
+        ]);
     }
 
     public function readAction(Request $request, Application $app)
@@ -19,6 +21,7 @@ class Mail
         return $app['twig']->render('mail_message.html', [
             'account_id' => (int)$request->query->get('account_id'),
             'uid' => (int)$request->query->get('uid'),
+            'mail_javascript_enabled' => $this->javascriptEnabled($request, $app),
         ]);
     }
 
@@ -188,6 +191,16 @@ class Mail
             'result' => 'SUCCESS',
             'data' => $message,
         ]);
+    }
+
+    private function javascriptEnabled(Request $request, Application $app)
+    {
+        $nojs = strtolower((string)$request->query->get('nojs', ''));
+        if (in_array($nojs, ['1', 'true', 'yes'], true)) {
+            return false;
+        }
+
+        return !isset($app['user.preferences']) || !$app['user.preferences']->get('disable_javascript', false);
     }
 
 }
