@@ -104,8 +104,19 @@ class Authentication
         $app['session']->set('principal_url', $principal_url);
         $app['session']->set('calendar_home_set', $caldav_client->getCalendarHomeSet($principal));
         $app['session']->set('addressbook_home_set', $app['carddav.client']->getAddressBookHomeSet($principal));
-        $app['session']->set('displayname', $principal->getDisplayName());
+        $app['session']->set('displayname', $this->displayNameForSession($user, $principal->getDisplayName()));
 
         return true;
+    }
+
+    protected function displayNameForSession($user, $principalDisplayName)
+    {
+        $displayName = trim((string)$principalDisplayName);
+
+        if ($displayName === '' || preg_match('#^/.+/$#', $displayName)) {
+            $displayName = trim((string)$user, '/');
+        }
+
+        return $displayName;
     }
 }

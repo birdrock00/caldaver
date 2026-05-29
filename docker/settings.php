@@ -7,8 +7,13 @@ $app['site.footer'] = 'AGENDAV_FOOTER';
 $app['proxies'] = [];
 
 $app['db.options'] = [
-    'path' => '/var/agendav/db.sqlite',
-    'driver' => 'pdo_sqlite',
+    'dbname' => 'AGENDAV_DB_NAME',
+    'user' => 'AGENDAV_DB_USER',
+    'password' => 'AGENDAV_DB_PASSWORD',
+    'host' => 'AGENDAV_DB_HOST',
+    'port' => AGENDAV_DB_PORT,
+    'driver' => 'AGENDAV_DB_DRIVER',
+    'charset' => 'utf8',
 ];
 
 $app['csrf.secret'] = 'AGENDAV_CSRF_SECRET';
