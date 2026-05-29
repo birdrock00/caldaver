@@ -180,6 +180,7 @@ test('CardDAV support can discover, create, query, and write local addressbooks'
   assert.match(run, /AGENDAV_CARDDAV_SERVER:=\$AGENDAV_CALDAV_SERVER/);
   assert.match(client, /getAddressBookHomeSet/);
   assert.match(client, /getOrCreateDefaultAddressBook/);
+  assert.match(client, /fetchContactsFromAddressBooks/);
   assert.match(client, /REPORT-ADDRESSBOOK/);
   assert.match(client, /setContentTypeVCard/);
   assert.match(client, /deleteContact/);
