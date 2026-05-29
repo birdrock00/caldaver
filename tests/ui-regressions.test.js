@@ -283,6 +283,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /jsonFetch/);
   assert.match(mailJs, /X-Requested-With/);
   assert.match(mailJs, /Your session expired/);
+  assert.match(mailJs, /AbortController/);
+  assert.match(mailJs, /server did not respond in time/);
   assert.match(mailJs, /data-testid="mail-attachments"/);
   assert.match(mailJs, /mail-attachment-download/);
   assert.match(mailJs, /messageRequestId/);
@@ -292,6 +294,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(repository, /openssl_encrypt/);
   assert.match(repository, /aes-256-gcm/);
   assert.match(imap, /imap_open/);
+  assert.match(imap, /imap_timeout/);
+  assert.match(imap, /IMAP_OPENTIMEOUT/);
+  assert.match(imap, /TIMEOUT_SECONDS = 10/);
   assert.match(imap, /downloadAttachment/);
   assert.match(imap, /attachmentsForMessage/);
   assert.match(imap, /fetchMessage/);
