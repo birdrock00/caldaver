@@ -115,6 +115,21 @@ class Client
         return $contacts;
     }
 
+    public function fetchContactsFromAddressBooks(array $addressBooks)
+    {
+        $contacts = [];
+
+        foreach ($addressBooks as $addressBook) {
+            $contacts = array_merge($contacts, $this->fetchContacts($addressBook));
+        }
+
+        usort($contacts, function(Contact $a, Contact $b) {
+            return strcasecmp($a->toArray()['full_name'], $b->toArray()['full_name']);
+        });
+
+        return $contacts;
+    }
+
     public function createContact(AddressBook $addressBook, array $data)
     {
         list($uid, $body) = Contact::buildVCard($data);
