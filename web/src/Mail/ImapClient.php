@@ -3,6 +3,8 @@ namespace AgenDAV\Mail;
 
 class ImapClient
 {
+    const TIMEOUT_SECONDS = 10;
+
     public function fetchInbox(array $account, $limit = 100)
     {
         AccountValidator::assertValid($account);
@@ -11,10 +13,7 @@ class ImapClient
             throw new \RuntimeException('The PHP IMAP extension is not installed.');
         }
 
-        $mailbox = $this->mailboxString($account);
-        $stream = @imap_open($mailbox, $account['username'], $account['password'], OP_READONLY, 1, [
-            'DISABLE_AUTHENTICATOR' => 'GSSAPI',
-        ]);
+        $stream = $this->openMailbox($account);
 
         if ($stream === false) {
             throw new \RuntimeException('Unable to connect to the IMAP account.');
@@ -65,9 +64,7 @@ class ImapClient
             throw new \RuntimeException('The PHP IMAP extension is not installed.');
         }
 
-        $stream = @imap_open($this->mailboxString($account), $account['username'], $account['password'], OP_READONLY, 1, [
-            'DISABLE_AUTHENTICATOR' => 'GSSAPI',
-        ]);
+        $stream = $this->openMailbox($account);
 
         if ($stream === false) {
             throw new \RuntimeException('Unable to connect to the IMAP account.');
@@ -107,9 +104,7 @@ class ImapClient
             throw new \RuntimeException('The PHP IMAP extension is not installed.');
         }
 
-        $stream = @imap_open($this->mailboxString($account), $account['username'], $account['password'], OP_READONLY, 1, [
-            'DISABLE_AUTHENTICATOR' => 'GSSAPI',
-        ]);
+        $stream = $this->openMailbox($account);
 
         if ($stream === false) {
             throw new \RuntimeException('Unable to connect to the IMAP account.');
@@ -150,6 +145,28 @@ class ImapClient
         }
 
         return sprintf('{%s:%d%s}INBOX', $account['imap_host'], $account['imap_port'], $flags);
+    }
+
+    protected function openMailbox(array $account)
+    {
+        $this->configureTimeouts();
+
+        return @imap_open($this->mailboxString($account), $account['username'], $account['password'], OP_READONLY, 1, [
+            'DISABLE_AUTHENTICATOR' => 'GSSAPI',
+        ]);
+    }
+
+    protected function configureTimeouts()
+    {
+        if (!function_exists('imap_timeout')) {
+            return;
+        }
+
+        foreach (['IMAP_OPENTIMEOUT', 'IMAP_READTIMEOUT', 'IMAP_WRITETIMEOUT', 'IMAP_CLOSETIMEOUT'] as $constant) {
+            if (defined($constant)) {
+                @imap_timeout(constant($constant), self::TIMEOUT_SECONDS);
+            }
+        }
     }
 
     protected function decodeHeader($value)
