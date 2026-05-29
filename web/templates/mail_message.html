@@ -1,0 +1,59 @@
+{% extends 'layout.html' %}
+
+{% block body_class %}agendav-mail-page{% endblock %}
+
+{% block content %}
+{% include 'parts/navbar.html' %}
+<div class="container-fluid mail-shell mail-read-shell">
+  <aside class="mail-sidebar">
+    {% if logo %}
+    <div id="logo" class="block">
+      <img src="{{ asset(logo, 'img') }}" alt="Logo">
+    </div>
+    {% endif %}
+    {% set active_section = 'mail' %}
+    {% include 'parts/appnav.html' %}
+    <a href="{{ app.url_generator.generate('mail') }}" class="btn btn-default compose-button">
+      <i class="fa fa-arrow-left"></i> {% trans %}labels.inbox{% endtrans %}
+    </a>
+  </aside>
+
+  <main class="mail-content">
+    <section
+      id="mail_reader"
+      class="mail-reader"
+      data-account-id="{{ account_id }}"
+      data-uid="{{ uid }}"
+      data-message-url="{{ app.url_generator.generate('mail.message') }}"
+      data-attachment-url="{{ app.url_generator.generate('mail.attachment') }}"
+    >
+      <div class="mail-reader-toolbar">
+        <a href="{{ app.url_generator.generate('mail') }}" id="mail_reader_back" title="{% trans %}labels.return{% endtrans %}">
+          <i class="fa fa-arrow-left"></i>
+        </a>
+        <button type="button" id="mail_reader_refresh" title="{% trans %}labels.refresh{% endtrans %}">
+          <i class="fa fa-refresh"></i>
+        </button>
+      </div>
+      <div id="mail_reader_error" class="mail-error" hidden></div>
+      <article id="mail_reader_message" class="mail-reader-message" hidden>
+        <h1 id="mail_reader_subject"></h1>
+        <div class="mail-reader-meta">
+          <div class="mail-reader-avatar" aria-hidden="true"></div>
+          <div>
+            <strong id="mail_reader_from"></strong>
+            <span id="mail_reader_date"></span>
+          </div>
+        </div>
+        <pre id="mail_reader_body"></pre>
+        <div id="mail_reader_attachments" class="mail-attachments" data-testid="mail-attachments"></div>
+      </article>
+      <div id="mail_reader_loading" class="mail-empty">{% trans %}labels.mail_loading{% endtrans %}</div>
+    </section>
+  </main>
+</div>
+{% endblock %}
+
+{% block bottom %}
+{% include 'parts/mailmessagejs.html' %}
+{% endblock %}

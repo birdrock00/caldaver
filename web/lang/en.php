@@ -61,6 +61,7 @@ $translations = array(
     'labels.name' => 'Name',
     'labels.email' => 'Email',
     'labels.mail' => 'Mail',
+    'labels.mail_loading' => 'Loading message',
     'labels.searchmail' => 'Search mail',
     'labels.addaccount' => 'Add account',
     'labels.accountname' => 'Account name',
@@ -156,6 +157,7 @@ $translations = array(
 
     'labels.preferences' => 'Preferences',
     'labels.return' => 'Return',
+    'labels.disable_javascript' => 'Disable JavaScript',
 
     'labels.defaultcalendar' => 'Default calendar',
     'labels.default_view' => 'Default view',
@@ -249,6 +251,7 @@ $translations = array(
     'messages.help_default_view' => 'Default view when you access your calendar',
     'messages.help_timezone' => 'Choose your current timezone. This will affect how you see existing events, and new events will be created using this timezone',
     'messages.help_list_days' => 'Choose how many consecutive days do you want to be shown on the "list" view',
+    'messages.help_disable_javascript' => 'Turn this on only when you want pages to render without JavaScript.',
 
     'messages.info_prefssaved' => 'Preferences saved',
 
