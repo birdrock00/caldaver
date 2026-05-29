@@ -335,9 +335,9 @@ test('pages can be rendered without loading JavaScript via nojs query option and
   const controller = read('web/src/Controller/Preferences.php');
 
   assert.match(layout, /app\.request\.query\.get\('nojs'\)/);
-  assert.match(layout, /nojs_query == '1'/);
-  assert.match(layout, /nojs_query == 'true'/);
-  assert.match(layout, /nojs_query == 'yes'/);
+  assert.match(layout, /nojs_query != '1'/);
+  assert.match(layout, /nojs_query != 'true'/);
+  assert.match(layout, /nojs_query != 'yes'/);
   assert.match(layout, /app\.offsetExists\('user\.preferences'\)/);
   assert.match(layout, /disable_javascript/);
   assert.match(layout, /\{% block bottom %\}/);
