@@ -96,5 +96,7 @@
 {% endblock %}
 
 {% block bottom %}
+{% if mail_javascript_enabled %}
 {% include 'parts/mailjs.html' %}
+{% endif %}
 {% endblock %}
