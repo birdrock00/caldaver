@@ -5,6 +5,8 @@ class ImapClient
 {
     public function fetchInbox(array $account, $limit = 100)
     {
+        AccountValidator::assertValid($account);
+
         if (!function_exists('imap_open')) {
             throw new \RuntimeException('The PHP IMAP extension is not installed.');
         }
@@ -57,6 +59,8 @@ class ImapClient
 
     public function downloadAttachment(array $account, $uid, $part)
     {
+        AccountValidator::assertValid($account);
+
         if (!function_exists('imap_open')) {
             throw new \RuntimeException('The PHP IMAP extension is not installed.');
         }
@@ -97,6 +101,8 @@ class ImapClient
 
     public function fetchMessage(array $account, $uid)
     {
+        AccountValidator::assertValid($account);
+
         if (!function_exists('imap_open')) {
             throw new \RuntimeException('The PHP IMAP extension is not installed.');
         }

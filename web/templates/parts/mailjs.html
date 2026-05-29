@@ -228,6 +228,8 @@
   function openDialog() {
     $('#mail_account_form').reset();
     $('#mail_account_form input[name="id"]').value = '';
+    $('#mail_account_error').hidden = true;
+    $('#mail_account_error').textContent = '';
     $('#mail_account_dialog').hidden = false;
     $('#mail_account_form input[name="label"]').focus();
   }
@@ -271,12 +273,13 @@
           }
           activeAccountId = payload.data.id;
           closeDialog();
+          $('#mail_account_error').hidden = true;
           renderAccounts();
           loadMessages();
         })
         .catch(function(error) {
-          $('#mail_error').textContent = error.message;
-          $('#mail_error').hidden = false;
+          $('#mail_account_error').textContent = error.message;
+          $('#mail_account_error').hidden = false;
         });
     });
 
