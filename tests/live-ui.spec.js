@@ -532,6 +532,39 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   expect(consoleErrors).toEqual([]);
 });
 
+test('configured live mail accounts are deduplicated and can fetch messages', async ({ page }) => {
+  await login(page);
+
+  const accountsResponse = await page.request.get(`${baseURL}/mail/accounts`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  });
+  expect(accountsResponse.status()).toBe(200);
+
+  const accountsPayload = await accountsResponse.json();
+  const accounts = accountsPayload.data || [];
+  const mailboxKeys = accounts.map(account => [
+    account.email_address.toLowerCase(),
+    account.imap_host.toLowerCase(),
+    account.imap_port,
+    account.encryption
+  ].join('|'));
+
+  expect(new Set(mailboxKeys).size).toBe(mailboxKeys.length);
+
+  const account = accounts.find(item => item.email_address === 'user@example.test') || accounts[0];
+  test.skip(!account, 'No live IMAP account is configured');
+
+  const messagesResponse = await page.request.get(`${baseURL}/mail/messages?account_id=${account.id}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    timeout: 30000
+  });
+  expect(messagesResponse.status()).toBe(200);
+
+  const messagesPayload = await messagesResponse.json();
+  expect(Array.isArray(messagesPayload.data)).toBe(true);
+  expect(messagesPayload.data.length).toBeGreaterThan(0);
+});
+
 test('mail account load failure is visible and does not throw UI errors', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
