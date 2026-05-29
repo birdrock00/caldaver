@@ -25,7 +25,11 @@
     </head>
     <body class="{% block body_class %}{% endblock %}">
         {% block content %}{% endblock %}
-        {% if app.request.query.get('nojs') not in ['1', 'true', 'yes'] %}
+        {% set javascript_disabled = app.request.query.get('nojs') in ['1', 'true', 'yes'] %}
+        {% if app.offsetExists('user.preferences') and app['user.preferences'].get('disable_javascript', false) %}
+            {% set javascript_disabled = true %}
+        {% endif %}
+        {% if not javascript_disabled %}
         {% block bottom %}{% endblock %}
         {% endif %}
     </body>

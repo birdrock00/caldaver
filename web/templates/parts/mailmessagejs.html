@@ -1,0 +1,94 @@
+<script>
+(function() {
+  function $(selector) {
+    return document.querySelector(selector);
+  }
+
+  function text(value) {
+    return value || '';
+  }
+
+  function initials(value) {
+    var source = text(value).replace(/<[^>]+>/g, '').trim();
+    return (source.charAt(0) || '?').toUpperCase();
+  }
+
+  function jsonFetch(url, fallbackMessage) {
+    return fetch(url, {
+      credentials: 'same-origin',
+      headers: {
+        Accept: 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    }).then(function(response) {
+      return response.text().then(function(body) {
+        var payload = {};
+        if (body) {
+          try {
+            payload = JSON.parse(body);
+          } catch (error) {
+            throw new Error(fallbackMessage || 'Unable to load mail request');
+          }
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.message || fallbackMessage || 'Unable to load mail request');
+        }
+
+        return payload;
+      });
+    });
+  }
+
+  function renderAttachments(container, message, accountId, attachmentUrl) {
+    container.innerHTML = '';
+    (message.attachments || []).forEach(function(attachment) {
+      var link = document.createElement('a');
+      link.className = 'mail-attachment';
+      link.setAttribute('data-testid', 'mail-attachment-download');
+      link.dataset.filename = attachment.filename;
+      link.href = attachmentUrl +
+        '?account_id=' + encodeURIComponent(accountId) +
+        '&uid=' + encodeURIComponent(message.uid) +
+        '&part=' + encodeURIComponent(attachment.part);
+      link.textContent = attachment.filename;
+      link.setAttribute('download', attachment.filename);
+      container.appendChild(link);
+    });
+  }
+
+  function loadMessage() {
+    var reader = $('#mail_reader');
+    var accountId = reader.dataset.accountId;
+    var uid = reader.dataset.uid;
+    var url = reader.dataset.messageUrl + '?account_id=' + encodeURIComponent(accountId) + '&uid=' + encodeURIComponent(uid);
+
+    $('#mail_reader_error').hidden = true;
+    $('#mail_reader_message').hidden = true;
+    $('#mail_reader_loading').hidden = false;
+
+    jsonFetch(url, 'Unable to load message')
+      .then(function(payload) {
+        var message = payload.data || {};
+        $('#mail_reader_subject').textContent = text(message.subject);
+        $('#mail_reader_from').textContent = text(message.from);
+        $('#mail_reader_date').textContent = text(message.date);
+        $('#mail_reader_body').textContent = text(message.body);
+        $('#mail_reader .mail-reader-avatar').textContent = initials(message.from);
+        renderAttachments($('#mail_reader_attachments'), message, accountId, reader.dataset.attachmentUrl);
+        $('#mail_reader_loading').hidden = true;
+        $('#mail_reader_message').hidden = false;
+      })
+      .catch(function(error) {
+        $('#mail_reader_loading').hidden = true;
+        $('#mail_reader_error').textContent = error.message;
+        $('#mail_reader_error').hidden = false;
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#mail_reader_refresh').addEventListener('click', loadMessage);
+    loadMessage();
+  });
+})();
+</script>

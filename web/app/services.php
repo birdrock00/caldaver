@@ -64,6 +64,7 @@ $app['preferences.repository'] = function($app) {
         'show_now_indicator' => $app['defaults.show_now_indicator'],
         'list_days' => $app['defaults.list_days'],
         'default_view' => $app['defaults.default_view'],
+        'disable_javascript' => $app['defaults.disable_javascript'],
     ]);
 
     return $repository;

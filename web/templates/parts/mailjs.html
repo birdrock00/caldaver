@@ -4,7 +4,6 @@
   var messages = [];
   var activeAccountId = null;
   var messageRequestId = 0;
-  var detailRequestId = 0;
   var defaultRequestTimeoutMs = 20000;
 
   function $(selector) {
@@ -65,16 +64,19 @@
       row.querySelector('.mail-subject').textContent = text(message.subject);
       row.querySelector('.mail-date').textContent = text(message.date);
       renderAttachments(row.querySelector('.mail-attachments'), message);
+      row.dataset.messageHref = '{{ app.url_generator.generate('mail.read') }}' +
+        '?account_id=' + encodeURIComponent(activeAccountId) +
+        '&uid=' + encodeURIComponent(message.uid);
       row.addEventListener('click', function(event) {
         if (event.target.closest('a')) {
           return;
         }
-        loadMessage(message);
+        window.location.href = row.dataset.messageHref;
       });
       row.addEventListener('keydown', function(event) {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          loadMessage(message);
+          window.location.href = row.dataset.messageHref;
         }
       });
       rows.appendChild(row);
@@ -180,7 +182,6 @@
   function loadMessages() {
     var account = activeAccount();
     var requestId = ++messageRequestId;
-    closeMessage();
     messages = [];
     $('#mail_account_title').textContent = account ? account.label : '{{ 'labels.mail'|trans }}';
     $('#mail_no_messages').hidden = true;
@@ -212,50 +213,6 @@
       });
   }
 
-  function loadMessage(message) {
-    var account = activeAccount();
-    var requestId = ++detailRequestId;
-    if (!account) {
-      return;
-    }
-
-    jsonFetch(
-      '{{ app.url_generator.generate('mail.message') }}?account_id=' + encodeURIComponent(account.id) + '&uid=' + encodeURIComponent(message.uid),
-      {},
-      'Unable to load message'
-    )
-      .then(function(payload) {
-        if (requestId !== detailRequestId || activeAccountId !== account.id) {
-          return;
-        }
-        renderMessageDetail(payload.data, account.id);
-      })
-      .catch(function(error) {
-        if (requestId !== detailRequestId) {
-          return;
-        }
-        $('#mail_error').textContent = error.message;
-        $('#mail_error').hidden = false;
-      });
-  }
-
-  function renderMessageDetail(message, accountId) {
-    $('#mail_message_subject').textContent = text(message.subject);
-    $('#mail_message_meta').textContent = [message.from, message.date].filter(Boolean).join(' - ');
-    $('#mail_message_body').textContent = text(message.body);
-    renderAttachments($('#mail_message_attachments'), message, accountId);
-    $('#mail_message_detail').hidden = false;
-  }
-
-  function closeMessage() {
-    detailRequestId += 1;
-    $('#mail_message_detail').hidden = true;
-    $('#mail_message_subject').textContent = '';
-    $('#mail_message_meta').textContent = '';
-    $('#mail_message_body').textContent = '';
-    $('#mail_message_attachments').innerHTML = '';
-  }
-
   function openDialog() {
     $('#mail_account_form').reset();
     $('#mail_account_form input[name="id"]').value = '';
@@ -275,7 +232,6 @@
     $('#mail_account_cancel_icon').addEventListener('click', closeDialog);
     $('#mail_refresh').addEventListener('click', loadMessages);
     $('#mail_search').addEventListener('input', renderMessages);
-    $('#mail_message_close').addEventListener('click', closeMessage);
 
     $('#mail_account_form').addEventListener('submit', function(event) {
       event.preventDefault();
