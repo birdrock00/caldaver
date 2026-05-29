@@ -127,20 +127,26 @@ class MailAccountRepository
 
     protected function encrypt($value)
     {
-        $iv = random_bytes(16);
+        $iv = random_bytes(12);
+        $tag = '';
         $ciphertext = openssl_encrypt(
             (string)$value,
-            'aes-256-cbc',
+            'aes-256-gcm',
             $this->key(),
             OPENSSL_RAW_DATA,
-            $iv
+            $iv,
+            $tag
         );
 
-        return base64_encode($iv . $ciphertext);
+        return 'gcm:' . base64_encode($iv . $tag . $ciphertext);
     }
 
     protected function decrypt($value)
     {
+        if (strpos((string)$value, 'gcm:') === 0) {
+            return $this->decryptGcm(substr((string)$value, 4));
+        }
+
         $raw = base64_decode((string)$value, true);
         if ($raw === false || strlen($raw) <= 16) {
             return '';
@@ -157,8 +163,27 @@ class MailAccountRepository
         return $plain === false ? '' : $plain;
     }
 
+    protected function decryptGcm($value)
+    {
+        $raw = base64_decode((string)$value, true);
+        if ($raw === false || strlen($raw) <= 28) {
+            return '';
+        }
+
+        $plain = openssl_decrypt(
+            substr($raw, 28),
+            'aes-256-gcm',
+            $this->key(),
+            OPENSSL_RAW_DATA,
+            substr($raw, 0, 12),
+            substr($raw, 12, 16)
+        );
+
+        return $plain === false ? '' : $plain;
+    }
+
     protected function key()
     {
-        return hash('sha256', $this->secret, true);
+        return hash('sha256', 'mail-account-credentials:' . $this->secret, true);
     }
 }
