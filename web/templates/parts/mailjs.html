@@ -3,6 +3,8 @@
   var accounts = [];
   var messages = [];
   var activeAccountId = null;
+  var messageRequestId = 0;
+  var detailRequestId = 0;
 
   function $(selector) {
     return document.querySelector(selector);
@@ -49,14 +51,50 @@
     rows.innerHTML = '';
     $('#mail_error').hidden = true;
 
-    filteredMessages().forEach(function(message) {
+    var data = filteredMessages();
+    $('#mail_no_messages').hidden = data.length > 0 || !activeAccount() || !$('#mail_error').hidden;
+
+    data.forEach(function(message) {
       var row = document.createElement('article');
       row.className = 'mail-row' + (message.seen ? '' : ' unread');
-      row.innerHTML = '<span class="mail-from"></span><span class="mail-subject"></span><span class="mail-date"></span>';
+      row.tabIndex = 0;
+      row.setAttribute('role', 'button');
+      row.innerHTML = '<span class="mail-from"></span><span class="mail-subject"></span><span class="mail-date"></span><div class="mail-attachments" data-testid="mail-attachments"></div>';
       row.querySelector('.mail-from').textContent = text(message.from);
       row.querySelector('.mail-subject').textContent = text(message.subject);
       row.querySelector('.mail-date').textContent = text(message.date);
+      renderAttachments(row.querySelector('.mail-attachments'), message);
+      row.addEventListener('click', function(event) {
+        if (event.target.closest('a')) {
+          return;
+        }
+        loadMessage(message);
+      });
+      row.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          loadMessage(message);
+        }
+      });
       rows.appendChild(row);
+    });
+  }
+
+  function renderAttachments(container, message, accountId) {
+    var downloadAccountId = accountId || activeAccountId;
+    container.innerHTML = '';
+    (message.attachments || []).forEach(function(attachment) {
+      var link = document.createElement('a');
+      link.className = 'mail-attachment';
+      link.setAttribute('data-testid', 'mail-attachment-download');
+      link.dataset.filename = attachment.filename;
+      link.href = '{{ app.url_generator.generate('mail.attachment') }}' +
+        '?account_id=' + encodeURIComponent(downloadAccountId) +
+        '&uid=' + encodeURIComponent(message.uid) +
+        '&part=' + encodeURIComponent(attachment.part);
+      link.textContent = attachment.filename;
+      link.setAttribute('download', attachment.filename);
+      container.appendChild(link);
     });
   }
 
@@ -81,17 +119,26 @@
         accounts = payload.data || [];
         activeAccountId = activeAccountId || (accounts[0] && accounts[0].id);
         $('#mail_empty').hidden = accounts.length > 0;
+        $('#mail_error').hidden = true;
         renderAccounts();
         if (activeAccountId) {
           return loadMessages();
         }
+      })
+      .catch(function(error) {
+        $('#mail_error').textContent = error.message;
+        $('#mail_error').hidden = false;
+        $('#mail_empty').hidden = true;
       });
   }
 
   function loadMessages() {
     var account = activeAccount();
+    var requestId = ++messageRequestId;
+    closeMessage();
     messages = [];
     $('#mail_account_title').textContent = account ? account.label : '{{ 'labels.mail'|trans }}';
+    $('#mail_no_messages').hidden = true;
     renderMessages();
 
     if (!account) {
@@ -111,13 +158,71 @@
         });
       })
       .then(function(payload) {
+        if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
+          return;
+        }
         messages = payload.data || [];
         renderMessages();
       })
       .catch(function(error) {
+        if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
+          return;
+        }
+        $('#mail_error').textContent = error.message;
+        $('#mail_error').hidden = false;
+        $('#mail_no_messages').hidden = true;
+      });
+  }
+
+  function loadMessage(message) {
+    var account = activeAccount();
+    var requestId = ++detailRequestId;
+    if (!account) {
+      return;
+    }
+
+    fetch('{{ app.url_generator.generate('mail.message') }}?account_id=' + encodeURIComponent(account.id) + '&uid=' + encodeURIComponent(message.uid), {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function(response) {
+        return response.json().then(function(payload) {
+          if (!response.ok) {
+            throw new Error(payload.message || 'Unable to load message');
+          }
+          return payload;
+        });
+      })
+      .then(function(payload) {
+        if (requestId !== detailRequestId || activeAccountId !== account.id) {
+          return;
+        }
+        renderMessageDetail(payload.data, account.id);
+      })
+      .catch(function(error) {
+        if (requestId !== detailRequestId) {
+          return;
+        }
         $('#mail_error').textContent = error.message;
         $('#mail_error').hidden = false;
       });
+  }
+
+  function renderMessageDetail(message, accountId) {
+    $('#mail_message_subject').textContent = text(message.subject);
+    $('#mail_message_meta').textContent = [message.from, message.date].filter(Boolean).join(' - ');
+    $('#mail_message_body').textContent = text(message.body);
+    renderAttachments($('#mail_message_attachments'), message, accountId);
+    $('#mail_message_detail').hidden = false;
+  }
+
+  function closeMessage() {
+    detailRequestId += 1;
+    $('#mail_message_detail').hidden = true;
+    $('#mail_message_subject').textContent = '';
+    $('#mail_message_meta').textContent = '';
+    $('#mail_message_body').textContent = '';
+    $('#mail_message_attachments').innerHTML = '';
   }
 
   function openDialog() {
@@ -137,6 +242,7 @@
     $('#mail_account_cancel_icon').addEventListener('click', closeDialog);
     $('#mail_refresh').addEventListener('click', loadMessages);
     $('#mail_search').addEventListener('input', renderMessages);
+    $('#mail_message_close').addEventListener('click', closeMessage);
 
     $('#mail_account_form').addEventListener('submit', function(event) {
       event.preventDefault();
