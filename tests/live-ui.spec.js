@@ -49,6 +49,7 @@ async function mockMailApi(page, options = {}) {
   const accountStatus = options.accountStatus || 200;
   const attachmentBody = options.attachmentBody || 'mock attachment body';
   const attachmentFilename = options.attachmentFilename || 'report.pdf';
+  const attachmentRequests = options.attachmentRequests || [];
 
   await page.route('**/mail/accounts', async route => {
     if (accountStatus >= 400) {
@@ -112,6 +113,9 @@ async function mockMailApi(page, options = {}) {
   });
 
   await page.route('**/mail/attachment?**', async route => {
+    const url = new URL(route.request().url());
+    attachmentRequests.push(Object.fromEntries(url.searchParams.entries()));
+
     return route.fulfill({
       status: 200,
       contentType: 'application/pdf',
@@ -121,6 +125,29 @@ async function mockMailApi(page, options = {}) {
       body: attachmentBody
     });
   });
+}
+
+function captureConsoleErrors(page) {
+  const consoleErrors = [];
+  page.on('console', message => {
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+    }
+  });
+  return consoleErrors;
+}
+
+async function visibleBox(page, selector) {
+  const box = await page.locator(selector).first().boundingBox();
+  expect(box, `${selector} should have a visible bounding box`).toBeTruthy();
+  return box;
+}
+
+function overlaps(a, b) {
+  return a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y;
 }
 
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
@@ -322,12 +349,8 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
 
 test('mail page renders mocked messages, message detail, search, and attachment download', async ({ page }) => {
   const pageErrors = await login(page);
-  const consoleErrors = [];
-  page.on('console', message => {
-    if (message.type() === 'error') {
-      consoleErrors.push(message.text());
-    }
-  });
+  const consoleErrors = captureConsoleErrors(page);
+  const attachmentRequests = [];
 
   await mockMailApi(page, {
     accounts: [
@@ -362,7 +385,8 @@ test('mail page renders mocked messages, message detail, search, and attachment 
         body: 'Attached is the quarterly report.',
         attachments: [{ part: '2', filename: 'report.pdf', content_type: 'application/pdf', size: 12345 }]
       }
-    }
+    },
+    attachmentRequests
   });
 
   await page.goto(`${baseURL}/mail`);
@@ -388,6 +412,7 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('report.pdf');
+  expect(attachmentRequests).toContainEqual({ account_id: '1', uid: '101', part: '2' });
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
@@ -395,6 +420,7 @@ test('mail page renders mocked messages, message detail, search, and attachment 
 
 test('mail account load failure is visible and does not throw UI errors', async ({ page }) => {
   const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
   await mockMailApi(page, { accountStatus: 500 });
 
   await page.goto(`${baseURL}/mail`);
@@ -404,10 +430,12 @@ test('mail account load failure is visible and does not throw UI errors', async 
   await expect(page.locator('#mail_empty')).toBeHidden();
 
   expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
 });
 
 test('mail account tab switching ignores stale message responses', async ({ page }) => {
-  await login(page);
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
   await mockMailApi(page, {
     accounts: [
       { id: 1, label: 'Slow Inbox', email_address: 'slow@example.test' },
@@ -429,10 +457,13 @@ test('mail account tab switching ignores stale message responses', async ({ page
   await expect(page.locator('#mail_account_title')).toHaveText('Fast Inbox');
   await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Fast message');
   await expect(page.locator('#mail_rows .mail-row .mail-subject')).not.toContainText('Slow message');
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
 });
 
 test('mail add-account dialog posts expected fields and activates saved account', async ({ page }) => {
-  await login(page);
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
   let postedBody = '';
   await mockMailApi(page, { accounts: [] });
   await page.route('**/mail/accounts/save', async route => {
@@ -476,4 +507,99 @@ test('mail add-account dialog posts expected fields and activates saved account'
   expect(postedBody).toContain('email_address');
   expect(postedBody).toContain('imap_host');
   expect(postedBody).toContain('password');
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail add-account save failure stays visible in the dialog', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  await mockMailApi(page, { accounts: [] });
+  await page.route('**/mail/accounts/save', async route => {
+    return route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: 'ERROR', message: 'Mock save rejected' })
+    });
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await page.locator('#mail_account_create').click();
+  await page.locator('#mail_account_form input[name="label"]').fill('Bad Inbox');
+  await page.locator('#mail_account_form input[name="email_address"]').fill('bad@example.com');
+  await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
+  await page.locator('#mail_account_form input[name="username"]').fill('bad@example.com');
+  await page.locator('#mail_account_form input[name="password"]').fill('secret-password');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+
+  await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await expect(page.locator('#mail_account_error')).toBeVisible();
+  await expect(page.locator('#mail_account_error')).toContainText('Mock save rejected');
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail layout keeps critical controls visible across desktop and mobile', async ({ page }) => {
+  await login(page);
+  await mockMailApi(page, {
+    accounts: [
+      { id: 1, label: 'Layout Inbox', email_address: 'layout@example.test' }
+    ],
+    messagesByAccount: {
+      1: [
+        {
+          uid: 501,
+          from: 'Long Sender Name <sender@example.test>',
+          subject: 'A long subject that should not overlap the date or attachment controls in the mail row',
+          date: 'Fri, 29 May 2026 10:30:00 -0700',
+          seen: false,
+          attachments: [{ part: '2', filename: 'layout-report-with-a-long-name.pdf', content_type: 'application/pdf', size: 12345 }]
+        }
+      ]
+    },
+    messageDetails: {
+      501: {
+        uid: 501,
+        from: 'Long Sender Name <sender@example.test>',
+        subject: 'A long subject that should not overlap',
+        date: 'Fri, 29 May 2026 10:30:00 -0700',
+        body: 'Layout smoke body',
+        attachments: [{ part: '2', filename: 'layout-report-with-a-long-name.pdf', content_type: 'application/pdf', size: 12345 }]
+      }
+    }
+  });
+
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto(`${baseURL}/mail`);
+    await expect(page.locator('#mail_rows .mail-row')).toHaveCount(1);
+
+    const create = await visibleBox(page, '#mail_account_create');
+    const accounts = await visibleBox(page, '#mail_accounts');
+    const search = await visibleBox(page, '.mail-search');
+    const panel = await visibleBox(page, '.mail-panel');
+    const toolbar = await visibleBox(page, '.mail-toolbar');
+    const row = await visibleBox(page, '.mail-row');
+
+    for (const box of [create, accounts, search, panel, toolbar, row]) {
+      expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+    }
+
+    if (viewport.width >= 900) {
+      const sidebar = await visibleBox(page, '.mail-sidebar');
+      const content = await visibleBox(page, '.mail-content');
+      expect(overlaps(sidebar, content)).toBe(false);
+      expect(search.y + search.height).toBeLessThanOrEqual(panel.y + 1);
+    }
+
+    expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(row.y + 1);
+
+    await page.locator('#mail_rows .mail-row').click();
+    const detail = await visibleBox(page, '#mail_message_detail');
+    expect(detail.x + detail.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(detail.y + detail.height).toBeLessThanOrEqual(viewport.height + 1);
+    await page.locator('#mail_message_close').click();
+    await expect(page.locator('#mail_message_detail')).toBeHidden();
+  }
 });
