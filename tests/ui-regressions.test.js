@@ -333,6 +333,9 @@ test('pages can be rendered without loading JavaScript via nojs query option and
   const settings = read('web/config/default.settings.php');
   const preferences = read('web/templates/preferences.html');
   const controller = read('web/src/Controller/Preferences.php');
+  const mailController = read('web/src/Controller/Mail.php');
+  const mail = read('web/templates/mail.html');
+  const mailMessage = read('web/templates/mail_message.html');
 
   assert.match(layout, /app\.request\.query\.get\('nojs'\)/);
   assert.match(layout, /nojs_query != '1'/);
@@ -345,6 +348,11 @@ test('pages can be rendered without loading JavaScript via nojs query option and
   assert.match(settings, /\$app\['defaults\.disable_javascript'\] = false/);
   assert.match(preferences, /name="disable_javascript"/);
   assert.match(controller, /'disable_javascript' => \$input->get\('disable_javascript'\) == 'true'/);
+  assert.match(mailController, /javascriptEnabled\(Request \$request, Application \$app\)/);
+  assert.match(mailController, /in_array\(\$nojs, \['1', 'true', 'yes'\], true\)/);
+  assert.match(mailController, /mail_javascript_enabled/);
+  assert.match(mail, /mail_javascript_enabled/);
+  assert.match(mailMessage, /mail_javascript_enabled/);
 });
 
 test('CSRF failures return JSON for Ajax mail requests', () => {
