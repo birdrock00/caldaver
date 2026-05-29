@@ -16,16 +16,23 @@ class Cards
 
     public function listAction(Request $request, Application $app)
     {
-        $addressBook = $this->getAddressBook($app);
+        $addressBooks = $this->getAddressBooks($app);
+        $primaryAddressBook = reset($addressBooks);
         $contacts = array_map(function($contact) {
             return $contact->toArray();
-        }, $app['carddav.client']->fetchContacts($addressBook));
+        }, $app['carddav.client']->fetchContactsFromAddressBooks($addressBooks));
 
         return new JsonResponse([
             'data' => $contacts,
+            'addressbooks' => array_map(function(AddressBook $addressBook) {
+                return [
+                    'url' => $addressBook->getUrl(),
+                    'displayname' => $addressBook->getProperty(AddressBook::DISPLAYNAME),
+                ];
+            }, array_values($addressBooks)),
             'addressbook' => [
-                'url' => $addressBook->getUrl(),
-                'displayname' => $addressBook->getProperty(AddressBook::DISPLAYNAME),
+                'url' => $primaryAddressBook->getUrl(),
+                'displayname' => $primaryAddressBook->getProperty(AddressBook::DISPLAYNAME),
             ],
         ]);
     }
@@ -75,12 +82,7 @@ class Cards
 
     protected function getAddressBook(Application $app)
     {
-        $homeSet = $app['session']->get('addressbook_home_set');
-        if (empty($homeSet)) {
-            $principal = new Principal($app['session']->get('principal_url'));
-            $homeSet = $app['carddav.client']->getAddressBookHomeSet($principal);
-            $app['session']->set('addressbook_home_set', $homeSet);
-        }
+        $homeSet = $this->getAddressBookHomeSet($app);
 
         $displayName = trim($app['session']->get('displayname') ?: $app['session']->get('username'));
         if ($displayName === '') {
@@ -91,5 +93,31 @@ class Cards
             $homeSet,
             $displayName . ' addressbook'
         );
+    }
+
+    protected function getAddressBooks(Application $app)
+    {
+        $homeSet = $this->getAddressBookHomeSet($app);
+        $addressBooks = $app['carddav.client']->getAddressBooks($homeSet);
+
+        if (count($addressBooks) > 0) {
+            return $addressBooks;
+        }
+
+        return [$this->getAddressBook($app)];
+    }
+
+    protected function getAddressBookHomeSet(Application $app)
+    {
+        $homeSet = $app['session']->get('addressbook_home_set');
+        if (!empty($homeSet)) {
+            return $homeSet;
+        }
+
+        $principal = new Principal($app['session']->get('principal_url'));
+        $homeSet = $app['carddav.client']->getAddressBookHomeSet($principal);
+        $app['session']->set('addressbook_home_set', $homeSet);
+
+        return $homeSet;
     }
 }
