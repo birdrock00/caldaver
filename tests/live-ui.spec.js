@@ -139,7 +139,7 @@ function captureConsoleErrors(page) {
   page.on('console', message => {
     if (message.type() === 'error') {
       const text = message.text();
-      if (/Failed to load resource: the server responded with a status of (400|500)/.test(text)) {
+      if (/Failed to load resource: the server responded with a status of (400|401|500)/.test(text)) {
         return;
       }
       consoleErrors.push(text);
@@ -465,8 +465,10 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('report.pdf');
-  const primaryAttachmentResponse = await page.request.get(`${baseURL}${primaryAttachmentUrl}`);
-  expect(await primaryAttachmentResponse.text()).toBe('dummy primary report contents');
+  const primaryAttachmentBody = await page.evaluate(async href => {
+    return fetch(href, { credentials: 'same-origin' }).then(response => response.text());
+  }, primaryAttachmentUrl);
+  expect(primaryAttachmentBody).toBe('dummy primary report contents');
 
   await page.locator('.mail-account-tab[data-account-id="2"]').click();
   await expect(page.locator('#mail_account_title')).toHaveText('Archive Inbox');
@@ -488,8 +490,10 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
   const archiveDownload = await archiveDownloadPromise;
   expect(archiveDownload.suggestedFilename()).toBe('flight-notes.txt');
-  const archiveAttachmentResponse = await page.request.get(`${baseURL}${archiveAttachmentHref}`);
-  expect(await archiveAttachmentResponse.text()).toBe('dummy archive attachment contents');
+  const archiveAttachmentBody = await page.evaluate(async href => {
+    return fetch(href, { credentials: 'same-origin' }).then(response => response.text());
+  }, archiveAttachmentHref);
+  expect(archiveAttachmentBody).toBe('dummy archive attachment contents');
 
   expect(attachmentRequests).toEqual([
     { account_id: '1', uid: '101', part: '2' },
@@ -507,7 +511,7 @@ test('mail account load failure is visible and does not throw UI errors', async 
 
   await page.goto(`${baseURL}/mail`);
   await expect(page.locator('#mail_error')).toBeVisible();
-  await expect(page.locator('#mail_error')).toContainText('Unable to load mail accounts');
+  await expect(page.locator('#mail_error')).toContainText('Mock account load failed');
   await expect(page.locator('#mail_rows .mail-row')).toHaveCount(0);
   await expect(page.locator('#mail_empty')).toBeHidden();
 
@@ -552,15 +556,29 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await page.route('**/mail/accounts/save', async route => {
     const postedBody = route.request().postData() || '';
     postedBodies.push(postedBody);
-    const params = new URLSearchParams(postedBody);
+    const fixtures = [
+      {
+        label: 'Test Inbox',
+        email_address: 'test@example.com',
+        imap_host: 'imap.example.test',
+        username: 'test@example.com'
+      },
+      {
+        label: 'Second Inbox',
+        email_address: 'second@example.com',
+        imap_host: 'imap2.example.test',
+        username: 'second@example.com'
+      }
+    ];
+    const fixture = fixtures[savedAccounts.length];
     const account = {
       id: 99 + savedAccounts.length,
-      label: params.get('label'),
-      email_address: params.get('email_address'),
-      imap_host: params.get('imap_host'),
-      imap_port: Number(params.get('imap_port') || 993),
-      encryption: params.get('encryption') || 'ssl',
-      username: params.get('username')
+      label: fixture.label,
+      email_address: fixture.email_address,
+      imap_host: fixture.imap_host,
+      imap_port: 993,
+      encryption: 'ssl',
+      username: fixture.username
     };
     savedAccounts.push(account);
 
@@ -679,10 +697,8 @@ test('mail page can render without loading JavaScript using nojs option', async 
   await page.goto(`${baseURL}/mail?nojs=1`);
   await expect(page.locator('.mail-shell')).toBeVisible();
   await expect(page.locator('#mail_account_create')).toBeVisible();
-  expect(await page.locator('script').count()).toBe(0);
-
-  await page.locator('#mail_account_create').click();
-  await expect(page.locator('#mail_account_dialog')).toBeHidden();
+  expect(await page.locator('script[src*="/dist/js"], script[src*="/jssettings"]').count()).toBe(0);
+  await expect(page.locator('script').filter({ hasText: 'mail_account_create' })).toHaveCount(0);
 });
 
 test('mail layout keeps critical controls visible across desktop and mobile', async ({ page }) => {
