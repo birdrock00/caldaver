@@ -62,8 +62,10 @@ Common optional runtime configuration:
 - `AGENDAV_SERVER_NAME`, defaults to `localhost`
 - `AGENDAV_TITLE`, defaults to `AgenDAV`
 - `AGENDAV_FOOTER`, defaults to `AgenDAV`
+- `AGENDAV_AUTH_USERNAME` and `AGENDAV_AUTH_PASSWORD`, set these to use a local CalDAVer login instead of logging in directly with DAV server credentials
 - `AGENDAV_CALDAV_PUBLIC_URL`, defaults to `AGENDAV_CALDAV_SERVER`
 - `AGENDAV_CARDDAV_SERVER`, defaults to `AGENDAV_CALDAV_SERVER`
+- `AGENDAV_CALDAV_USERNAME` and `AGENDAV_CALDAV_PASSWORD`, service credentials used by CalDAVer when local login is enabled
 - `AGENDAV_TIMEZONE`, defaults to `UTC`
 - `AGENDAV_LANG`, defaults to `en`
 - `AGENDAV_WEEKSTART`, defaults to `0`
