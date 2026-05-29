@@ -1468,6 +1468,7 @@ body.agendav-calendar-page {
 }
 
 .mail-panel {
+  position: relative;
   height: ~"calc(100% - 72px)";
   overflow: auto;
   background: #fff;
@@ -1508,9 +1509,9 @@ body.agendav-calendar-page {
 .mail-row {
   display: grid;
   grid-template-columns: minmax(160px, .7fr) minmax(240px, 2fr) minmax(170px, .55fr);
-  min-height: 28px;
+  min-height: 36px;
   align-items: center;
-  padding: 0 16px;
+  padding: 5px 16px;
   color: #202124;
   border-bottom: 1px solid #e8eaed;
   column-gap: 18px;
@@ -1532,6 +1533,40 @@ body.agendav-calendar-page {
   }
 }
 
+.mail-attachments {
+  grid-column: 2 / span 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 4px;
+}
+
+.mail-attachment {
+  display: inline-flex;
+  max-width: 260px;
+  min-height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  overflow: hidden;
+  color: #174ea6;
+  background: #f1f3f4;
+  border: 1px solid #dadce0;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover,
+  &:focus {
+    color: #174ea6;
+    background: #e8f0fe;
+    text-decoration: none;
+  }
+}
+
 .mail-date {
   justify-self: end;
   color: #3c4043;
@@ -1547,6 +1582,61 @@ body.agendav-calendar-page {
 
 .mail-error {
   color: #b3261e;
+}
+
+.mail-message-detail {
+  position: absolute;
+  top: 56px;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 560px;
+  padding: 24px;
+  overflow: auto;
+  background: #fff;
+  border-left: 1px solid #dadce0;
+  box-shadow: -2px 0 8px rgba(60, 64, 67, .18);
+
+  h2 {
+    margin: 0 44px 8px 0;
+    color: #202124;
+    font-size: 22px;
+    font-weight: 500;
+  }
+
+  p {
+    margin: 0 0 20px;
+    color: #5f6368;
+    font-size: 13px;
+  }
+
+  pre {
+    min-height: 180px;
+    margin: 0 0 18px;
+    color: #202124;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  button {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+
+    &:hover,
+    &:focus {
+      background: #f1f3f4;
+      outline: 0;
+    }
+  }
 }
 
 .contact-dialog {
@@ -1566,6 +1656,8 @@ body.agendav-calendar-page {
 .contact-dialog-panel {
   width: 92vw;
   max-width: 520px;
+  max-height: 88vh;
+  overflow: auto;
   padding: 20px 24px 18px;
   background: #fff;
   border-radius: 8px;
@@ -1742,6 +1834,18 @@ body.agendav-calendar-page {
 
   .mail-date {
     justify-self: start;
+  }
+
+  .mail-attachments {
+    grid-column: 1;
+  }
+
+  .mail-message-detail {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    width: 100%;
+    border-left: 0;
   }
 
   #calendar_view .fc-toolbar {
