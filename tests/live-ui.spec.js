@@ -801,13 +801,13 @@ test('mail page can render without loading JavaScript using nojs option', async 
   await login(page);
 
   await page.goto(`${baseURL}/mail`);
-  await expect(page.locator('script').filter({ hasText: 'mail_account_create' })).toHaveCount(1);
+  expect(await page.content()).toContain('mail_account_create');
 
   await page.goto(`${baseURL}/mail?nojs=1`);
   await expect(page.locator('.mail-shell')).toBeVisible();
   await expect(page.locator('#mail_account_create')).toBeVisible();
   expect(await page.locator('script[src*="/dist/js"], script[src*="/jssettings"]').count()).toBe(0);
-  await expect(page.locator('script').filter({ hasText: 'mail_account_create' })).toHaveCount(0);
+  expect(await page.content()).not.toContain('mail_account_create');
 });
 
 test('mail layout keeps critical controls visible across desktop and mobile', async ({ page }) => {
