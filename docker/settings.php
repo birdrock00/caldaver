@@ -20,9 +20,13 @@ $app['csrf.secret'] = 'AGENDAV_CSRF_SECRET';
 $app['log.path'] = 'AGENDAV_LOG_DIR';
 $app['log.level'] = 'INFO';
 
+$app['auth.local.username'] = 'AGENDAV_AUTH_USERNAME';
+$app['auth.local.password'] = 'AGENDAV_AUTH_PASSWORD';
 $app['caldav.baseurl'] = 'AGENDAV_CALDAV_SERVER';
 $app['carddav.baseurl'] = 'AGENDAV_CARDDAV_SERVER';
 $app['caldav.authmethod'] = 'AGENDAV_CALDAV_AUTHMETHOD';
+$app['caldav.username'] = 'AGENDAV_CALDAV_USERNAME';
+$app['caldav.password'] = 'AGENDAV_CALDAV_PASSWORD';
 $app['caldav.publicurls'] = true;
 $app['caldav.baseurl.public'] = 'AGENDAV_CALDAV_PUBLIC_URL';
 $app['caldav.certificate.verify'] = AGENDAV_CALDAV_CERTIFICATE_VERIFY;
