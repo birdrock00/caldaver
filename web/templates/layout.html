@@ -26,11 +26,10 @@
     <body class="{% block body_class %}{% endblock %}">
         {% block content %}{% endblock %}
         {% set nojs_query = app.request.query.get('nojs') %}
-        {% set javascript_disabled = nojs_query == '1' or nojs_query == 'true' or nojs_query == 'yes' %}
-        {% if app.offsetExists('user.preferences') and app['user.preferences'].get('disable_javascript', false) %}
-            {% set javascript_disabled = true %}
-        {% endif %}
-        {% if not javascript_disabled %}
+        {% if nojs_query != '1'
+            and nojs_query != 'true'
+            and nojs_query != 'yes'
+            and not (app.offsetExists('user.preferences') and app['user.preferences'].get('disable_javascript', false)) %}
         {% block bottom %}{% endblock %}
         {% endif %}
     </body>
