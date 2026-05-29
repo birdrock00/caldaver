@@ -193,6 +193,17 @@ $app['carddav.client'] = function($app) {
     );
 };
 
+$app['mail.accounts'] = function($app) {
+    return new \AgenDAV\Mail\MailAccountRepository(
+        $app['db'],
+        $app['csrf.secret']
+    );
+};
+
+$app['mail.imap.client'] = function() {
+    return new \AgenDAV\Mail\ImapClient();
+};
+
 // Calendar finder
 $app['calendar.finder'] = function($app) {
 

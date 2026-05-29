@@ -7,6 +7,12 @@ PHP_CONFIG_FILE="${PHP_INI_DIR}/php.ini"
 
 : "${AGENDAV_CALDAV_PUBLIC_URL:=$AGENDAV_CALDAV_SERVER}"
 : "${AGENDAV_CARDDAV_SERVER:=$AGENDAV_CALDAV_SERVER}"
+: "${AGENDAV_DB_DRIVER:=pdo_pgsql}"
+: "${AGENDAV_DB_HOST:=postgres.example.com}"
+: "${AGENDAV_DB_PORT:=5432}"
+: "${AGENDAV_DB_NAME:=caldaver}"
+: "${AGENDAV_DB_USER:=caldaver}"
+: "${AGENDAV_DB_PASSWORD:?AGENDAV_DB_PASSWORD is required}"
 
 escape_sed() {
     printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'
@@ -33,8 +39,16 @@ replace_config "AGENDAV_TIMEZONE" "$AGENDAV_TIMEZONE"
 replace_config "AGENDAV_LANG" "$AGENDAV_LANG"
 replace_config "AGENDAV_LOG_DIR" "$AGENDAV_LOG_DIR"
 replace_config "AGENDAV_WEEKSTART" "$AGENDAV_WEEKSTART"
+replace_config "AGENDAV_DB_DRIVER" "$AGENDAV_DB_DRIVER"
+replace_config "AGENDAV_DB_HOST" "$AGENDAV_DB_HOST"
+replace_config "AGENDAV_DB_PORT" "$AGENDAV_DB_PORT"
+replace_config "AGENDAV_DB_NAME" "$AGENDAV_DB_NAME"
+replace_config "AGENDAV_DB_USER" "$AGENDAV_DB_USER"
+replace_config "AGENDAV_DB_PASSWORD" "$AGENDAV_DB_PASSWORD"
 
 sed -i -e "s/AGENDAV_TIMEZONE/$(escape_sed "$AGENDAV_TIMEZONE")/g" "$PHP_CONFIG_FILE"
+
+php /var/www/agendav/docker/initialize-database.php
 
 if [ "${1:-}" = "apache2" ]; then
     exec /usr/sbin/apache2ctl -D FOREGROUND
