@@ -52,6 +52,10 @@ Required runtime configuration:
 
 - `AGENDAV_CALDAV_SERVER`, for example `https://baikal.example.com/cal.php`
 - `AGENDAV_CSRF_SECRET`, set to a unique secret value
+- `AGENDAV_DB_HOST`
+- `AGENDAV_DB_NAME`
+- `AGENDAV_DB_USER`
+- `AGENDAV_DB_PASSWORD`
 
 Common optional runtime configuration:
 
@@ -72,6 +76,10 @@ docker run -d --name caldaver \
   -p 8080:8080 \
   -e AGENDAV_CALDAV_SERVER=https://baikal.example.com/cal.php \
   -e AGENDAV_CSRF_SECRET="$(openssl rand -hex 32)" \
+  -e AGENDAV_DB_HOST=postgres.example.com \
+  -e AGENDAV_DB_NAME=agendav \
+  -e AGENDAV_DB_USER=agendav \
+  -e AGENDAV_DB_PASSWORD=change-this \
   ghcr.io/caldaver-app/caldaver:latest
 ```
 
