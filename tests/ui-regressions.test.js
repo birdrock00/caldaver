@@ -257,7 +257,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   const services = read('web/app/services.php');
   const appNav = read('web/templates/parts/appnav.html');
   const mail = read('web/templates/mail.html');
+  const mailMessage = read('web/templates/mail_message.html');
   const mailJs = read('web/templates/parts/mailjs.html');
+  const mailMessageJs = read('web/templates/parts/mailmessagejs.html');
   const repository = read('web/src/Mail/MailAccountRepository.php');
   const imap = read('web/src/Mail/ImapClient.php');
   const validator = read('web/src/Mail/AccountValidator.php');
@@ -266,6 +268,7 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(controllers, /->get\('\/mail', '\\AgenDAV\\Controller\\Mail::indexAction'\)->bind\('mail'\)/);
   assert.match(controllers, /->get\('\/mail\/accounts', '\\AgenDAV\\Controller\\Mail::accountsAction'\)->bind\('mail\.accounts'\)/);
   assert.match(controllers, /->post\('\/mail\/accounts\/save', '\\AgenDAV\\Controller\\Mail::saveAccountAction'\)->bind\('mail\.accounts\.save'\)/);
+  assert.match(controllers, /->get\('\/mail\/read', '\\AgenDAV\\Controller\\Mail::readAction'\)->bind\('mail\.read'\)/);
   assert.match(controllers, /->get\('\/mail\/messages', '\\AgenDAV\\Controller\\Mail::messagesAction'\)->bind\('mail\.messages'\)/);
   assert.match(controllers, /->get\('\/mail\/message', '\\AgenDAV\\Controller\\Mail::messageAction'\)->bind\('mail\.message'\)/);
   assert.match(controllers, /->get\('\/mail\/attachment', '\\AgenDAV\\Controller\\Mail::attachmentAction'\)->bind\('mail\.attachment'\)/);
@@ -276,10 +279,20 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mail, /id="mail_account_form"/);
   assert.match(mail, /id="mail_account_error"/);
   assert.match(mail, /id="mail_no_messages"/);
+  assert.doesNotMatch(mail, /id="mail_message_detail"/);
+  assert.match(mailMessage, /id="mail_reader"/);
+  assert.match(mailMessage, /data-message-url/);
+  assert.match(mailMessage, /mailmessagejs\.html/);
   assert.match(mailJs, /mail\.accounts/);
   assert.match(mailJs, /mail\.messages/);
-  assert.match(mailJs, /mail\.message/);
+  assert.match(mailJs, /mail\.read/);
   assert.match(mailJs, /mail\.attachment/);
+  assert.match(mailJs, /window\.location\.href/);
+  assert.doesNotMatch(mailJs, /function loadMessage\(/);
+  assert.match(mailMessage, /app\.url_generator\.generate\('mail\.message'\)/);
+  assert.match(mailMessage, /app\.url_generator\.generate\('mail\.attachment'\)/);
+  assert.match(mailMessageJs, /dataset\.messageUrl/);
+  assert.match(mailMessageJs, /dataset\.attachmentUrl/);
   assert.match(mailJs, /jsonFetch/);
   assert.match(mailJs, /X-Requested-With/);
   assert.match(mailJs, /Your session expired/);
@@ -288,7 +301,6 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /data-testid="mail-attachments"/);
   assert.match(mailJs, /mail-attachment-download/);
   assert.match(mailJs, /messageRequestId/);
-  assert.match(mailJs, /loadMessage/);
   assert.match(mailJs, /mail_error'\)\.hidden = false/);
   assert.match(repository, /mail_accounts/);
   assert.match(repository, /openssl_encrypt/);
@@ -311,15 +323,25 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(less, /\.mail-account-tab/);
   assert.match(less, /\.mail-row/);
   assert.match(less, /\.mail-attachment/);
-  assert.match(less, /\.mail-message-detail/);
+  assert.match(less, /\.mail-reader/);
+  assert.match(less, /\.mail-reader-message/);
 });
 
-test('pages can be rendered without loading JavaScript via nojs query option', () => {
+test('pages can be rendered without loading JavaScript via nojs query option and user preference', () => {
   const layout = read('web/templates/layout.html');
+  const services = read('web/app/services.php');
+  const settings = read('web/config/default.settings.php');
+  const preferences = read('web/templates/preferences.html');
+  const controller = read('web/src/Controller/Preferences.php');
 
   assert.match(layout, /app\.request\.query\.get\('nojs'\)/);
-  assert.match(layout, /not in \['1', 'true', 'yes'\]/);
+  assert.match(layout, /app\.offsetExists\('user\.preferences'\)/);
+  assert.match(layout, /disable_javascript/);
   assert.match(layout, /\{% block bottom %\}/);
+  assert.match(services, /'disable_javascript' => \$app\['defaults\.disable_javascript'\]/);
+  assert.match(settings, /\$app\['defaults\.disable_javascript'\] = false/);
+  assert.match(preferences, /name="disable_javascript"/);
+  assert.match(controller, /'disable_javascript' => \$input->get\('disable_javascript'\) == 'true'/);
 });
 
 test('CSRF failures return JSON for Ajax mail requests', () => {
