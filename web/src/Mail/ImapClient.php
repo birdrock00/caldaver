@@ -151,9 +151,29 @@ class ImapClient
     {
         $this->configureTimeouts();
 
-        return @imap_open($this->mailboxString($account), $account['username'], $account['password'], OP_READONLY, 1, [
-            'DISABLE_AUTHENTICATOR' => 'GSSAPI',
-        ]);
+        foreach ($this->candidateUsernames($account) as $username) {
+            $stream = @imap_open($this->mailboxString($account), $username, $account['password'], OP_READONLY, 1, [
+                'DISABLE_AUTHENTICATOR' => 'GSSAPI',
+            ]);
+
+            if ($stream !== false) {
+                return $stream;
+            }
+        }
+
+        return false;
+    }
+
+    protected function candidateUsernames(array $account)
+    {
+        $usernames = [(string)$account['username']];
+        $email = (string)($account['email_address'] ?? '');
+
+        if (strpos($usernames[0], '@') === false && $email !== '' && !in_array($email, $usernames, true)) {
+            $usernames[] = $email;
+        }
+
+        return $usernames;
     }
 
     protected function configureTimeouts()

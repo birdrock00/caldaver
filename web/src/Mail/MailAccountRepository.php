@@ -54,6 +54,10 @@ class MailAccountRepository
             ? $input['encryption']
             : 'ssl';
 
+        if ($id === null) {
+            $id = $this->matchingAccountId($owner, $input, $port, $encryption);
+        }
+
         if ($id !== null) {
             $current = $this->connection->fetchAssociative(
                 'SELECT password_encrypted FROM mail_accounts WHERE owner = ? AND id = ?',
@@ -110,6 +114,30 @@ class MailAccountRepository
         );
 
         return $row ? $this->publicAccount($row) : null;
+    }
+
+    protected function matchingAccountId($owner, array $input, $port, $encryption)
+    {
+        $id = $this->connection->fetchOne(
+            'SELECT id
+             FROM mail_accounts
+             WHERE owner = ?
+               AND lower(email_address) = lower(?)
+               AND lower(imap_host) = lower(?)
+               AND imap_port = ?
+               AND encryption = ?
+             ORDER BY id DESC
+             LIMIT 1',
+            [
+                $owner,
+                $input['email_address'],
+                $input['imap_host'],
+                $port,
+                $encryption,
+            ]
+        );
+
+        return $id === false ? null : (int)$id;
     }
 
     protected function publicAccount(array $row)
