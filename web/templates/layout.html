@@ -25,6 +25,8 @@
     </head>
     <body class="{% block body_class %}{% endblock %}">
         {% block content %}{% endblock %}
+        {% if app.request.query.get('nojs') not in ['1', 'true', 'yes'] %}
         {% block bottom %}{% endblock %}
+        {% endif %}
     </body>
 </html>

@@ -21,6 +21,7 @@ namespace AgenDAV;
  */
 
 use Silex\Application;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Security\Csrf\CsrfToken;
 
@@ -39,6 +40,12 @@ class Csrf
 
         if (!$request->request->has('_token')) {
             $app['monolog']->debug('_token not found on request');
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse([
+                    'result' => 'ERROR',
+                    'message' => 'CSRF token not present',
+                ], 401);
+            }
             $app->abort(401, 'CSRF token not present');
             return;
         }
@@ -53,6 +60,12 @@ class Csrf
 
         if (!$app['csrf.manager']->isTokenValid($token)) {
             $app['monolog']->debug('CSRF token is not valid. Aborting');
+            if ($request->isXmlHttpRequest()) {
+                return new JsonResponse([
+                    'result' => 'ERROR',
+                    'message' => 'Invalid CSRF token',
+                ], 401);
+            }
             $app->abort(401, 'Invalid CSRF token');
             return;
         }

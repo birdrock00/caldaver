@@ -104,17 +104,42 @@
     });
   }
 
-  function loadAccounts() {
-    return fetch('{{ app.url_generator.generate('mail.accounts') }}', {
-      credentials: 'same-origin',
-      headers: { 'Accept': 'application/json' }
-    })
-      .then(function(response) {
-        if (!response.ok) {
-          throw new Error('Unable to load mail accounts');
+  function jsonFetch(url, options, fallbackMessage) {
+    options = options || {};
+    options.headers = options.headers || {};
+    options.headers.Accept = 'application/json';
+    options.headers['X-Requested-With'] = 'XMLHttpRequest';
+    options.credentials = options.credentials || 'same-origin';
+
+    return fetch(url, options).then(function(response) {
+      return response.text().then(function(body) {
+        var payload = {};
+        if (body) {
+          try {
+            payload = JSON.parse(body);
+          } catch (error) {
+            if (response.status === 401) {
+              throw new Error('Your session expired. Reload CalDAVer and sign in again.');
+            }
+            throw new Error(fallbackMessage || 'Unable to complete mail request');
+          }
         }
-        return response.json();
-      })
+
+        if (!response.ok) {
+          throw new Error(payload.message || (response.status === 401 ? 'Your session expired. Reload CalDAVer and sign in again.' : fallbackMessage) || 'Unable to complete mail request');
+        }
+
+        return payload;
+      });
+    });
+  }
+
+  function loadAccounts() {
+    return jsonFetch(
+      '{{ app.url_generator.generate('mail.accounts') }}',
+      {},
+      'Unable to load mail accounts'
+    )
       .then(function(payload) {
         accounts = payload.data || [];
         activeAccountId = activeAccountId || (accounts[0] && accounts[0].id);
@@ -145,18 +170,11 @@
       return Promise.resolve();
     }
 
-    return fetch('{{ app.url_generator.generate('mail.messages') }}?account_id=' + encodeURIComponent(account.id), {
-      credentials: 'same-origin',
-      headers: { 'Accept': 'application/json' }
-    })
-      .then(function(response) {
-        return response.json().then(function(payload) {
-          if (!response.ok) {
-            throw new Error(payload.message || 'Unable to load mail');
-          }
-          return payload;
-        });
-      })
+    return jsonFetch(
+      '{{ app.url_generator.generate('mail.messages') }}?account_id=' + encodeURIComponent(account.id),
+      {},
+      'Unable to load mail'
+    )
       .then(function(payload) {
         if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
           return;
@@ -181,18 +199,11 @@
       return;
     }
 
-    fetch('{{ app.url_generator.generate('mail.message') }}?account_id=' + encodeURIComponent(account.id) + '&uid=' + encodeURIComponent(message.uid), {
-      credentials: 'same-origin',
-      headers: { 'Accept': 'application/json' }
-    })
-      .then(function(response) {
-        return response.json().then(function(payload) {
-          if (!response.ok) {
-            throw new Error(payload.message || 'Unable to load message');
-          }
-          return payload;
-        });
-      })
+    jsonFetch(
+      '{{ app.url_generator.generate('mail.message') }}?account_id=' + encodeURIComponent(account.id) + '&uid=' + encodeURIComponent(message.uid),
+      {},
+      'Unable to load message'
+    )
       .then(function(payload) {
         if (requestId !== detailRequestId || activeAccountId !== account.id) {
           return;
@@ -248,20 +259,14 @@
 
     $('#mail_account_form').addEventListener('submit', function(event) {
       event.preventDefault();
-      fetch(event.target.action, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Accept': 'application/json' },
-        body: new FormData(event.target)
-      })
-        .then(function(response) {
-          return response.json().then(function(payload) {
-            if (!response.ok) {
-              throw new Error(payload.message || 'Unable to save mail account');
-            }
-            return payload;
-          });
-        })
+      jsonFetch(
+        event.target.action,
+        {
+          method: 'POST',
+          body: new FormData(event.target)
+        },
+        'Unable to save mail account'
+      )
         .then(function(payload) {
           var index = accounts.findIndex(function(account) {
             return account.id === payload.data.id;
