@@ -340,6 +340,7 @@ test('preferences page remains vertically scrollable', async ({ page }) => {
 
   await expect(page.locator('#prefs_form')).toBeVisible();
   await expect(page.locator('#prefs_buttons')).toBeVisible();
+  await expect(page.locator('input[name="disable_javascript"][value="false"]')).toBeChecked();
 
   const before = await page.evaluate(() => ({
     overflow: window.getComputedStyle(document.body).overflow,
@@ -475,22 +476,24 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await expect(page.locator('#mail_rows .mail-row')).toHaveCount(2);
 
   await page.locator('#mail_rows .mail-row').first().click();
-  await expect(page.locator('#mail_message_detail')).toBeVisible();
-  await expect(page.locator('#mail_message_subject')).toHaveText('Quarterly report');
-  await expect(page.locator('#mail_message_body')).toContainText('Attached is the quarterly report.');
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=101/);
+  await expect(page.locator('#mail_reader_message')).toBeVisible();
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Quarterly report');
+  await expect(page.locator('#mail_reader_body')).toContainText('Attached is the quarterly report.');
+  await expect(page.locator('#mail_message_detail')).toHaveCount(0);
 
-  const attachmentHref = await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').getAttribute('href');
+  const attachmentHref = await page.locator('#mail_reader_message [data-testid="mail-attachment-download"]').getAttribute('href');
   expect(attachmentHref).toContain('account_id=1');
   expect(attachmentHref).toContain('uid=101');
   expect(attachmentHref).toContain('part=2');
 
   const downloadPromise = page.waitForEvent('download');
-  const primaryAttachmentUrl = await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').getAttribute('href');
+  const primaryAttachmentUrl = await page.locator('#mail_reader_message [data-testid="mail-attachment-download"]').getAttribute('href');
   expect(primaryAttachmentUrl).toContain('account_id=1');
   expect(primaryAttachmentUrl).toContain('uid=101');
   expect(primaryAttachmentUrl).toContain('part=2');
 
-  await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
+  await page.locator('#mail_reader_message [data-testid="mail-attachment-download"]').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('report.pdf');
   const primaryAttachmentBody = await page.evaluate(async href => {
@@ -498,6 +501,9 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   }, primaryAttachmentUrl);
   expect(primaryAttachmentBody).toBe('dummy primary report contents');
 
+  await page.locator('#mail_reader_back').click();
+  await expect(page).toHaveURL(/\/mail$/);
+  await expect(page.locator('.mail-account-tab[data-account-id="2"]')).toBeVisible();
   await page.locator('.mail-account-tab[data-account-id="2"]').click();
   await expect(page.locator('#mail_account_title')).toHaveText('Archive Inbox');
   await expect(page.locator('#mail_rows .mail-row')).toHaveCount(2);
@@ -505,17 +511,18 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await expect(page.locator('[data-testid="mail-attachment-download"][data-filename="flight-notes.txt"]').first()).toBeVisible();
 
   await page.locator('#mail_rows .mail-row').first().click();
-  await expect(page.locator('#mail_message_detail')).toBeVisible();
-  await expect(page.locator('#mail_message_subject')).toHaveText('Archived flight notes');
-  await expect(page.locator('#mail_message_body')).toContainText('Dummy archive notes for account two.');
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=2&uid=201/);
+  await expect(page.locator('#mail_reader_message')).toBeVisible();
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Archived flight notes');
+  await expect(page.locator('#mail_reader_body')).toContainText('Dummy archive notes for account two.');
 
-  const archiveAttachmentHref = await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').getAttribute('href');
+  const archiveAttachmentHref = await page.locator('#mail_reader_message [data-testid="mail-attachment-download"]').getAttribute('href');
   expect(archiveAttachmentHref).toContain('account_id=2');
   expect(archiveAttachmentHref).toContain('uid=201');
   expect(archiveAttachmentHref).toContain('part=3');
 
   const archiveDownloadPromise = page.waitForEvent('download');
-  await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
+  await page.locator('#mail_reader_message [data-testid="mail-attachment-download"]').click();
   const archiveDownload = await archiveDownloadPromise;
   expect(archiveDownload.suggestedFilename()).toBe('flight-notes.txt');
   const archiveAttachmentBody = await page.evaluate(async href => {
@@ -793,6 +800,9 @@ test('mail add-account non-JSON auth failure shows a useful error', async ({ pag
 test('mail page can render without loading JavaScript using nojs option', async ({ page }) => {
   await login(page);
 
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('script').filter({ hasText: 'mail_account_create' })).toHaveCount(1);
+
   await page.goto(`${baseURL}/mail?nojs=1`);
   await expect(page.locator('.mail-shell')).toBeVisible();
   await expect(page.locator('#mail_account_create')).toBeVisible();
@@ -857,11 +867,11 @@ test('mail layout keeps critical controls visible across desktop and mobile', as
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(row.y + 1);
 
     await page.locator('#mail_rows .mail-row').first().click();
-    await expect(page.locator('#mail_message_detail')).toBeVisible();
-    const detail = await visibleBox(page, '#mail_message_detail');
-    expect(detail.x + detail.width).toBeLessThanOrEqual(viewport.width + 1);
-    expect(detail.y + detail.height).toBeLessThanOrEqual(viewport.height + 1);
-    await page.locator('#mail_message_close').click();
-    await expect(page.locator('#mail_message_detail')).toBeHidden();
+    await expect(page).toHaveURL(/\/mail\/read/);
+    await expect(page.locator('#mail_reader_message')).toBeVisible();
+    const reader = await visibleBox(page, '.mail-reader');
+    const subject = await visibleBox(page, '#mail_reader_subject');
+    expect(reader.x + reader.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(subject.x + subject.width).toBeLessThanOrEqual(viewport.width + 1);
   }
 });

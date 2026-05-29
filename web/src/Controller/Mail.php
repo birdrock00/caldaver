@@ -14,6 +14,14 @@ class Mail
         return $app['twig']->render('mail.html');
     }
 
+    public function readAction(Request $request, Application $app)
+    {
+        return $app['twig']->render('mail_message.html', [
+            'account_id' => (int)$request->query->get('account_id'),
+            'uid' => (int)$request->query->get('uid'),
+        ]);
+    }
+
     public function accountsAction(Request $request, Application $app)
     {
         return new JsonResponse([
