@@ -39,6 +39,10 @@ $app['log.path'] = __DIR__.'/../var/log/';
 // Logging level
 $app['log.level'] = 'INFO';
 
+// Optional local AgenDAV login. Leave empty to authenticate directly with the DAV server.
+$app['auth.local.username'] = '';
+$app['auth.local.password'] = '';
+
 // Base URL
 $app['caldav.baseurl'] = 'http://localhost:81/';
 
@@ -47,6 +51,10 @@ $app['carddav.baseurl'] = $app['caldav.baseurl'];
 
 // Authentication method required by CalDAV server (basic or digest)
 $app['caldav.authmethod'] = 'basic';
+
+// Optional service credentials for the DAV server. Leave empty to use login credentials.
+$app['caldav.username'] = '';
+$app['caldav.password'] = '';
 
 // Whether to show public CalDAV urls
 $app['caldav.publicurls'] = true;
