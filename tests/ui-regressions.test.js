@@ -293,10 +293,14 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(repository, /mail_accounts/);
   assert.match(repository, /openssl_encrypt/);
   assert.match(repository, /aes-256-gcm/);
+  assert.match(repository, /matchingAccountId/);
+  assert.match(repository, /lower\(email_address\) = lower\(\?\)/);
   assert.match(imap, /imap_open/);
   assert.match(imap, /imap_timeout/);
   assert.match(imap, /IMAP_OPENTIMEOUT/);
   assert.match(imap, /TIMEOUT_SECONDS = 10/);
+  assert.match(imap, /candidateUsernames/);
+  assert.match(imap, /email_address/);
   assert.match(imap, /downloadAttachment/);
   assert.match(imap, /attachmentsForMessage/);
   assert.match(imap, /fetchMessage/);
