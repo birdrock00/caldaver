@@ -155,7 +155,7 @@ class MailAccountRepository
         $plain = openssl_decrypt(
             substr($raw, 16),
             'aes-256-cbc',
-            $this->key(),
+            $this->legacyKey(),
             OPENSSL_RAW_DATA,
             substr($raw, 0, 16)
         );
@@ -185,5 +185,10 @@ class MailAccountRepository
     protected function key()
     {
         return hash('sha256', 'mail-account-credentials:' . $this->secret, true);
+    }
+
+    protected function legacyKey()
+    {
+        return hash('sha256', $this->secret, true);
     }
 }
