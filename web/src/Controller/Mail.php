@@ -1,6 +1,7 @@
 <?php
 namespace AgenDAV\Controller;
 
+use AgenDAV\Mail\AccountValidator;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -42,7 +43,7 @@ class Mail
             }
         }
 
-        $validationError = $this->validateAccountInput($input);
+        $validationError = AccountValidator::validate($input);
         if ($validationError !== null) {
             return new JsonResponse([
                 'result' => 'ERROR',
@@ -181,32 +182,4 @@ class Mail
         ]);
     }
 
-    protected function validateAccountInput(array $input)
-    {
-        $port = filter_var($input['imap_port'], FILTER_VALIDATE_INT, [
-            'options' => ['min_range' => 1, 'max_range' => 65535],
-        ]);
-        if ($port === false) {
-            return 'IMAP port must be between 1 and 65535';
-        }
-
-        $host = strtolower($input['imap_host']);
-        if ($host === 'localhost' || substr($host, -10) === '.localhost') {
-            return 'IMAP host cannot be localhost';
-        }
-
-        if (filter_var($host, FILTER_VALIDATE_IP)) {
-            if (!filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                return 'IMAP host cannot be a private or reserved address';
-            }
-
-            return null;
-        }
-
-        if (!preg_match('/\A[a-z0-9.-]+\z/', $host) || strpos($host, '.') === false) {
-            return 'IMAP host must be a valid hostname';
-        }
-
-        return null;
-    }
 }
