@@ -113,6 +113,18 @@
         <label class="radio-inline">
           <input type="radio" name="show_now_indicator" {% if show_now_indicator == false %} checked="checked" {% endif %} value="false"> {% trans %}labels.no{% endtrans %}
         </label>
+	    </div>
+
+    <div class="form-group">
+        <label for="disable_javascript">{% trans %}labels.disable_javascript{% endtrans %}</label>
+        <br>
+        <label class="radio-inline">
+          <input type="radio" name="disable_javascript" {% if disable_javascript == true %} checked="checked" {% endif %} value="true"> {% trans %}labels.yes{% endtrans %}
+        </label>
+        <label class="radio-inline">
+          <input type="radio" name="disable_javascript" {% if disable_javascript == false %} checked="checked" {% endif %} value="false"> {% trans %}labels.no{% endtrans %}
+        </label>
+        <span class="help-block">{% trans %}messages.help_disable_javascript{% endtrans %}</span>
     </div>
 
 

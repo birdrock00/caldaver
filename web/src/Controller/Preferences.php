@@ -62,6 +62,7 @@ class Preferences
                 'show_now_indicator' => $preferences->get('show_now_indicator'),
                 'list_days' => $preferences->get('list_days'),
                 'default_view' => $preferences->get('default_view'),
+                'disable_javascript' => $preferences->get('disable_javascript', false),
             ]
         );
     }
@@ -89,6 +90,7 @@ class Preferences
             'show_now_indicator' => $input->get('show_now_indicator') == 'true',
             'list_days' => $input->get('list_days'),
             'default_view' => $input->get('default_view'),
+            'disable_javascript' => $input->get('disable_javascript') == 'true',
         ]);
         $app['preferences.repository']->save($username, $preferences);
 
