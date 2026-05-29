@@ -233,6 +233,7 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   const mailJs = read('web/templates/parts/mailjs.html');
   const repository = read('web/src/Mail/MailAccountRepository.php');
   const imap = read('web/src/Mail/ImapClient.php');
+  const validator = read('web/src/Mail/AccountValidator.php');
   const less = read('assets/less/agendav.less');
 
   assert.match(controllers, /->get\('\/mail', '\\AgenDAV\\Controller\\Mail::indexAction'\)->bind\('mail'\)/);
@@ -246,6 +247,7 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(appNav, /app\.url_generator\.generate\('mail'\)/);
   assert.match(mail, /id="mail_accounts"/);
   assert.match(mail, /id="mail_account_form"/);
+  assert.match(mail, /id="mail_account_error"/);
   assert.match(mail, /id="mail_no_messages"/);
   assert.match(mailJs, /mail\.accounts/);
   assert.match(mailJs, /mail\.messages/);
@@ -263,7 +265,10 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(imap, /downloadAttachment/);
   assert.match(imap, /attachmentsForMessage/);
   assert.match(imap, /fetchMessage/);
+  assert.match(imap, /AccountValidator::assertValid/);
   assert.doesNotMatch(imap, /novalidate-cert/);
+  assert.match(validator, /dns_get_record/);
+  assert.match(validator, /FILTER_FLAG_NO_PRIV_RANGE \| FILTER_FLAG_NO_RES_RANGE/);
   assert.match(less, /\.mail-account-tab/);
   assert.match(less, /\.mail-row/);
   assert.match(less, /\.mail-attachment/);
