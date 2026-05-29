@@ -32,27 +32,7 @@ ENV APACHE_RUN_USER=www-data \
     APACHE_LOCK_DIR=/var/lock/apache2 \
     APACHE_PID_FILE=/var/run/apache2/apache2.pid \
     TERM=xterm \
-    PHP_INI_DIR=/usr/local/etc/php \
-    AGENDAV_SERVER_NAME=localhost \
-    AGENDAV_TITLE="AgenDAV" \
-    AGENDAV_FOOTER="AgenDAV" \
-    AGENDAV_CALDAV_SERVER="http://localhost:5232/" \
-    AGENDAV_CARDDAV_SERVER="" \
-    AGENDAV_CALDAV_PUBLIC_URL="" \
-    AGENDAV_CALDAV_AUTHMETHOD=basic \
-    AGENDAV_CALDAV_CERTIFICATE_VERIFY=true \
-    AGENDAV_TIMEZONE=UTC \
-    AGENDAV_WEEKSTART=0 \
-    AGENDAV_LANG=en \
-    AGENDAV_LOG_DIR=/tmp/ \
-    AGENDAV_DB_DRIVER=pdo_pgsql \
-    AGENDAV_DB_HOST=postgres.example.com \
-    AGENDAV_DB_PORT=5432 \
-    AGENDAV_DB_NAME=agendav \
-    AGENDAV_DB_USER=agendav \
-    AGENDAV_DB_PASSWORD= \
-    AGENDAV_CALENDAR_SHARING=false \
-    AGENDAV_CSRF_SECRET=change-me
+    PHP_INI_DIR=/usr/local/etc/php
 
 ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions /usr/local/bin/
 ADD https://curl.se/ca/cacert.pem /etc/ssl/certs/cacert.pem
