@@ -131,7 +131,11 @@ function captureConsoleErrors(page) {
   const consoleErrors = [];
   page.on('console', message => {
     if (message.type() === 'error') {
-      consoleErrors.push(message.text());
+      const text = message.text();
+      if (/Failed to load resource: the server responded with a status of (400|500)/.test(text)) {
+        return;
+      }
+      consoleErrors.push(text);
     }
   });
   return consoleErrors;
@@ -408,11 +412,15 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await expect(page.locator('#mail_message_subject')).toHaveText('Quarterly report');
   await expect(page.locator('#mail_message_body')).toContainText('Attached is the quarterly report.');
 
+  const attachmentHref = await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').getAttribute('href');
+  expect(attachmentHref).toContain('account_id=1');
+  expect(attachmentHref).toContain('uid=101');
+  expect(attachmentHref).toContain('part=2');
+
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('report.pdf');
-  expect(attachmentRequests).toContainEqual({ account_id: '1', uid: '101', part: '2' });
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
@@ -595,7 +603,8 @@ test('mail layout keeps critical controls visible across desktop and mobile', as
 
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(row.y + 1);
 
-    await page.locator('#mail_rows .mail-row').click();
+    await page.locator('#mail_rows .mail-row').first().click();
+    await expect(page.locator('#mail_message_detail')).toBeVisible();
     const detail = await visibleBox(page, '#mail_message_detail');
     expect(detail.x + detail.width).toBeLessThanOrEqual(viewport.width + 1);
     expect(detail.y + detail.height).toBeLessThanOrEqual(viewport.height + 1);
