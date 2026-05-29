@@ -132,6 +132,9 @@ $app['defaults.list_days'] = 7;
 // Default view (month, week, day or list)
 $app['defaults.default_view'] = 'month';
 
+// Default for disabling JavaScript. JavaScript is loaded unless users turn this on.
+$app['defaults.disable_javascript'] = false;
+
 // Logout redirection. Optional
 $app['logout.redirection'] = '';
 
