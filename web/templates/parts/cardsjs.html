@@ -55,13 +55,17 @@
       row.className = 'contact-row';
       row.innerHTML =
         '<div class="contact-name-cell"><span class="contact-name"></span></div>' +
-        '<div></div><div></div><div></div><div class="contact-labels"></div>';
+        '<div></div><div></div><div></div><div class="contact-labels"></div>' +
+        '<div class="contact-actions-cell"><button type="button" class="contact-delete" title="{{ 'labels.delete'|trans }}"><i class="fa fa-trash"></i></button></div>';
       row.children[0].insertBefore(contactAvatar(contact), row.children[0].firstChild);
       row.querySelector('.contact-name').textContent = contact.full_name;
       row.children[1].textContent = text(contact.email);
       row.children[2].textContent = text(contact.phone);
       row.children[3].textContent = text(contact.company_line);
       row.children[4].textContent = (contact.labels || []).join(', ');
+      row.querySelector('.contact-delete').addEventListener('click', function() {
+        deleteContact(contact);
+      });
       rows.appendChild(row);
     });
   }
@@ -91,6 +95,16 @@
       detail.children[3].textContent = text(contact.phone);
       detail.children[5].textContent = text(contact.company_line);
       card.appendChild(detail);
+
+      var deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'contact-delete card-delete';
+      deleteButton.title = '{{ 'labels.delete'|trans }}';
+      deleteButton.innerHTML = '<i class="fa fa-trash"></i>';
+      deleteButton.addEventListener('click', function() {
+        deleteContact(contact);
+      });
+      card.appendChild(deleteButton);
       grid.appendChild(card);
     });
   }
@@ -120,6 +134,35 @@
       })
       .then(function(payload) {
         contacts = payload.data || [];
+        render();
+      })
+      .catch(function(error) {
+        $('#contacts_rows').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
+      });
+  }
+
+  function deleteContact(contact) {
+    var formData = new FormData();
+    formData.append('_token', $('#contact_form input[name="_token"]').value);
+    formData.append('url', contact.url);
+    formData.append('etag', contact.etag || '');
+
+    fetch('{{ app.url_generator.generate('cards.delete') }}', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' },
+      body: formData
+    })
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Unable to delete contact');
+        }
+        return response.json();
+      })
+      .then(function() {
+        contacts = contacts.filter(function(item) {
+          return item.url !== contact.url;
+        });
         render();
       })
       .catch(function(error) {
