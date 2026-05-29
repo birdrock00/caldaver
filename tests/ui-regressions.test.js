@@ -239,16 +239,41 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(controllers, /->get\('\/mail\/accounts', '\\AgenDAV\\Controller\\Mail::accountsAction'\)->bind\('mail\.accounts'\)/);
   assert.match(controllers, /->post\('\/mail\/accounts\/save', '\\AgenDAV\\Controller\\Mail::saveAccountAction'\)->bind\('mail\.accounts\.save'\)/);
   assert.match(controllers, /->get\('\/mail\/messages', '\\AgenDAV\\Controller\\Mail::messagesAction'\)->bind\('mail\.messages'\)/);
+  assert.match(controllers, /->get\('\/mail\/message', '\\AgenDAV\\Controller\\Mail::messageAction'\)->bind\('mail\.message'\)/);
+  assert.match(controllers, /->get\('\/mail\/attachment', '\\AgenDAV\\Controller\\Mail::attachmentAction'\)->bind\('mail\.attachment'\)/);
   assert.match(services, /\$app\['mail\.accounts'\]/);
   assert.match(services, /\$app\['mail\.imap\.client'\]/);
   assert.match(appNav, /app\.url_generator\.generate\('mail'\)/);
   assert.match(mail, /id="mail_accounts"/);
   assert.match(mail, /id="mail_account_form"/);
+  assert.match(mail, /id="mail_no_messages"/);
   assert.match(mailJs, /mail\.accounts/);
   assert.match(mailJs, /mail\.messages/);
+  assert.match(mailJs, /mail\.message/);
+  assert.match(mailJs, /mail\.attachment/);
+  assert.match(mailJs, /data-testid="mail-attachments"/);
+  assert.match(mailJs, /mail-attachment-download/);
+  assert.match(mailJs, /messageRequestId/);
+  assert.match(mailJs, /loadMessage/);
+  assert.match(mailJs, /mail_error'\)\.hidden = false/);
   assert.match(repository, /mail_accounts/);
   assert.match(repository, /openssl_encrypt/);
+  assert.match(repository, /aes-256-gcm/);
   assert.match(imap, /imap_open/);
+  assert.match(imap, /downloadAttachment/);
+  assert.match(imap, /attachmentsForMessage/);
+  assert.match(imap, /fetchMessage/);
+  assert.doesNotMatch(imap, /novalidate-cert/);
   assert.match(less, /\.mail-account-tab/);
   assert.match(less, /\.mail-row/);
+  assert.match(less, /\.mail-attachment/);
+  assert.match(less, /\.mail-message-detail/);
+});
+
+test('mail account schema is available to non-Docker migrations', () => {
+  const migration = read('web/src/DB/Migrations/Version20260529000000.php');
+
+  assert.match(migration, /createTable\('mail_accounts'\)/);
+  assert.match(migration, /addColumn\('password_encrypted', 'text'\)/);
+  assert.match(migration, /addIndex\(\['owner'\]\)/);
 });
