@@ -1198,7 +1198,7 @@ body.agendav-calendar-page {
 .contacts-table-header,
 .contact-row {
   display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) minmax(180px, 1fr) minmax(150px, .75fr) minmax(210px, 1fr) minmax(120px, .55fr);
+  grid-template-columns: minmax(260px, 1.4fr) minmax(180px, 1fr) minmax(150px, .75fr) minmax(210px, 1fr) minmax(120px, .55fr) 48px;
   align-items: center;
   column-gap: 20px;
 }
@@ -1249,6 +1249,26 @@ body.agendav-calendar-page {
   white-space: nowrap;
 }
 
+.contact-actions-cell {
+  text-align: right;
+}
+
+.contact-delete {
+  width: 36px;
+  height: 36px;
+  color: #5f6368;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+
+  &:hover,
+  &:focus {
+    color: #202124;
+    background: #f1f3f4;
+    outline: 0;
+  }
+}
+
 .contacts-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1257,6 +1277,7 @@ body.agendav-calendar-page {
 }
 
 .contact-card {
+  position: relative;
   min-height: 196px;
   padding: 20px;
   border: 1px solid #e0e7ef;
@@ -1300,6 +1321,12 @@ body.agendav-calendar-page {
     margin: 0;
     overflow-wrap: anywhere;
   }
+
+  .card-delete {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+  }
 }
 
 .contacts-empty,
@@ -1312,6 +1339,214 @@ body.agendav-calendar-page {
   margin: 0;
   font-size: 18px;
   font-weight: 400;
+}
+
+.mail-shell {
+  display: flex;
+  height: ~"calc(100vh - 64px)";
+  padding: 0;
+  background: #f6f8fc;
+}
+
+.mail-sidebar {
+  width: 256px;
+  min-width: 256px;
+  height: 100%;
+  padding: 12px 8px;
+  overflow-y: auto;
+  background: #f6f8fc;
+}
+
+.compose-button {
+  display: inline-flex;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  margin: 6px 0 14px;
+  padding: 0 24px;
+  color: #001d35;
+  background: #c2e7ff;
+  border: 0;
+  border-radius: 16px;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 500;
+
+  i {
+    margin-right: 14px;
+    font-size: 18px;
+  }
+}
+
+.mail-accounts {
+  display: grid;
+  gap: 2px;
+}
+
+.mail-account-tab {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  min-height: 44px;
+  align-items: center;
+  padding: 4px 12px 4px 20px;
+  color: #3c4043;
+  background: transparent;
+  border: 0;
+  border-radius: 0 22px 22px 0;
+  text-align: left;
+
+  i {
+    grid-row: 1 / span 2;
+    color: #5f6368;
+  }
+
+  span,
+  small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  small {
+    color: #5f6368;
+    font-size: 12px;
+  }
+
+  &.active {
+    color: #001d35;
+    background: #d3e3fd;
+
+    i {
+      color: #001d35;
+    }
+  }
+}
+
+.mail-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  padding: 0 16px 16px 0;
+}
+
+.mail-search-row {
+  display: flex;
+  min-height: 72px;
+  align-items: center;
+}
+
+.mail-search {
+  display: flex;
+  width: 48vw;
+  max-width: 720px;
+  height: 48px;
+  align-items: center;
+  padding: 0 18px;
+  color: #5f6368;
+  background: #eaf1fb;
+  border-radius: 24px;
+
+  i {
+    margin-right: 16px;
+    font-size: 18px;
+  }
+
+  input {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: #202124;
+    background: transparent;
+    border: 0;
+    font-size: 16px;
+    outline: 0;
+  }
+}
+
+.mail-panel {
+  height: ~"calc(100% - 72px)";
+  overflow: auto;
+  background: #fff;
+  border-radius: 16px;
+}
+
+.mail-toolbar {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  padding: 0 16px;
+  border-bottom: 1px solid #e0e0e0;
+
+  h1 {
+    margin: 0;
+    color: #3c4043;
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  button {
+    width: 40px;
+    height: 40px;
+    margin-left: auto;
+    color: #3c4043;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+
+    &:hover,
+    &:focus {
+      background: #f1f3f4;
+      outline: 0;
+    }
+  }
+}
+
+.mail-row {
+  display: grid;
+  grid-template-columns: minmax(160px, .7fr) minmax(240px, 2fr) minmax(170px, .55fr);
+  min-height: 28px;
+  align-items: center;
+  padding: 0 16px;
+  color: #202124;
+  border-bottom: 1px solid #e8eaed;
+  column-gap: 18px;
+  font-size: 14px;
+
+  &:hover {
+    box-shadow: inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0, 0 1px 2px rgba(60, 64, 67, .3);
+  }
+
+  &.unread {
+    font-weight: 700;
+    background: #fff;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.mail-date {
+  justify-self: end;
+  color: #3c4043;
+  font-size: 12px;
+}
+
+.mail-empty,
+.mail-error {
+  padding: 32px 24px;
+  color: #5f6368;
+  font-size: 16px;
+}
+
+.mail-error {
+  color: #b3261e;
 }
 
 .contact-dialog {
@@ -1348,10 +1583,12 @@ body.agendav-calendar-page {
       font-weight: 500;
     }
 
-    input {
+    input,
+    select {
       width: 100%;
       height: 40px;
       padding: 0 12px;
+      background: #fff;
       border: 1px solid #dadce0;
       border-radius: 4px;
       font-size: 14px;
@@ -1466,6 +1703,45 @@ body.agendav-calendar-page {
     grid-template-columns: 1fr;
     row-gap: 4px;
     padding: 12px 20px;
+  }
+
+  .contact-actions-cell {
+    text-align: left;
+  }
+
+  .mail-shell {
+    display: block;
+    height: auto;
+  }
+
+  .mail-sidebar {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+  }
+
+  .mail-content {
+    height: auto;
+    padding: 0 12px 12px;
+  }
+
+  .mail-search {
+    width: 100%;
+  }
+
+  .mail-panel {
+    height: auto;
+  }
+
+  .mail-row {
+    grid-template-columns: 1fr;
+    row-gap: 3px;
+    min-height: 64px;
+    padding: 8px 16px;
+  }
+
+  .mail-date {
+    justify-self: start;
   }
 
   #calendar_view .fc-toolbar {

@@ -45,6 +45,12 @@ ENV APACHE_RUN_USER=www-data \
     AGENDAV_WEEKSTART=0 \
     AGENDAV_LANG=en \
     AGENDAV_LOG_DIR=/tmp/ \
+    AGENDAV_DB_DRIVER=pdo_pgsql \
+    AGENDAV_DB_HOST=postgres.example.com \
+    AGENDAV_DB_PORT=5432 \
+    AGENDAV_DB_NAME=agendav \
+    AGENDAV_DB_USER=agendav \
+    AGENDAV_DB_PASSWORD= \
     AGENDAV_CALENDAR_SHARING=false \
     AGENDAV_CSRF_SECRET=change-me
 
@@ -54,7 +60,7 @@ ADD https://curl.se/ca/cacert.pem /etc/ssl/certs/cacert.pem
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git unzip \
     && chmod +x /usr/local/bin/install-php-extensions \
-    && install-php-extensions mbstring xml pdo_sqlite curl \
+    && install-php-extensions mbstring xml pdo_pgsql curl imap \
     && rm /usr/local/bin/install-php-extensions \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -66,7 +72,7 @@ COPY --chown=www-data:www-data . /var/www/agendav
 COPY --from=assets --chown=www-data:www-data /src/web/public/dist /var/www/agendav/web/public/dist
 COPY docker/agendav.conf /etc/apache2/sites-available/agendav.conf
 COPY docker/settings.php /var/www/agendav/web/config/settings.php.template
-COPY docker/initialize-sqlite.php /var/www/agendav/docker/initialize-sqlite.php
+COPY docker/initialize-database.php /var/www/agendav/docker/initialize-database.php
 COPY docker/run.sh /usr/local/bin/run.sh
 
 RUN set -eux; \
@@ -79,11 +85,8 @@ RUN set -eux; \
     echo 'openssl.cafile = "/etc/ssl/certs/cacert.pem"' >> "$PHP_INI_DIR/php.ini"; \
     echo 'curl.cainfo = "/etc/ssl/certs/cacert.pem"' >> "$PHP_INI_DIR/php.ini"; \
     COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --prefer-dist --no-progress --no-interaction --optimize-autoloader --working-dir=/var/www/agendav/web; \
-    mkdir -p /var/agendav /var/www/agendav/web/var/cache/twig; \
-    touch /var/agendav/db.sqlite; \
-    chown -R www-data:www-data /var/agendav /var/www/agendav/web/var; \
-    chmod 640 /var/agendav/db.sqlite; \
-    php /var/www/agendav/docker/initialize-sqlite.php; \
+    mkdir -p /var/www/agendav/web/var/cache/twig; \
+    chown -R www-data:www-data /var/www/agendav/web/var; \
     a2ensite agendav.conf; \
     a2dissite 000-default; \
     a2enmod rewrite; \
