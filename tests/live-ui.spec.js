@@ -1,5 +1,4 @@
 const { test, expect } = require('@playwright/test');
-
 const baseURL = process.env.CALDAVER_BASE_URL || 'http://localhost:8080';
 const username = process.env.CALDAVER_USERNAME;
 const password = process.env.CALDAVER_PASSWORD;
@@ -49,6 +48,7 @@ async function mockMailApi(page, options = {}) {
   const accountStatus = options.accountStatus || 200;
   const attachmentBody = options.attachmentBody || 'mock attachment body';
   const attachmentFilename = options.attachmentFilename || 'report.pdf';
+  const attachmentBodies = options.attachmentBodies || {};
   const attachmentRequests = options.attachmentRequests || [];
 
   await page.route('**/mail/accounts', async route => {
@@ -114,15 +114,22 @@ async function mockMailApi(page, options = {}) {
 
   await page.route('**/mail/attachment?**', async route => {
     const url = new URL(route.request().url());
-    attachmentRequests.push(Object.fromEntries(url.searchParams.entries()));
+    const request = Object.fromEntries(url.searchParams.entries());
+    attachmentRequests.push(request);
+    const message = messageDetails[request.uid] || {};
+    const attachment = (message.attachments || []).find(item => String(item.part) === String(request.part)) || {};
+    const filename = attachment.filename || attachmentFilename;
+    const body = Object.prototype.hasOwnProperty.call(attachmentBodies, filename)
+      ? attachmentBodies[filename]
+      : attachmentBody;
 
     return route.fulfill({
       status: 200,
-      contentType: 'application/pdf',
+      contentType: attachment.content_type || 'application/octet-stream',
       headers: {
-        'Content-Disposition': `attachment; filename="${attachmentFilename}"`
+        'Content-Disposition': `attachment; filename="${filename}"`
       },
-      body: attachmentBody
+      body
     });
   });
 }
@@ -358,7 +365,8 @@ test('mail page renders mocked messages, message detail, search, and attachment 
 
   await mockMailApi(page, {
     accounts: [
-      { id: 1, label: 'Primary Inbox', email_address: 'user@example.test' }
+      { id: 1, label: 'Primary Inbox', email_address: 'user@example.test' },
+      { id: 2, label: 'Archive Inbox', email_address: 'archive@example.test' }
     ],
     messagesByAccount: {
       1: [
@@ -378,6 +386,24 @@ test('mail page renders mocked messages, message detail, search, and attachment 
           seen: true,
           attachments: []
         }
+      ],
+      2: [
+        {
+          uid: 201,
+          from: 'Katherine Johnson <katherine@example.test>',
+          subject: 'Archived flight notes',
+          date: 'Wed, 27 May 2026 08:45:00 -0700',
+          seen: true,
+          attachments: [{ part: '3', filename: 'flight-notes.txt', content_type: 'text/plain', size: 36 }]
+        },
+        {
+          uid: 202,
+          from: 'Mary Jackson <mary@example.test>',
+          subject: 'Archive without attachments',
+          date: 'Tue, 26 May 2026 11:00:00 -0700',
+          seen: true,
+          attachments: []
+        }
       ]
     },
     messageDetails: {
@@ -388,13 +414,26 @@ test('mail page renders mocked messages, message detail, search, and attachment 
         date: 'Fri, 29 May 2026 10:30:00 -0700',
         body: 'Attached is the quarterly report.',
         attachments: [{ part: '2', filename: 'report.pdf', content_type: 'application/pdf', size: 12345 }]
+      },
+      201: {
+        uid: 201,
+        from: 'Katherine Johnson <katherine@example.test>',
+        subject: 'Archived flight notes',
+        date: 'Wed, 27 May 2026 08:45:00 -0700',
+        body: 'Dummy archive notes for account two.',
+        attachments: [{ part: '3', filename: 'flight-notes.txt', content_type: 'text/plain', size: 36 }]
       }
+    },
+    attachmentBodies: {
+      'report.pdf': 'dummy primary report contents',
+      'flight-notes.txt': 'dummy archive attachment contents'
     },
     attachmentRequests
   });
 
   await page.goto(`${baseURL}/mail`);
   await expect(page.locator('.mail-account-tab[data-account-id="1"]')).toBeVisible();
+  await expect(page.locator('.mail-account-tab[data-account-id="2"]')).toBeVisible();
   await expect(page.locator('#mail_account_title')).toHaveText('Primary Inbox');
   await expect(page.locator('#mail_rows .mail-row')).toHaveCount(2);
   await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/unread/);
@@ -418,9 +457,44 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   expect(attachmentHref).toContain('part=2');
 
   const downloadPromise = page.waitForEvent('download');
+  const primaryAttachmentUrl = await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').getAttribute('href');
+  expect(primaryAttachmentUrl).toContain('account_id=1');
+  expect(primaryAttachmentUrl).toContain('uid=101');
+  expect(primaryAttachmentUrl).toContain('part=2');
+
   await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('report.pdf');
+  const primaryAttachmentResponse = await page.request.get(`${baseURL}${primaryAttachmentUrl}`);
+  expect(await primaryAttachmentResponse.text()).toBe('dummy primary report contents');
+
+  await page.locator('.mail-account-tab[data-account-id="2"]').click();
+  await expect(page.locator('#mail_account_title')).toHaveText('Archive Inbox');
+  await expect(page.locator('#mail_rows .mail-row')).toHaveCount(2);
+  await expect(page.locator('#mail_rows .mail-row .mail-subject').first()).toContainText('Archived flight notes');
+  await expect(page.locator('[data-testid="mail-attachment-download"][data-filename="flight-notes.txt"]').first()).toBeVisible();
+
+  await page.locator('#mail_rows .mail-row').first().click();
+  await expect(page.locator('#mail_message_detail')).toBeVisible();
+  await expect(page.locator('#mail_message_subject')).toHaveText('Archived flight notes');
+  await expect(page.locator('#mail_message_body')).toContainText('Dummy archive notes for account two.');
+
+  const archiveAttachmentHref = await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').getAttribute('href');
+  expect(archiveAttachmentHref).toContain('account_id=2');
+  expect(archiveAttachmentHref).toContain('uid=201');
+  expect(archiveAttachmentHref).toContain('part=3');
+
+  const archiveDownloadPromise = page.waitForEvent('download');
+  await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
+  const archiveDownload = await archiveDownloadPromise;
+  expect(archiveDownload.suggestedFilename()).toBe('flight-notes.txt');
+  const archiveAttachmentResponse = await page.request.get(`${baseURL}${archiveAttachmentHref}`);
+  expect(await archiveAttachmentResponse.text()).toBe('dummy archive attachment contents');
+
+  expect(attachmentRequests).toEqual([
+    { account_id: '1', uid: '101', part: '2' },
+    { account_id: '2', uid: '201', part: '3' }
+  ]);
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
@@ -469,27 +543,33 @@ test('mail account tab switching ignores stale message responses', async ({ page
   expect(consoleErrors).toEqual([]);
 });
 
-test('mail add-account dialog posts expected fields and activates saved account', async ({ page }) => {
+test('mail add-account dialog posts expected fields and supports multiple saved accounts', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
-  let postedBody = '';
+  const savedAccounts = [];
+  const postedBodies = [];
   await mockMailApi(page, { accounts: [] });
   await page.route('**/mail/accounts/save', async route => {
-    postedBody = route.request().postData() || '';
+    const postedBody = route.request().postData() || '';
+    postedBodies.push(postedBody);
+    const params = new URLSearchParams(postedBody);
+    const account = {
+      id: 99 + savedAccounts.length,
+      label: params.get('label'),
+      email_address: params.get('email_address'),
+      imap_host: params.get('imap_host'),
+      imap_port: Number(params.get('imap_port') || 993),
+      encryption: params.get('encryption') || 'ssl',
+      username: params.get('username')
+    };
+    savedAccounts.push(account);
+
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         result: 'SUCCESS',
-        data: {
-          id: 99,
-          label: 'Test Inbox',
-          email_address: 'test@example.com',
-          imap_host: 'imap.example.test',
-          imap_port: 993,
-          encryption: 'ssl',
-          username: 'test@example.com'
-        }
+        data: account
       })
     });
   });
@@ -511,10 +591,24 @@ test('mail add-account dialog posts expected fields and activates saved account'
   await expect(page.locator('#mail_account_dialog')).toBeHidden();
   await expect(page.locator('.mail-account-tab[data-account-id="99"]')).toBeVisible();
   await expect(page.locator('#mail_account_title')).toHaveText('Test Inbox');
-  expect(postedBody).toContain('label');
-  expect(postedBody).toContain('email_address');
-  expect(postedBody).toContain('imap_host');
-  expect(postedBody).toContain('password');
+  await page.locator('#mail_account_create').click();
+  await page.locator('#mail_account_form input[name="label"]').fill('Second Inbox');
+  await page.locator('#mail_account_form input[name="email_address"]').fill('second@example.com');
+  await page.locator('#mail_account_form input[name="imap_host"]').fill('imap2.example.test');
+  await page.locator('#mail_account_form input[name="username"]').fill('second@example.com');
+  await page.locator('#mail_account_form input[name="password"]').fill('second-secret');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+
+  await expect(page.locator('#mail_account_dialog')).toBeHidden();
+  await expect(page.locator('.mail-account-tab')).toHaveCount(2);
+  await expect(page.locator('.mail-account-tab[data-account-id="100"]')).toBeVisible();
+  await expect(page.locator('#mail_account_title')).toHaveText('Second Inbox');
+  expect(postedBodies).toHaveLength(2);
+  expect(postedBodies[0]).toContain('label');
+  expect(postedBodies[0]).toContain('email_address');
+  expect(postedBodies[0]).toContain('imap_host');
+  expect(postedBodies[0]).toContain('password');
+  expect(savedAccounts.map(account => account.label)).toEqual(['Test Inbox', 'Second Inbox']);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
@@ -545,6 +639,50 @@ test('mail add-account save failure stays visible in the dialog', async ({ page 
   await expect(page.locator('#mail_account_error')).toContainText('Mock save rejected');
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
+});
+
+test('mail add-account non-JSON auth failure shows a useful error', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  let requestedWith = '';
+  await mockMailApi(page, { accounts: [] });
+  await page.route('**/mail/accounts/save', async route => {
+    requestedWith = route.request().headers()['x-requested-with'] || '';
+    return route.fulfill({
+      status: 401,
+      contentType: 'text/html',
+      body: '<!doctype html><title>401</title><p>Invalid CSRF token</p>'
+    });
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await page.locator('#mail_account_create').click();
+  await page.locator('#mail_account_form input[name="label"]').fill('Expired Inbox');
+  await page.locator('#mail_account_form input[name="email_address"]').fill('expired@example.com');
+  await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
+  await page.locator('#mail_account_form input[name="username"]').fill('expired@example.com');
+  await page.locator('#mail_account_form input[name="password"]').fill('secret-password');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+
+  await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await expect(page.locator('#mail_account_error')).toBeVisible();
+  await expect(page.locator('#mail_account_error')).toContainText('Your session expired');
+  await expect(page.locator('#mail_account_error')).not.toContainText('JSON.parse');
+  expect(requestedWith).toBe('XMLHttpRequest');
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail page can render without loading JavaScript using nojs option', async ({ page }) => {
+  await login(page);
+
+  await page.goto(`${baseURL}/mail?nojs=1`);
+  await expect(page.locator('.mail-shell')).toBeVisible();
+  await expect(page.locator('#mail_account_create')).toBeVisible();
+  expect(await page.locator('script').count()).toBe(0);
+
+  await page.locator('#mail_account_create').click();
+  await expect(page.locator('#mail_account_dialog')).toBeHidden();
 });
 
 test('mail layout keeps critical controls visible across desktop and mobile', async ({ page }) => {

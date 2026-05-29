@@ -280,6 +280,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /mail\.messages/);
   assert.match(mailJs, /mail\.message/);
   assert.match(mailJs, /mail\.attachment/);
+  assert.match(mailJs, /jsonFetch/);
+  assert.match(mailJs, /X-Requested-With/);
+  assert.match(mailJs, /Your session expired/);
   assert.match(mailJs, /data-testid="mail-attachments"/);
   assert.match(mailJs, /mail-attachment-download/);
   assert.match(mailJs, /messageRequestId/);
@@ -300,6 +303,23 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(less, /\.mail-row/);
   assert.match(less, /\.mail-attachment/);
   assert.match(less, /\.mail-message-detail/);
+});
+
+test('pages can be rendered without loading JavaScript via nojs query option', () => {
+  const layout = read('web/templates/layout.html');
+
+  assert.match(layout, /app\.request\.query\.get\('nojs'\)/);
+  assert.match(layout, /not in \['1', 'true', 'yes'\]/);
+  assert.match(layout, /\{% block bottom %\}/);
+});
+
+test('CSRF failures return JSON for Ajax mail requests', () => {
+  const csrf = read('web/src/Csrf.php');
+
+  assert.match(csrf, /use Symfony\\Component\\HttpFoundation\\JsonResponse;/);
+  assert.match(csrf, /isXmlHttpRequest\(\)/);
+  assert.match(csrf, /CSRF token not present/);
+  assert.match(csrf, /Invalid CSRF token/);
 });
 
 test('mail account schema is available to non-Docker migrations', () => {
