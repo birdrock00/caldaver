@@ -42,6 +42,87 @@ function isoDate(date) {
   return date.toISOString().slice(0, 10);
 }
 
+async function mockMailApi(page, options = {}) {
+  const accounts = options.accounts || [];
+  const messagesByAccount = options.messagesByAccount || {};
+  const messageDetails = options.messageDetails || {};
+  const accountStatus = options.accountStatus || 200;
+  const attachmentBody = options.attachmentBody || 'mock attachment body';
+  const attachmentFilename = options.attachmentFilename || 'report.pdf';
+
+  await page.route('**/mail/accounts', async route => {
+    if (accountStatus >= 400) {
+      return route.fulfill({
+        status: accountStatus,
+        contentType: 'application/json',
+        body: JSON.stringify({ result: 'ERROR', message: 'Mock account load failed' })
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: accounts })
+    });
+  });
+
+  await page.route('**/mail/accounts/save', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        result: 'SUCCESS',
+        data: {
+          id: 99,
+          label: 'Test Inbox',
+          email_address: 'test@example.com',
+          imap_host: 'imap.example.test',
+          imap_port: 993,
+          encryption: 'ssl',
+          username: 'test@example.com'
+        }
+      })
+    });
+  });
+
+  await page.route('**/mail/messages?**', async route => {
+    const url = new URL(route.request().url());
+    const accountId = url.searchParams.get('account_id');
+
+    if (options.delays && options.delays[accountId]) {
+      await new Promise(resolve => setTimeout(resolve, options.delays[accountId]));
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: 'SUCCESS', data: messagesByAccount[accountId] || [] })
+    });
+  });
+
+  await page.route('**/mail/message?**', async route => {
+    const url = new URL(route.request().url());
+    const uid = url.searchParams.get('uid');
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: 'SUCCESS', data: messageDetails[uid] })
+    });
+  });
+
+  await page.route('**/mail/attachment?**', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/pdf',
+      headers: {
+        'Content-Disposition': `attachment; filename="${attachmentFilename}"`
+      },
+      body: attachmentBody
+    });
+  });
+}
+
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
   const pageErrors = await login(page);
 
@@ -237,4 +318,162 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
   expect(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y))).toBeLessThan(8);
   expect(centers[0].x).toBeLessThan(centers[1].x);
   expect(centers[1].x).toBeLessThan(centers[2].x);
+});
+
+test('mail page renders mocked messages, message detail, search, and attachment download', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = [];
+  page.on('console', message => {
+    if (message.type() === 'error') {
+      consoleErrors.push(message.text());
+    }
+  });
+
+  await mockMailApi(page, {
+    accounts: [
+      { id: 1, label: 'Primary Inbox', email_address: 'user@example.test' }
+    ],
+    messagesByAccount: {
+      1: [
+        {
+          uid: 101,
+          from: 'Ada Lovelace <ada@example.test>',
+          subject: 'Quarterly report',
+          date: 'Fri, 29 May 2026 10:30:00 -0700',
+          seen: false,
+          attachments: [{ part: '2', filename: 'report.pdf', content_type: 'application/pdf', size: 12345 }]
+        },
+        {
+          uid: 102,
+          from: 'Grace Hopper <grace@example.test>',
+          subject: 'Deployment update',
+          date: 'Thu, 28 May 2026 16:15:00 -0700',
+          seen: true,
+          attachments: []
+        }
+      ]
+    },
+    messageDetails: {
+      101: {
+        uid: 101,
+        from: 'Ada Lovelace <ada@example.test>',
+        subject: 'Quarterly report',
+        date: 'Fri, 29 May 2026 10:30:00 -0700',
+        body: 'Attached is the quarterly report.',
+        attachments: [{ part: '2', filename: 'report.pdf', content_type: 'application/pdf', size: 12345 }]
+      }
+    }
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('.mail-account-tab[data-account-id="1"]')).toBeVisible();
+  await expect(page.locator('#mail_account_title')).toHaveText('Primary Inbox');
+  await expect(page.locator('#mail_rows .mail-row')).toHaveCount(2);
+  await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/unread/);
+  await expect(page.locator('#mail_rows .mail-row').first().locator('.mail-from')).toContainText('Ada Lovelace');
+  await expect(page.locator('[data-testid="mail-attachment-download"][data-filename="report.pdf"]').first()).toBeVisible();
+
+  await page.locator('#mail_search').fill('deployment');
+  await expect(page.locator('#mail_rows .mail-row')).toHaveCount(1);
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Deployment update');
+  await page.locator('#mail_search').fill('');
+  await expect(page.locator('#mail_rows .mail-row')).toHaveCount(2);
+
+  await page.locator('#mail_rows .mail-row').first().click();
+  await expect(page.locator('#mail_message_detail')).toBeVisible();
+  await expect(page.locator('#mail_message_subject')).toHaveText('Quarterly report');
+  await expect(page.locator('#mail_message_body')).toContainText('Attached is the quarterly report.');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#mail_message_detail [data-testid="mail-attachment-download"]').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('report.pdf');
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail account load failure is visible and does not throw UI errors', async ({ page }) => {
+  const pageErrors = await login(page);
+  await mockMailApi(page, { accountStatus: 500 });
+
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('#mail_error')).toBeVisible();
+  await expect(page.locator('#mail_error')).toContainText('Unable to load mail accounts');
+  await expect(page.locator('#mail_rows .mail-row')).toHaveCount(0);
+  await expect(page.locator('#mail_empty')).toBeHidden();
+
+  expect(pageErrors).toEqual([]);
+});
+
+test('mail account tab switching ignores stale message responses', async ({ page }) => {
+  await login(page);
+  await mockMailApi(page, {
+    accounts: [
+      { id: 1, label: 'Slow Inbox', email_address: 'slow@example.test' },
+      { id: 2, label: 'Fast Inbox', email_address: 'fast@example.test' }
+    ],
+    delays: { 1: 350 },
+    messagesByAccount: {
+      1: [{ uid: 201, from: 'Slow Sender', subject: 'Slow message', date: 'Fri, 29 May 2026 09:00:00 -0700', seen: true }],
+      2: [{ uid: 301, from: 'Fast Sender', subject: 'Fast message', date: 'Fri, 29 May 2026 09:01:00 -0700', seen: true }]
+    }
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('.mail-account-tab[data-account-id="1"]')).toBeVisible();
+  await page.locator('.mail-account-tab[data-account-id="2"]').click();
+  await expect(page.locator('#mail_account_title')).toHaveText('Fast Inbox');
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Fast message');
+  await page.waitForTimeout(500);
+  await expect(page.locator('#mail_account_title')).toHaveText('Fast Inbox');
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Fast message');
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).not.toContainText('Slow message');
+});
+
+test('mail add-account dialog posts expected fields and activates saved account', async ({ page }) => {
+  await login(page);
+  let postedBody = '';
+  await mockMailApi(page, { accounts: [] });
+  await page.route('**/mail/accounts/save', async route => {
+    postedBody = route.request().postData() || '';
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        result: 'SUCCESS',
+        data: {
+          id: 99,
+          label: 'Test Inbox',
+          email_address: 'test@example.com',
+          imap_host: 'imap.example.test',
+          imap_port: 993,
+          encryption: 'ssl',
+          username: 'test@example.com'
+        }
+      })
+    });
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('#mail_empty')).toBeVisible();
+  await page.locator('#mail_account_create').click();
+  await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await expect(page.locator('#mail_account_form input[name="imap_port"]')).toHaveValue('993');
+  await expect(page.locator('#mail_account_form select[name="encryption"]')).toHaveValue('ssl');
+
+  await page.locator('#mail_account_form input[name="label"]').fill('Test Inbox');
+  await page.locator('#mail_account_form input[name="email_address"]').fill('test@example.com');
+  await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.test');
+  await page.locator('#mail_account_form input[name="username"]').fill('test@example.com');
+  await page.locator('#mail_account_form input[name="password"]').fill('secret-password');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+
+  await expect(page.locator('#mail_account_dialog')).toBeHidden();
+  await expect(page.locator('.mail-account-tab[data-account-id="99"]')).toBeVisible();
+  await expect(page.locator('#mail_account_title')).toHaveText('Test Inbox');
+  expect(postedBody).toContain('label');
+  expect(postedBody).toContain('email_address');
+  expect(postedBody).toContain('imap_host');
+  expect(postedBody).toContain('password');
 });
