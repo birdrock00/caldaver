@@ -71,6 +71,7 @@ $translations = array(
     'labels.inbox' => 'Inbox',
     'labels.noaccounts' => 'Add an IMAP account to download mail.',
     'labels.nomessages' => 'No messages',
+    'labels.attachments' => 'Attachments',
     'labels.from' => 'From',
     'labels.subject' => 'Subject',
     'labels.date' => 'Date',
