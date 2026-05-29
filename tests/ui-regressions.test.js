@@ -156,9 +156,12 @@ test('cards page renders list and card views without loading the calendar bundle
   assert.match(cards, /id="contact_form"/);
   assert.match(cardsJs, /fetch\('\{\{ app\.url_generator\.generate\('cards\.list'\) \}\}'/);
   assert.match(cardsJs, /fetch\(event\.target\.action/);
+  assert.match(cardsJs, /app\.url_generator\.generate\('cards\.delete'\)/);
+  assert.match(cardsJs, /class="contact-delete/);
   assert.doesNotMatch(cards, /parts\/bottom\.html/, 'cards page must not initialize FullCalendar app.js');
   assert.match(less, /\.contacts-card-grid/);
   assert.match(less, /\.contact-row/);
+  assert.match(less, /\.contact-delete/);
 });
 
 test('CardDAV support can discover, create, query, and write local addressbooks', () => {
@@ -189,4 +192,63 @@ test('CardDAV support can discover, create, query, and write local addressbooks'
   assert.match(generator, /addressBookQueryBody/);
   assert.match(parser, /\{urn:ietf:params:xml:ns:carddav\}addressbook-home-set/);
   assert.match(http, /function setContentTypeVCard\(\)/);
+});
+
+test('Radicale principal paths are not shown as the topbar display name', () => {
+  const auth = read('web/src/Controller/Authentication.php');
+
+  assert.match(auth, /displayNameForSession/);
+  assert.match(auth, /preg_match\('#\^\/\.\+\/\$#', \$displayName\)/);
+  assert.match(auth, /trim\(\(string\)\$user, '\/'\)/);
+  assert.doesNotMatch(
+    auth,
+    /\$app\['session'\]->set\('displayname', \$principal->getDisplayName\(\)\);/,
+    'the raw principal display name can be /user/ from Radicale'
+  );
+});
+
+test('CalDAVer Docker image and runtime use Postgres instead of SQLite', () => {
+  const dockerfile = read('Dockerfile');
+  const settings = read('docker/settings.php');
+  const run = read('docker/run.sh');
+  const init = read('docker/initialize-database.php');
+
+  assert.match(dockerfile, /pdo_pgsql/);
+  assert.match(dockerfile, /imap/);
+  assert.doesNotMatch(dockerfile, /pdo_sqlite/);
+  assert.doesNotMatch(dockerfile, /db\.sqlite/);
+  assert.match(settings, /'driver' => 'AGENDAV_DB_DRIVER'/);
+  assert.match(settings, /'host' => 'AGENDAV_DB_HOST'/);
+  assert.match(run, /AGENDAV_DB_PASSWORD:\?AGENDAV_DB_PASSWORD is required/);
+  assert.match(run, /initialize-database\.php/);
+  assert.match(init, /pgsql:host=/);
+  assert.match(init, /CREATE TABLE IF NOT EXISTS mail_accounts/);
+});
+
+test('mail section exposes IMAP account routes and a Gmail-like left tab', () => {
+  const controllers = read('web/app/controllers.php');
+  const services = read('web/app/services.php');
+  const appNav = read('web/templates/parts/appnav.html');
+  const mail = read('web/templates/mail.html');
+  const mailJs = read('web/templates/parts/mailjs.html');
+  const repository = read('web/src/Mail/MailAccountRepository.php');
+  const imap = read('web/src/Mail/ImapClient.php');
+  const less = read('assets/less/agendav.less');
+
+  assert.match(controllers, /->get\('\/mail', '\\AgenDAV\\Controller\\Mail::indexAction'\)->bind\('mail'\)/);
+  assert.match(controllers, /->get\('\/mail\/accounts', '\\AgenDAV\\Controller\\Mail::accountsAction'\)->bind\('mail\.accounts'\)/);
+  assert.match(controllers, /->post\('\/mail\/accounts\/save', '\\AgenDAV\\Controller\\Mail::saveAccountAction'\)->bind\('mail\.accounts\.save'\)/);
+  assert.match(controllers, /->get\('\/mail\/messages', '\\AgenDAV\\Controller\\Mail::messagesAction'\)->bind\('mail\.messages'\)/);
+  assert.match(services, /\$app\['mail\.accounts'\]/);
+  assert.match(services, /\$app\['mail\.imap\.client'\]/);
+  assert.match(appNav, /app\.url_generator\.generate\('mail'\)/);
+  assert.match(mail, /id="mail_accounts"/);
+  assert.match(mail, /id="mail_account_form"/);
+  assert.match(mailJs, /mail\.accounts/);
+  assert.match(mailJs, /mail\.messages/);
+  assert.match(repository, /mail_accounts/);
+  assert.match(repository, /openssl_encrypt/);
+  assert.match(imap, /imap_open/);
+  assert.match(less, /\.mail-account-tab/);
+  assert.match(less, /\.mail-row/);
 });

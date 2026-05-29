@@ -1,0 +1,180 @@
+<script>
+(function() {
+  var accounts = [];
+  var messages = [];
+  var activeAccountId = null;
+
+  function $(selector) {
+    return document.querySelector(selector);
+  }
+
+  function text(value) {
+    return value || '';
+  }
+
+  function filteredMessages() {
+    var filter = $('#mail_search').value.trim().toLowerCase();
+    if (!filter) {
+      return messages;
+    }
+
+    return messages.filter(function(message) {
+      return [message.from, message.subject, message.date].join(' ').toLowerCase().indexOf(filter) !== -1;
+    });
+  }
+
+  function renderAccounts() {
+    var nav = $('#mail_accounts');
+    nav.innerHTML = '';
+
+    accounts.forEach(function(account) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mail-account-tab' + (account.id === activeAccountId ? ' active' : '');
+      button.dataset.accountId = account.id;
+      button.innerHTML = '<i class="fa fa-inbox"></i><span></span><small></small>';
+      button.querySelector('span').textContent = account.label;
+      button.querySelector('small').textContent = account.email_address;
+      button.addEventListener('click', function() {
+        activeAccountId = account.id;
+        renderAccounts();
+        loadMessages();
+      });
+      nav.appendChild(button);
+    });
+  }
+
+  function renderMessages() {
+    var rows = $('#mail_rows');
+    rows.innerHTML = '';
+    $('#mail_error').hidden = true;
+
+    filteredMessages().forEach(function(message) {
+      var row = document.createElement('article');
+      row.className = 'mail-row' + (message.seen ? '' : ' unread');
+      row.innerHTML = '<span class="mail-from"></span><span class="mail-subject"></span><span class="mail-date"></span>';
+      row.querySelector('.mail-from').textContent = text(message.from);
+      row.querySelector('.mail-subject').textContent = text(message.subject);
+      row.querySelector('.mail-date').textContent = text(message.date);
+      rows.appendChild(row);
+    });
+  }
+
+  function activeAccount() {
+    return accounts.find(function(account) {
+      return account.id === activeAccountId;
+    });
+  }
+
+  function loadAccounts() {
+    return fetch('{{ app.url_generator.generate('mail.accounts') }}', {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Unable to load mail accounts');
+        }
+        return response.json();
+      })
+      .then(function(payload) {
+        accounts = payload.data || [];
+        activeAccountId = activeAccountId || (accounts[0] && accounts[0].id);
+        $('#mail_empty').hidden = accounts.length > 0;
+        renderAccounts();
+        if (activeAccountId) {
+          return loadMessages();
+        }
+      });
+  }
+
+  function loadMessages() {
+    var account = activeAccount();
+    messages = [];
+    $('#mail_account_title').textContent = account ? account.label : '{{ 'labels.mail'|trans }}';
+    renderMessages();
+
+    if (!account) {
+      return Promise.resolve();
+    }
+
+    return fetch('{{ app.url_generator.generate('mail.messages') }}?account_id=' + encodeURIComponent(account.id), {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function(response) {
+        return response.json().then(function(payload) {
+          if (!response.ok) {
+            throw new Error(payload.message || 'Unable to load mail');
+          }
+          return payload;
+        });
+      })
+      .then(function(payload) {
+        messages = payload.data || [];
+        renderMessages();
+      })
+      .catch(function(error) {
+        $('#mail_error').textContent = error.message;
+        $('#mail_error').hidden = false;
+      });
+  }
+
+  function openDialog() {
+    $('#mail_account_form').reset();
+    $('#mail_account_form input[name="id"]').value = '';
+    $('#mail_account_dialog').hidden = false;
+    $('#mail_account_form input[name="label"]').focus();
+  }
+
+  function closeDialog() {
+    $('#mail_account_dialog').hidden = true;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#mail_account_create').addEventListener('click', openDialog);
+    $('#mail_account_cancel').addEventListener('click', closeDialog);
+    $('#mail_account_cancel_icon').addEventListener('click', closeDialog);
+    $('#mail_refresh').addEventListener('click', loadMessages);
+    $('#mail_search').addEventListener('input', renderMessages);
+
+    $('#mail_account_form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      fetch(event.target.action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' },
+        body: new FormData(event.target)
+      })
+        .then(function(response) {
+          return response.json().then(function(payload) {
+            if (!response.ok) {
+              throw new Error(payload.message || 'Unable to save mail account');
+            }
+            return payload;
+          });
+        })
+        .then(function(payload) {
+          var index = accounts.findIndex(function(account) {
+            return account.id === payload.data.id;
+          });
+          if (index === -1) {
+            accounts.push(payload.data);
+          } else {
+            accounts[index] = payload.data;
+          }
+          activeAccountId = payload.data.id;
+          closeDialog();
+          renderAccounts();
+          loadMessages();
+        })
+        .catch(function(error) {
+          $('#mail_error').textContent = error.message;
+          $('#mail_error').hidden = false;
+        });
+    });
+
+    loadAccounts();
+  });
+})();
+</script>
