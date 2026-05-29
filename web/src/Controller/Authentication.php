@@ -85,8 +85,15 @@ class Authentication
      */
     public function processLogin($user, $password, Application $app)
     {
-        $app['http.client']->setAuthentication($user, $password, $app['caldav.authmethod']);
-        $app['carddav.http.client']->setAuthentication($user, $password, $app['caldav.authmethod']);
+        if (!$this->validLocalCredentials($user, $password, $app)) {
+            return false;
+        }
+
+        $davUser = $this->davUsername($user, $app);
+        $davPassword = $this->davPassword($password, $app);
+
+        $app['http.client']->setAuthentication($davUser, $davPassword, $app['caldav.authmethod']);
+        $app['carddav.http.client']->setAuthentication($davUser, $davPassword, $app['caldav.authmethod']);
 
         $caldav_client = $app['caldav.client'];
 
@@ -96,6 +103,8 @@ class Authentication
 
         $app['session']->set('username', $user);
         $app['session']->set('password', $password);
+        $app['session']->set('dav_username', $davUser);
+        $app['session']->set('dav_password', $davPassword);
         $principal_url = $caldav_client->getCurrentUserPrincipal();
 
         $principals_repository = $app['principals.repository'];
@@ -107,6 +116,33 @@ class Authentication
         $app['session']->set('displayname', $this->displayNameForSession($user, $principal->getDisplayName()));
 
         return true;
+    }
+
+    protected function validLocalCredentials($user, $password, Application $app)
+    {
+        $localUser = trim((string)$app['auth.local.username']);
+        $localPassword = (string)$app['auth.local.password'];
+
+        if ($localUser === '' && $localPassword === '') {
+            return true;
+        }
+
+        return hash_equals($localUser, (string)$user) &&
+            hash_equals($localPassword, (string)$password);
+    }
+
+    protected function davUsername($fallbackUser, Application $app)
+    {
+        $configured = trim((string)$app['caldav.username']);
+
+        return $configured === '' ? $fallbackUser : $configured;
+    }
+
+    protected function davPassword($fallbackPassword, Application $app)
+    {
+        $configured = (string)$app['caldav.password'];
+
+        return $configured === '' ? $fallbackPassword : $configured;
     }
 
     protected function displayNameForSession($user, $principalDisplayName)

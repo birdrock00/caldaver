@@ -207,6 +207,33 @@ test('Radicale principal paths are not shown as the topbar display name', () => 
   );
 });
 
+test('CalDAVer login credentials are separate from DAV service credentials', () => {
+  const auth = read('web/src/Controller/Authentication.php');
+  const clientFactory = read('web/src/Http/ClientFactory.php');
+  const services = read('web/app/services.php');
+  const settings = read('docker/settings.php');
+  const defaults = read('web/config/default.settings.php');
+  const run = read('docker/run.sh');
+
+  assert.match(auth, /validLocalCredentials/);
+  assert.match(auth, /\$app\['auth\.local\.username'\]/);
+  assert.match(auth, /\$app\['auth\.local\.password'\]/);
+  assert.match(auth, /\$app\['caldav\.username'\]/);
+  assert.match(auth, /\$app\['caldav\.password'\]/);
+  assert.match(auth, /set\('dav_username', \$davUser\)/);
+  assert.match(auth, /set\('dav_password', \$davPassword\)/);
+  assert.match(clientFactory, /has\('dav_username'\) && \$session->has\('dav_password'\)/);
+  assert.match(services, /get\('dav_username', \$app\['session'\]->get\('username'\)\)/);
+  assert.match(settings, /\$app\['auth\.local\.username'\] = 'AGENDAV_AUTH_USERNAME';/);
+  assert.match(settings, /\$app\['auth\.local\.password'\] = 'AGENDAV_AUTH_PASSWORD';/);
+  assert.match(settings, /\$app\['caldav\.username'\] = 'AGENDAV_CALDAV_USERNAME';/);
+  assert.match(settings, /\$app\['caldav\.password'\] = 'AGENDAV_CALDAV_PASSWORD';/);
+  assert.match(defaults, /\$app\['auth\.local\.username'\] = '';/);
+  assert.match(defaults, /\$app\['caldav\.username'\] = '';/);
+  assert.match(run, /AGENDAV_AUTH_USERNAME:=/);
+  assert.match(run, /AGENDAV_CALDAV_PASSWORD:=/);
+});
+
 test('CalDAVer Docker image and runtime use Postgres instead of SQLite', () => {
   const dockerfile = read('Dockerfile');
   const settings = read('docker/settings.php');
