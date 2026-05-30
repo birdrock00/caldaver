@@ -69,6 +69,32 @@
     });
   }
 
+  function renderBody(message) {
+    var htmlFrame = $('#mail_reader_html');
+    var plainBody = $('#mail_reader_body');
+    var html = text(message.html_body);
+
+    if (html) {
+      plainBody.hidden = true;
+      plainBody.textContent = '';
+      htmlFrame.hidden = false;
+      htmlFrame.srcdoc = '<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#202124;font:14px Arial,sans-serif;line-height:1.5;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}table{max-width:100%;}</style></head><body>' + html + '</body></html>';
+      htmlFrame.onload = function() {
+        try {
+          htmlFrame.style.height = Math.max(340, htmlFrame.contentWindow.document.documentElement.scrollHeight) + 'px';
+        } catch (error) {
+          htmlFrame.style.height = '520px';
+        }
+      };
+      return;
+    }
+
+    htmlFrame.hidden = true;
+    htmlFrame.removeAttribute('srcdoc');
+    plainBody.hidden = false;
+    plainBody.textContent = text(message.body);
+  }
+
   function loadMessage() {
     var reader = $('#mail_reader');
     var accountId = reader.dataset.accountId;
@@ -85,7 +111,7 @@
         $('#mail_reader_subject').textContent = text(message.subject);
         $('#mail_reader_from').textContent = text(message.from);
         $('#mail_reader_date').textContent = text(message.date);
-        $('#mail_reader_body').textContent = text(message.body);
+        renderBody(message);
         $('#mail_reader .mail-reader-avatar').textContent = initials(message.from);
         renderAttachments($('#mail_reader_attachments'), message, accountId, reader.dataset.attachmentUrl);
         $('#mail_reader_loading').hidden = true;
