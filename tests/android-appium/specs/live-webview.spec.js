@@ -360,17 +360,30 @@ describe('Caldaver installed Android WebView', function () {
     assert.ok(afterScrollY > before.scrollY, 'Preferences page should scroll');
 
     await browser.execute(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    const menu = await getBox('.mobile-section-menu');
+    const brand = await getBox('.caldaver-brand-title');
     const prefs = await getBox('#usermenu .prefs');
     const logout = await getBox('#usermenu .logout');
     const user = await getBox('#usermenu .user-pill');
-    const centers = [prefs, logout, user].map(box => ({
+    const centers = [menu, brand, prefs, logout, user].map(box => ({
       x: box.x + box.width / 2,
       y: box.y + box.height / 2
     }));
+    const brandIconHidden = await browser.execute(() => {
+      const icon = document.querySelector('.caldaver-brand-icon');
+      return !icon || window.getComputedStyle(icon).display === 'none';
+    });
 
     assert.ok(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y)) < 10);
     assert.ok(centers[0].x < centers[1].x);
     assert.ok(centers[1].x < centers[2].x);
+    assert.ok(centers[2].x < centers[3].x);
+    assert.ok(centers[3].x < centers[4].x);
+    assert.equal(brandIconHidden, true, 'Mobile topbar should not show the date icon');
+    await waitForSelector('#mail_account_create');
+    await $('#mail_account_create').click();
+    await waitForSelector('#mail_account_dialog');
+    await $('#mail_account_cancel').click();
   });
 
   it('opens mail and can navigate a configured mailbox or empty mail state', async function () {
@@ -378,6 +391,7 @@ describe('Caldaver installed Android WebView', function () {
     await openPath('/mail');
 
     await waitForSelector('.mail-content');
+    assert.equal(await exists('#mail_account_create'), false, 'Add account should live in preferences, not the mail screen');
     await browser.waitUntil(async () => {
       return browser.execute(() => {
         return !!document.querySelector('#mail_empty') ||
@@ -411,6 +425,7 @@ describe('Caldaver installed Android WebView', function () {
         await $('#mail_rows .mail-row').click();
         await waitForSelector('#mail_reader_message');
         await waitForSelector('#mail_reader_subject');
+        assert.equal(await exists('.mail-read-shell .compose-button'), false, 'Mail reader should rely on the toolbar back button');
         await $('#mail_reader_back').click();
         await waitForSelector('#mail_rows');
       }
@@ -426,6 +441,11 @@ describe('Caldaver installed Android WebView', function () {
     await waitForSelector('.caldaver-brand-title');
     assert.equal(await $('.caldaver-brand-title').getText(), 'Caldaver');
     await waitForSelector('.mobile-section-menu');
+    const brandIconHidden = await browser.execute(() => {
+      const icon = document.querySelector('.caldaver-brand-icon');
+      return !icon || window.getComputedStyle(icon).display === 'none';
+    });
+    assert.equal(brandIconHidden, true, 'Mobile topbar should not show the date icon');
     await waitForSelector('#own_calendar_list');
 
     await $('.mobile-section-menu summary').click();
@@ -435,5 +455,22 @@ describe('Caldaver installed Android WebView', function () {
 
     const calendarScroll = await browser.execute(() => document.documentElement.scrollHeight - window.innerHeight);
     assert.ok(calendarScroll > 80, 'Calendar page should have vertical scroll room on mobile');
+  });
+
+  it('does not show a mobile calendar event loading error in the installed app WebView', async function () {
+    await login();
+    await openPath('/');
+    await waitForSelector('#calendar_view');
+    await browser.pause(3000);
+
+    const state = await browser.execute(() => ({
+      errors: Array.from(document.querySelectorAll('.freeow')).map(item => item.textContent || ''),
+      eventSources: window.jQuery && window.jQuery('#calendar_view').data('fullCalendar')
+        ? window.jQuery('#calendar_view').fullCalendar('getEventSources').length
+        : 0
+    }));
+
+    assert.ok(state.eventSources > 0, 'Calendar should have at least one event source');
+    assert.equal(/error loading events/i.test(state.errors.join(' ')), false, state.errors.join(' '));
   });
 });
