@@ -50,6 +50,10 @@ var calendar_default_view_for_viewport = function calendar_default_view_for_view
   return fullcalendar_views[CaldaverUserPrefs.default_view];
 };
 
+var calendar_timezone = function calendar_timezone() {
+  return CaldaverUserPrefs.timezone || 'UTC';
+};
+
 $(document).ready(function() {
   // translations is loaded in HTML body (TODO make it more elegant)
   setTranslations(translations);
@@ -108,7 +112,7 @@ $(document).ready(function() {
   $('#calendar_view').fullCalendar({
     selectable: true,
     editable: true,
-    timezone: CaldaverUserPrefs.timezone,
+    timezone: calendar_timezone(),
     firstDay: CaldaverUserPrefs.weekstart,
     timeFormat: CaldaverDateAndTime.fullCalendarFormat[CaldaverUserPrefs.time_format],
     fixedWeekCount: false,
@@ -379,7 +383,13 @@ $(document).ready(function() {
  */
 var calendar_height = function calendar_height() {
   var offset = $('#calendar_view').offset();
-  return $(window).height() - Math.ceil(offset.top) - 30;
+  var calculated_height = $(window).height() - Math.ceil(offset.top) - 30;
+
+  if (is_mobile_viewport()) {
+    return Math.max(720, calculated_height);
+  }
+
+  return Math.max(480, calculated_height);
 };
 
 var add_refresh_button = function add_refresh_button() {
@@ -440,6 +450,10 @@ var show_success = function show_success(title, message) {
         left: '400px'
       }
     });
+};
+
+var should_ignore_event_load_error = function should_ignore_event_load_error(jqXHR, textStatus) {
+  return textStatus === 'abort' || (jqXHR !== undefined && jqXHR.status === 0);
 };
 
 /**
@@ -1262,10 +1276,14 @@ var generate_event_source = function generate_event_source(calendar) {
       data: function() {
         return {
           calendar: calendar,
-          timezone: CaldaverUserPrefs.timezone || 'UTC'
+          timezone: calendar_timezone()
         };
       },
       error: function (jqXHR, textStatus, errorThrown) {
+        if (should_ignore_event_load_error(jqXHR, textStatus)) {
+          return;
+        }
+
         show_error(t('messages', 'error_interfacefailure'),
             t('messages', 'error_loadevents', { '%cal' : calendar }));
       }
