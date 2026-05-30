@@ -16,7 +16,7 @@
       <a class="contacts-nav-item active" href="{{ app.url_generator.generate('cards') }}">
         <i class="fa fa-user"></i>
         <span>{% trans %}labels.contacts{% endtrans %}</span>
-        <span id="contact_count_nav" class="contacts-nav-count">0</span>
+        <span id="contact_count_nav" class="contacts-nav-count">...</span>
       </a>
       <span class="contacts-nav-item muted">
         <i class="fa fa-history"></i>
@@ -43,12 +43,16 @@
 
     <section class="contacts-panel">
       <div class="contacts-heading">
-        <h1>{% trans %}labels.contacts{% endtrans %} <span id="contact_count">(0)</span></h1>
+        <h1>{% trans %}labels.contacts{% endtrans %} <span id="contact_count">Loading...</span></h1>
         <div class="contacts-actions">
           <button type="button" id="contacts_refresh" title="{% trans %}labels.refresh{% endtrans %}">
             <i class="fa fa-refresh"></i>
           </button>
         </div>
+      </div>
+
+      <div id="contacts_loading" class="contacts-empty">
+        <h2>Loading contacts...</h2>
       </div>
 
       <div id="contacts_empty" class="contacts-empty" hidden>
