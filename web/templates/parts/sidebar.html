@@ -15,7 +15,9 @@
    <ul class="fa-ul">
    </ul>
    <div class="buttons">
-   <i title="{% trans from "labels" %}create{% endtrans %}" id="calendar_add" class="pseudobutton fa fa-plus"></i>
+   <button type="button" title="{% trans from "labels" %}create{% endtrans %}" aria-label="{% trans from "labels" %}create{% endtrans %}" id="calendar_add" class="pseudobutton">
+     <i class="fa fa-plus" aria-hidden="true"></i>
+   </button>
    </div>
   </div><!-- panel-body -->
  </div><!-- panel -->
@@ -28,9 +30,10 @@
    <ul class="fa-ul">
    </ul>
    <div class="buttons">
-    <span id="toggle_all_shared_calendars" class="pseudobutton hide_all"
-      title="{% trans %}labels.toggleallcalendars{% endtrans %}>"
-    ><i class="fa fa-eye-slash fa-lg"></i></span>
+    <button type="button" id="toggle_all_shared_calendars" class="pseudobutton hide_all"
+      title="{% trans %}labels.toggleallcalendars{% endtrans %}"
+      aria-label="{% trans %}labels.toggleallcalendars{% endtrans %}"
+    ><i class="fa fa-eye-slash fa-lg" aria-hidden="true"></i></button>
    </div>
   </div><!-- panel-body -->
  </div><!-- panel -->
