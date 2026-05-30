@@ -3,20 +3,20 @@
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 $app['monolog.logfile'] = function($app) { return $app['log.path'] . '/' . date('Y-m-d') . '.log'; };
@@ -49,7 +49,7 @@ $app['fractal'] = function($app) {
 // Preferences repository
 $app['preferences.repository'] = function($app) {
     $em = $app['orm'];
-    $repository = new AgenDAV\Repositories\DoctrineOrmPreferencesRepository($em);
+    $repository = new Caldaver\Repositories\DoctrineOrmPreferencesRepository($em);
 
     // Default values
     $repository->setDefaults([
@@ -72,7 +72,7 @@ $app['preferences.repository'] = function($app) {
 
 // Principals repository (queries the CalDAV server)
 $app['principals.repository'] = function($app) {
-    $repository = new AgenDAV\Repositories\DAVPrincipalsRepository(
+    $repository = new Caldaver\Repositories\DAVPrincipalsRepository(
         $app['xml.toolkit'],
         $app['caldav.client'],
         $app['principal.email.attribute']
@@ -95,7 +95,7 @@ $app['session.storage.handler'] = function($app) {
 
 // HTTP connection logger
 $app['monolog.http'] = function($app) {
-    return \AgenDAV\Log::generateHttpLogger($app['log.path']);
+    return \Caldaver\Log::generateHttpLogger($app['log.path']);
 };
 
 // Guzzle HTTP client
@@ -140,18 +140,18 @@ $app['guzzle.factory'] = $app->protect(function($baseurl) use ($app) {
     ]);
 });
 
-// AgenDAV HTTP client, based on Guzzle
+// Caldaver HTTP client, based on Guzzle
 $app['http.client'] = function($app) {
-    return \AgenDAV\Http\ClientFactory::create(
+    return \Caldaver\Http\ClientFactory::create(
         $app['guzzle'],
         $app['session'],
         $app['caldav.authmethod']
     );
 };
 
-// AgenDAV HTTP client for CardDAV requests
+// Caldaver HTTP client for CardDAV requests
 $app['carddav.http.client'] = function($app) {
-    return \AgenDAV\Http\ClientFactory::create(
+    return \Caldaver\Http\ClientFactory::create(
         $app['carddav.guzzle'],
         $app['session'],
         $app['caldav.authmethod']
@@ -160,17 +160,17 @@ $app['carddav.http.client'] = function($app) {
 
 // XML generator
 $app['xml.generator'] = function($app) {
-    return new \AgenDAV\XML\Generator();
+    return new \Caldaver\XML\Generator();
 };
 
 // XML parser
 $app['xml.parser'] = function($app) {
-    return new \AgenDAV\XML\Parser();
+    return new \Caldaver\XML\Parser();
 };
 
 // XML toolkit
 $app['xml.toolkit'] = function($app) {
-    return new \AgenDAV\XML\Toolkit(
+    return new \Caldaver\XML\Toolkit(
         $app['xml.parser'],
         $app['xml.generator']
     );
@@ -178,12 +178,12 @@ $app['xml.toolkit'] = function($app) {
 
 // Event parser
 $app['event.parser'] = function($app) {
-    return new \AgenDAV\Event\Parser\VObjectParser;
+    return new \Caldaver\Event\Parser\VObjectParser;
 };
 
 // CalDAV client
 $app['caldav.client'] = function($app) {
-    return new \AgenDAV\CalDAV\Client(
+    return new \Caldaver\CalDAV\Client(
         $app['http.client'],
         $app['xml.toolkit'],
         $app['event.parser']
@@ -192,27 +192,27 @@ $app['caldav.client'] = function($app) {
 
 // CardDAV client
 $app['carddav.client'] = function($app) {
-    return new \AgenDAV\CardDAV\Client(
+    return new \Caldaver\CardDAV\Client(
         $app['carddav.http.client'],
         $app['xml.toolkit']
     );
 };
 
 $app['mail.accounts'] = function($app) {
-    return new \AgenDAV\Mail\MailAccountRepository(
+    return new \Caldaver\Mail\MailAccountRepository(
         $app['db'],
         $app['csrf.secret']
     );
 };
 
 $app['mail.imap.client'] = function() {
-    return new \AgenDAV\Mail\ImapClient();
+    return new \Caldaver\Mail\ImapClient();
 };
 
 // Calendar finder
 $app['calendar.finder'] = function($app) {
 
-    $finder = new \AgenDAV\CalendarFinder(
+    $finder = new \Caldaver\CalendarFinder(
         $app['session'],
         $app['caldav.client']
     );
@@ -229,7 +229,7 @@ $app['calendar.finder'] = function($app) {
 // Event builder
 $app['event.builder'] = function($app) {
     $timezone = new \DateTimeZone($app['user.timezone']);
-    return new \AgenDAV\Event\Builder\VObjectBuilder($timezone);
+    return new \Caldaver\Event\Builder\VObjectBuilder($timezone);
 };
 
 
@@ -242,13 +242,13 @@ $app['csrf.manager'] = function ($app) {
 // Shares repository
 $app['shares.repository'] = function($app) {
     $em = $app['orm'];
-    return new AgenDAV\Repositories\DoctrineOrmSharesRepository($em);
+    return new Caldaver\Repositories\DoctrineOrmSharesRepository($em);
 };
 
 $app['sharing.resolver'] = function($app) {
     $shares_repository = $app['shares.repository'];
     $principals_repository = $app['principals.repository'];
-    return new AgenDAV\Sharing\SharingResolver(
+    return new Caldaver\Sharing\SharingResolver(
         $shares_repository,
         $principals_repository
     );
@@ -256,10 +256,10 @@ $app['sharing.resolver'] = function($app) {
 
 // Configured permissions
 $app['permissions'] = function($app) {
-    return new \AgenDAV\CalDAV\Share\Permissions($app['calendar.sharing.permissions']);
+    return new \Caldaver\CalDAV\Share\Permissions($app['calendar.sharing.permissions']);
 };
 
 // ACL factory
 $app['acl'] = $app->factory(function($app) {
-    return new \AgenDAV\CalDAV\Share\ACL($app['permissions']);
+    return new \Caldaver\CalDAV\Share\ACL($app['permissions']);
 });

@@ -1,30 +1,30 @@
 <?php
 
-namespace AgenDAV\Event;
+namespace Caldaver\Event;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Event;
-use AgenDAV\EventInstance;
-use AgenDAV\CalDAV\Resource\Calendar;
-use AgenDAV\CalDAV\Resource\CalendarObject;
+use Caldaver\Event;
+use Caldaver\EventInstance;
+use Caldaver\CalDAV\Resource\Calendar;
+use Caldaver\CalDAV\Resource\CalendarObject;
 
 /**
  * Represents an event that will be read by Fullcalendar
@@ -40,14 +40,14 @@ class FullCalendarEvent
     /** @var string */
     protected $calendar_url;
 
-    /** @var \AgenDAV\EventInstance */
+    /** @var \Caldaver\EventInstance */
     protected $event;
 
     /**
      * @param string $url
      * @param string $etag
      * @param string $calendar_url Calendar URL
-     * @param \AgenDAV\EventInstance $event Event instance
+     * @param \Caldaver\EventInstance $event Event instance
      */
     public function __construct($url, $etag, $calendar_url, EventInstance $event)
     {
@@ -95,10 +95,10 @@ class FullCalendarEvent
      * Generates an array of FullCalendarEvent that refer to a list of event
      * instances that come from a given CalendarObject and Calendar
      *
-     * @param \AgenDAV\CalDAV\Resource\CalendarObject $calendar_object
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
-     * @param \AgenDAV\EventInstance[] $instances
-     * @return \AgenDAV\Event\FullCalendarEvent[]
+     * @param \Caldaver\CalDAV\Resource\CalendarObject $calendar_object
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\EventInstance[] $instances
+     * @return \Caldaver\Event\FullCalendarEvent[]
      */
     public static function generateFrom(
         CalendarObject $calendar_object,

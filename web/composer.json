@@ -1,8 +1,8 @@
 {
-    "name": "adobo/agendav",
+    "name": "birdrock00/caldaver",
     "type": "project",
     "description": "CalDAV web client",
-    "homepage": "https://github.com/agendav/agendav/",
+    "homepage": "https://github.com/birdrock00/caldaver/",
     "license": "GPL-3.0-or-later",
     "require": {
         "php": ">=8.5",
@@ -35,7 +35,7 @@
     },
     "autoload": {
         "psr-4": {
-            "AgenDAV\\": "src/"
+            "Caldaver\\": "src/"
         }
     }
 }

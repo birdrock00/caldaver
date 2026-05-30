@@ -1,7 +1,7 @@
 [main]
 host = https://www.transifex.com
 
-[agendav.strings]
+[caldaver.strings]
 file_filter = web/lang/<lang>.php
 source_file = web/lang/en.php
 source_lang = en

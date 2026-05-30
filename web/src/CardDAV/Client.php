@@ -1,15 +1,15 @@
 <?php
-namespace AgenDAV\CardDAV;
+namespace Caldaver\CardDAV;
 
-use AgenDAV\Data\Principal;
-use AgenDAV\Uuid;
+use Caldaver\Data\Principal;
+use Caldaver\Uuid;
 
 class Client
 {
     protected $httpClient;
     protected $xmlToolkit;
 
-    public function __construct(\AgenDAV\Http\Client $httpClient, \AgenDAV\XML\Toolkit $xmlToolkit)
+    public function __construct(\Caldaver\Http\Client $httpClient, \Caldaver\XML\Toolkit $xmlToolkit)
     {
         $this->httpClient = $httpClient;
         $this->xmlToolkit = $xmlToolkit;
