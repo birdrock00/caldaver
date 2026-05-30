@@ -1,7 +1,7 @@
 <?php
-namespace AgenDAV\Controller;
+namespace Caldaver\Controller;
 
-use AgenDAV\Mail\AccountValidator;
+use Caldaver\Mail\AccountValidator;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

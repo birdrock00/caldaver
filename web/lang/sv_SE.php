@@ -1,19 +1,19 @@
 <?php
 /*
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 $translations = array(
@@ -225,7 +225,7 @@ $translations = array(
 
     'messages.more_events' => '+ %count händelser',
 
-    'messages.info_reminders_agendav_support' => 'Observera: påminnelser kommer endast att visas av CalDAV-klienter med stöd för det. AgenDAV kan inte visa dem',
+    'messages.info_reminders_caldaver_support' => 'Observera: påminnelser kommer endast att visas av CalDAV-klienter med stöd för det. Caldaver kan inte visa dem',
 
     'messages.request_error' => 'Fann ett fel i din begäran',
     'messages.page_not_found' => 'Sidan kunde inte hittas',

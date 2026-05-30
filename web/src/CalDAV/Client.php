@@ -1,54 +1,54 @@
 <?php
-namespace AgenDAV\CalDAV;
+namespace Caldaver\CalDAV;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use \AgenDAV\CalDAV\Resource\Calendar;
-use \AgenDAV\CalDAV\Resource\CalendarObject;
-use \AgenDAV\Data\Principal;
-use \AgenDAV\CalDAV\Share\ACL;
-use \AgenDAV\CalDAV\Filter\Uid;
-use \AgenDAV\CalDAV\Filter\TimeRange;
+use \Caldaver\CalDAV\Resource\Calendar;
+use \Caldaver\CalDAV\Resource\CalendarObject;
+use \Caldaver\Data\Principal;
+use \Caldaver\CalDAV\Share\ACL;
+use \Caldaver\CalDAV\Filter\Uid;
+use \Caldaver\CalDAV\Filter\TimeRange;
 
 class Client
 {
-    /** @type \AgenDAV\Http\Client   HTTP client used */
+    /** @type \Caldaver\Http\Client   HTTP client used */
 
     protected $http_client;
 
-    /** @type \AgenDAV\XML\Toolkit XML toolkit  */
+    /** @type \Caldaver\XML\Toolkit XML toolkit  */
     protected $xml_toolkit;
 
-    /** @type \AgenDAV\Event\Parser Event parser */
+    /** @type \Caldaver\Event\Parser Event parser */
     protected $event_parser;
 
 
     /**
-     * @param \AgenDAV\Http\Client $http_client
-     * @param \AgenDAV\XML\Toolkit $xml_toolkit
-     * @param \AgenDAV\Event\Parser $event_parser
+     * @param \Caldaver\Http\Client $http_client
+     * @param \Caldaver\XML\Toolkit $xml_toolkit
+     * @param \Caldaver\Event\Parser $event_parser
      */
     public function __construct(
-        \AgenDAV\Http\Client $http_client,
-        \AgenDAV\XML\Toolkit $xml_toolkit,
-        \AgenDAV\Event\Parser $event_parser
+        \Caldaver\Http\Client $http_client,
+        \Caldaver\XML\Toolkit $xml_toolkit,
+        \Caldaver\Event\Parser $event_parser
     )
     {
         $this->http_client = $http_client;
@@ -67,7 +67,7 @@ class Client
     {
         try {
             $response = $this->http_client->request('OPTIONS', '');
-        } catch (\AgenDAV\Exception\NotAuthenticated $e) {
+        } catch (\Caldaver\Exception\NotAuthenticated $e) {
             // Invalid authentication
             return false;
         }
@@ -81,7 +81,7 @@ class Client
      * user
      *
      * @return string   Principal URL
-     * @throws \AgenDAV\Exception\NotFound if no current-user-principal is returned
+     * @throws \Caldaver\Exception\NotFound if no current-user-principal is returned
      */
     public function getCurrentUserPrincipal()
     {
@@ -93,7 +93,7 @@ class Client
         $response = $this->propfind('', 0, $body);
 
         if (count($response) === 0 || !isset($response['{DAV:}current-user-principal'])) {
-            throw new \AgenDAV\Exception\NotFound('No current-user-principal was returned by the server!');
+            throw new \Caldaver\Exception\NotFound('No current-user-principal was returned by the server!');
         }
 
         reset($response);
@@ -107,11 +107,11 @@ class Client
      * Queries the CalDAV server for the calendar-home-set. It will be
      * requested on the principal URL
      *
-     * @param \AgenDAV\Data\Principal $principal User principal
+     * @param \Caldaver\Data\Principal $principal User principal
      *
      * @return string Calendar home set for given principal
      *
-     * @throws \AgenDAV\Exception\NotFound if no calendar-home-set is returned
+     * @throws \Caldaver\Exception\NotFound if no calendar-home-set is returned
      */
     public function getCalendarHomeSet(Principal $principal)
     {
@@ -124,7 +124,7 @@ class Client
         $response = $this->propfind($url, 0, $body);
 
         if (count($response) === 0 || !isset($response['{urn:ietf:params:xml:ns:caldav}calendar-home-set'])) {
-            throw new \AgenDAV\Exception\NotFound('No calendar-home-set was returned by the server!');
+            throw new \Caldaver\Exception\NotFound('No calendar-home-set was returned by the server!');
         }
 
         reset($response);
@@ -185,14 +185,14 @@ class Client
      *
      * @return Calendar
      *
-     * @throws \AgenDAV\Exception\NotFound In case the server replies with a 2xx code but
+     * @throws \Caldaver\Exception\NotFound In case the server replies with a 2xx code but
      *                                     no valid calendars are found
      */
     public function getCalendarByUrl($url)
     {
         $result = $this->getCalendars($url, false);
         if (count($result) === 0) {
-            throw new \AgenDAV\Exception\NotFound('Calendar not found at ' . $url);
+            throw new \Caldaver\Exception\NotFound('Calendar not found at ' . $url);
         }
 
         reset($result);
@@ -202,7 +202,7 @@ class Client
     /**
      * Creates a calendar collection
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar   Calendar that we want to create
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar   Calendar that we want to create
      * @return void
      */
     public function createCalendar(Calendar $calendar)
@@ -220,7 +220,7 @@ class Client
     /**
      * Modifies an existing calendar
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
      * @return void
      */
     public function updateCalendar(Calendar $calendar)
@@ -238,7 +238,7 @@ class Client
     /**
      * Deletes a calendar from the server
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
      * @return void
      */
     public function deleteCalendar(Calendar $calendar)
@@ -249,7 +249,7 @@ class Client
     /**
      * Fetches all objects from a calendar that are in the range of [start, end)
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
      * @param string $start UTC start time filter, based on ISO8601: 20141120T230000Z
      * @param string $end UTC end time filter, based on ISO8601: 20141121T230000Z
      * @return array Array of CalendarObject
@@ -266,10 +266,10 @@ class Client
     /**
      * Fetches the calendar object that has the specified UID
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
      * @param string $uid Calendar object UID
-     * @return \AgenDAV\CalDAV\Resource\CalendarObject
-     * @throws \AgenDAV\Exception\NotFound if calendar object is not found
+     * @return \Caldaver\CalDAV\Resource\CalendarObject
+     * @throws \Caldaver\Exception\NotFound if calendar object is not found
      */
     public function fetchObjectByUid(Calendar $calendar, $uid)
     {
@@ -278,7 +278,7 @@ class Client
         $data = $this->report($calendar->getUrl(), $xml_body);
 
         if (count($data) === 0) {
-            throw new \AgenDAV\Exception\NotFound('Object '.$uid.' not found at ' . $calendar->getUrl());
+            throw new \Caldaver\Exception\NotFound('Object '.$uid.' not found at ' . $calendar->getUrl());
         }
 
         $result = $this->buildObjectCollection($data, $calendar);
@@ -292,7 +292,7 @@ class Client
     /**
      * Puts an calendar object on the CalDAV server, inside its parent collection
      *
-     * @param \AgenDAV\CalDAV\Resource\CalendarObject $calendar_object
+     * @param \Caldaver\CalDAV\Resource\CalendarObject $calendar_object
      * @return \GuzzleHttp\Psr7\Response
      */
     public function uploadCalendarObject(CalendarObject $calendar_object)
@@ -335,8 +335,8 @@ class Client
     /**
      * Sets an ACL on a calendar
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
-     * @param \AgenDAV\CalDAV\Share\ACL $acl
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Share\ACL $acl
      * @return \GuzzleHttp\Psr7\Response
      */
     public function applyACL(Calendar $calendar, ACL $acl)

@@ -177,14 +177,14 @@
             payload = JSON.parse(body);
           } catch (error) {
             if (response.status === 401) {
-              throw new Error('Your session expired. Reload CalDAVer and sign in again.');
+              throw new Error('Your session expired. Reload Caldaver and sign in again.');
             }
             throw new Error(fallbackMessage || 'Unable to complete mail request');
           }
         }
 
         if (!response.ok) {
-          throw new Error(payload.message || (response.status === 401 ? 'Your session expired. Reload CalDAVer and sign in again.' : fallbackMessage) || 'Unable to complete mail request');
+          throw new Error(payload.message || (response.status === 401 ? 'Your session expired. Reload Caldaver and sign in again.' : fallbackMessage) || 'Unable to complete mail request');
         }
 
         return payload;

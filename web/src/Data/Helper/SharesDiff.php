@@ -1,27 +1,27 @@
 <?php
 
-namespace AgenDAV\Data\Helper;
+namespace Caldaver\Data\Helper;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Data\Share;
+use Caldaver\Data\Share;
 
 /**
  * Support class used to decide which existing Shares should be removed,
@@ -30,19 +30,19 @@ use AgenDAV\Data\Share;
 
 class SharesDiff
 {
-    /** @var \AgenDAV\Data\Share[] */
+    /** @var \Caldaver\Data\Share[] */
     protected $keep;
 
-    /** @var \AgenDAV\Data\Share[] */
+    /** @var \Caldaver\Data\Share[] */
     protected $remove;
 
-    /** @var \AgenDAV\Data\Share[] */
+    /** @var \Caldaver\Data\Share[] */
     protected $current_shares;
 
     /**
      * Creates empty lists on $keep and $remove
      *
-     * @param \AgenDAV\Data\Share[] $current_shares Current list of shares
+     * @param \Caldaver\Data\Share[] $current_shares Current list of shares
      */
     public function __construct(Array $current_shares)
     {
@@ -56,7 +56,7 @@ class SharesDiff
      * kept, and those that are not present on input anymore, so they should
      * be removed.
      *
-     * @param \AgenDAV\Data\Share[] $input
+     * @param \Caldaver\Data\Share[] $input
      * @return void
      */
     public function decide(Array $input)
@@ -98,7 +98,7 @@ class SharesDiff
     /**
      * Get existing shares that need to be kept and also new ones
      *
-     * @return \AgenDAV\Data\Share[]
+     * @return \Caldaver\Data\Share[]
      */
     public function getKeptShares()
     {
@@ -108,7 +108,7 @@ class SharesDiff
     /**
      * Get shares that have to be deleted
      *
-     * @return \AgenDAV\Data\Share[]
+     * @return \Caldaver\Data\Share[]
      */
     public function getMarkedForRemoval()
     {

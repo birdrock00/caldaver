@@ -1,5 +1,5 @@
 <?php
-namespace AgenDAV\CardDAV;
+namespace Caldaver\CardDAV;
 
 class AddressBook
 {
