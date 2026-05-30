@@ -41,7 +41,7 @@ class Preferences
      */
     private $username;
 
-    /** @Column(type="json_array") */
+    /** @Column(type="json") */
     private $options = array();
 
     public function __construct($arr_values = array()) {
