@@ -84,9 +84,13 @@ CREATE TABLE IF NOT EXISTS mail_message_cache (
     seen BOOLEAN NOT NULL DEFAULT FALSE,
     attachments TEXT NOT NULL,
     body TEXT,
+    html_body TEXT,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT UNIQ_MAIL_MESSAGE_CACHE_ACCOUNT_UID UNIQUE (account_id, uid)
 );
+
+ALTER TABLE mail_message_cache
+    ADD COLUMN IF NOT EXISTS html_body TEXT;
 
 CREATE INDEX IF NOT EXISTS IDX_MAIL_MESSAGE_CACHE_OWNER_ACCOUNT ON mail_message_cache (owner, account_id);
 
