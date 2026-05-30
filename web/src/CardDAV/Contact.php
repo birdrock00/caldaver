@@ -1,7 +1,7 @@
 <?php
-namespace AgenDAV\CardDAV;
+namespace Caldaver\CardDAV;
 
-use AgenDAV\Uuid;
+use Caldaver\Uuid;
 use Sabre\VObject\Component\VCard;
 use Sabre\VObject\Reader;
 

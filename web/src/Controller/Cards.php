@@ -1,8 +1,8 @@
 <?php
-namespace AgenDAV\Controller;
+namespace Caldaver\Controller;
 
-use AgenDAV\CardDAV\AddressBook;
-use AgenDAV\Data\Principal;
+use Caldaver\CardDAV\AddressBook;
+use Caldaver\Data\Principal;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

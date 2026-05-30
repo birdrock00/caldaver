@@ -1,8 +1,8 @@
-var AgenDAVConf = {{ site_config|json_encode|raw }};
+var CaldaverConf = {{ site_config|json_encode|raw }};
 
-var AgenDAVUserPrefs = {{ preferences|json_encode|raw }};
+var CaldaverUserPrefs = {{ preferences|json_encode|raw }};
 
 function set_default_colorpicker_options() {
-  $.fn.colorPicker.defaultColors = AgenDAVConf.calendar_colors;
+  $.fn.colorPicker.defaultColors = CaldaverConf.calendar_colors;
 }
 

@@ -1,7 +1,7 @@
 <?php
-namespace AgenDAV\Authentication;
+namespace Caldaver\Authentication;
 
-use AgenDAV\Controller\Authentication;
+use Caldaver\Controller\Authentication;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
 

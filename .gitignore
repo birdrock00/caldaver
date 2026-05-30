@@ -15,7 +15,7 @@
 *.phar
 *.sqlite
 
-agendav-built*
+caldaver-built*
 web/public/dist/css/*.css
 web/public/dist/js/*.js
 

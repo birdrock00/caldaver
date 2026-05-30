@@ -5,20 +5,20 @@ $app['twig.options'] = array('cache' => __DIR__.'/../var/cache/twig');
 
 // Assets
 $app['stylesheets'] = [
-    'agendav.css',
+    'caldaver.css',
 ];
 
 $app['print.stylesheets'] = [
-    'agendav.print.css',
+    'caldaver.print.css',
 ];
 
 $app['scripts'] = [
-    'agendav.min.js',
+    'caldaver.min.js',
 ];
 
 // Session parameters
 $app['session.storage.options'] = [
-    'name' => 'agendav_sess',
+    'name' => 'caldaver_sess',
     // You should not change cookie_lifetime. Change 'gc_divisor', 'gc_maxlifetime' and other
     // session related settings (http://php.net/session.configuration)
     'cookie_lifetime' => 0,

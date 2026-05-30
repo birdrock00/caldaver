@@ -1,20 +1,20 @@
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 // Useful names
@@ -49,12 +49,12 @@ $(document).ready(function() {
 
   // Dust.js base context
   dustbase = dust.makeBase({
-    default_calendar_color: AgenDAVConf.default_calendar_color,
-    base_url: AgenDAVConf.base_url,
-    base_app_url: AgenDAVConf.base_app_url,
+    default_calendar_color: CaldaverConf.default_calendar_color,
+    base_url: CaldaverConf.base_url,
+    base_app_url: CaldaverConf.base_app_url,
     csrf_token_name: csrf_id,
     csrf_token_value: csrf_value,
-    enable_calendar_sharing: AgenDAVConf.enable_calendar_sharing,
+    enable_calendar_sharing: CaldaverConf.enable_calendar_sharing,
     // Sorry for this!
     numbers1to31: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31],
   });
@@ -80,11 +80,11 @@ $(document).ready(function() {
   $('#calendar_view').fullCalendar({
     selectable: true,
     editable: true,
-    timezone: AgenDAVUserPrefs.timezone,
-    firstDay: AgenDAVUserPrefs.weekstart,
-    timeFormat: AgenDAVDateAndTime.fullCalendarFormat[AgenDAVUserPrefs.time_format],
+    timezone: CaldaverUserPrefs.timezone,
+    firstDay: CaldaverUserPrefs.weekstart,
+    timeFormat: CaldaverDateAndTime.fullCalendarFormat[CaldaverUserPrefs.time_format],
     fixedWeekCount: false,
-    weekNumbers: AgenDAVUserPrefs.show_week_nb,
+    weekNumbers: CaldaverUserPrefs.show_week_nb,
     weekNumberCalculation: 'ISO',
     weekNumbersWithinDays: true,
     height: calendar_height(),
@@ -95,7 +95,7 @@ $(document).ready(function() {
     views: {
       customizable_list: {
         type: 'list',
-        duration: { days: parseInt(AgenDAVUserPrefs.list_days) },
+        duration: { days: parseInt(CaldaverUserPrefs.list_days) },
         listDayAltFormat: 'dddd'
       }
     },
@@ -106,12 +106,12 @@ $(document).ready(function() {
     },
     navLinks: true,
 
-    defaultView: fullcalendar_views[AgenDAVUserPrefs.default_view],
+    defaultView: fullcalendar_views[CaldaverUserPrefs.default_view],
     theme: true, // use jQuery UI themeing
-    slotLabelFormat: AgenDAVDateAndTime.fullCalendarFormat[AgenDAVUserPrefs.time_format],
+    slotLabelFormat: CaldaverDateAndTime.fullCalendarFormat[CaldaverUserPrefs.time_format],
     slotMinutes: 30,
     firstHour: 8,
-    nowIndicator: AgenDAVUserPrefs.show_now_indicator,
+    nowIndicator: CaldaverUserPrefs.show_now_indicator,
 
     // Default event durations. Used when dropping events
     defaultTimedEventDuration: '01:00:00',
@@ -536,7 +536,7 @@ var destroy_dialog = function destroy_dialog(name) {
  */
 var set_default_datepicker_options = function set_default_datepicker_options() {
   $.datepicker.setDefaults({constrainInput: true});
-  $.datepicker.setDefaults({dateFormat: AgenDAVDateAndTime.datepickerFormat[AgenDAVUserPrefs.date_format]});
+  $.datepicker.setDefaults({dateFormat: CaldaverDateAndTime.datepickerFormat[CaldaverUserPrefs.date_format]});
 };
 
 /**
@@ -588,8 +588,8 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     title = t('labels', 'createevent');
 
     if (event.view == 'month') {
-      event.start = AgenDAVDateAndTime.approxNearest(event.start);
-      event.end = AgenDAVDateAndTime.approxNearest(event.end).add(1, 'hours');
+      event.start = CaldaverDateAndTime.approxNearest(event.start);
+      event.end = CaldaverDateAndTime.approxNearest(event.end).add(1, 'hours');
     }
   }
 
@@ -602,18 +602,18 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
   }
 
   // end can be null if the iCalendar resource was defined with DTSTART <= DTEND
-  event.end = AgenDAVDateAndTime.endDate(event);
+  event.end = CaldaverDateAndTime.endDate(event);
 
   // All day events have start_time = end_time = 00:00. Set them to something
   // more sensible to have an initial value on each
   if (event.allDay === true) {
-      event.start = AgenDAVDateAndTime.approxNearest(event.start);
-      event.end = AgenDAVDateAndTime.approxNearest(event.end).add(1, 'hours');
+      event.start = CaldaverDateAndTime.approxNearest(event.start);
+      event.end = CaldaverDateAndTime.approxNearest(event.end).add(1, 'hours');
   }
 
   // Use default calendar
   if (event.calendar === undefined) {
-    event.calendar = AgenDAVUserPrefs.default_calendar;
+    event.calendar = CaldaverUserPrefs.default_calendar;
   }
 
   // Recurrence instances: allow modifying recurrence rules or calendar only
@@ -628,16 +628,16 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     {
       applyid: 'event_edit_form',
       frm: {
-        action: AgenDAVConf.base_app_url + 'events/save',
+        action: CaldaverConf.base_app_url + 'events/save',
         method: 'post'
       },
       calendars: calendar_list(),
 
       // Dates and times
-      start_date: AgenDAVDateAndTime.extractDate(event.start),
-      start_time: AgenDAVDateAndTime.extractTime(event.start),
-      end_date: AgenDAVDateAndTime.extractDate(event.end),
-      end_time: AgenDAVDateAndTime.extractTime(event.end),
+      start_date: CaldaverDateAndTime.extractDate(event.start),
+      start_time: CaldaverDateAndTime.extractTime(event.start),
+      end_date: CaldaverDateAndTime.extractDate(event.end),
+      end_time: CaldaverDateAndTime.extractTime(event.end),
 
       // RRule constants for frequency
       // We can't do the same with weekdays, as RRule.MO - .SU don't have
@@ -658,7 +658,7 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     'click': function() {
       var event_fields = $('#event_edit_form').serializeObject();
 
-      event_fields.timezone = AgenDAVUserPrefs.timezone;
+      event_fields.timezone = CaldaverUserPrefs.timezone;
 
       send_form({
         form_object: $('#event_edit_form'),
@@ -698,10 +698,10 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     pre_func: function() {
       $('#event_edit_dialog').find('input.summary').focus();
       handle_date_and_time('#event_edit_dialog', event);
-      AgenDAVRepeat.handleForm($('#tabs-recurrence'));
+      CaldaverRepeat.handleForm($('#tabs-recurrence'));
 
       if (event.rrule !== undefined && event.rrule !== '') {
-        AgenDAVRepeat.setRepeatRuleOnForm(event.rrule, $('#tabs-recurrence'));
+        CaldaverRepeat.setRepeatRuleOnForm(event.rrule, $('#tabs-recurrence'));
       }
 
       // Reminders
@@ -724,8 +724,8 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
   var $repeat_until = $('#repeat_until');
   var $allday = $(where).find('input.allday');
 
-  $start_time.timepicker(AgenDAVDateAndTime.timepickerSettings[AgenDAVUserPrefs.time_format]);
-  $end_time.timepicker(AgenDAVDateAndTime.timepickerSettings[AgenDAVUserPrefs.time_format]);
+  $start_time.timepicker(CaldaverDateAndTime.timepickerSettings[CaldaverUserPrefs.time_format]);
+  $end_time.timepicker(CaldaverDateAndTime.timepickerSettings[CaldaverUserPrefs.time_format]);
   $start_date.datepicker(
       {
         onSelect: function(dateText, inst) {
@@ -771,16 +771,16 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
   // Preserve start->end duration
   $(where)
     .on('change', 'input.start_time', function(event) {
-      var start = AgenDAVDateAndTime.getMoment(
+      var start = CaldaverDateAndTime.getMoment(
           $('#start').val(),
-          AgenDAVUserPrefs.timezone
+          CaldaverUserPrefs.timezone
       );
       var duration = $end_time.data('duration');
 
       var new_end = start.add(duration, 'minutes');
 
-      $end_date.val(AgenDAVDateAndTime.extractDate(new_end));
-      $end_time.val(AgenDAVDateAndTime.extractTime(new_end));
+      $end_date.val(CaldaverDateAndTime.extractDate(new_end));
+      $end_time.val(CaldaverDateAndTime.extractTime(new_end));
       generate_iso8601_values($(where));
     })
 
@@ -795,7 +795,7 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
 
     // Update repeat rule UNTIL time (start_time) or format (allday)
     $(where).on('change', 'input.start_time, input.allday', function(event) {
-      AgenDAVRepeat.regenerate();
+      CaldaverRepeat.regenerate();
     });
 
     // First start/end generation
@@ -809,13 +809,13 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
  * Calculates the duration of an event
  */
 var calculate_event_duration = function calculate_event_duration() {
-  var start = AgenDAVDateAndTime.getMoment(
+  var start = CaldaverDateAndTime.getMoment(
       $('#start').val(),
-      AgenDAVUserPrefs.timezone
+      CaldaverUserPrefs.timezone
   );
-  var end = AgenDAVDateAndTime.getMoment(
+  var end = CaldaverDateAndTime.getMoment(
       $('#end').val(),
-      AgenDAVUserPrefs.timezone
+      CaldaverUserPrefs.timezone
   );
 
   var result = end.diff(start, 'minutes');
@@ -830,7 +830,7 @@ var calculate_event_duration = function calculate_event_duration() {
 // Triggers a dialog for creating calendars
 var calendar_create_dialog = function calendar_create_dialog() {
 
-  var form_url = AgenDAVConf.base_app_url + 'calendars/save';
+  var form_url = CaldaverConf.base_app_url + 'calendars/save';
   var title = t('labels', 'newcalendar');
 
   var data = {
@@ -884,7 +884,7 @@ var calendar_create_dialog = function calendar_create_dialog() {
 // Triggers a dialog for editing calendars
 var calendar_modify_dialog = function calendar_modify_dialog(calendar_obj) {
 
-  var form_url = AgenDAVConf.base_app_url + 'calendars/save';
+  var form_url = CaldaverConf.base_app_url + 'calendars/save';
   var title = t('labels', 'modifycalendar');
 
   var data = calendar_obj;
@@ -896,8 +896,8 @@ var calendar_modify_dialog = function calendar_modify_dialog(calendar_obj) {
     }
   });
 
-  if (AgenDAVConf.show_public_caldav_url === true) {
-    data.public_url = AgenDAVConf.caldav_public_base_url + data.url;
+  if (CaldaverConf.show_public_caldav_url === true) {
+    data.public_url = CaldaverConf.caldav_public_base_url + data.url;
   }
 
   // Buttons for modification dialog
@@ -954,7 +954,7 @@ var calendar_modify_dialog = function calendar_modify_dialog(calendar_obj) {
     pre_func: function() {
       $('input.pick_color').colorPicker();
 
-      if (AgenDAVConf.enable_calendar_sharing === true && data.is_shared !== true) {
+      if (CaldaverConf.enable_calendar_sharing === true && data.is_shared !== true) {
         shares_manager();
       }
     }
@@ -967,7 +967,7 @@ var calendar_modify_dialog = function calendar_modify_dialog(calendar_obj) {
  */
 var calendar_delete_dialog = function calendar_delete_dialog(calendar_obj) {
   destroy_dialog('#calendar_modify_dialog');
-  var form_url = AgenDAVConf.base_app_url + 'calendars/delete';
+  var form_url = CaldaverConf.base_app_url + 'calendars/delete';
   var title = t('labels', 'deletecalendar');
 
   var data = calendar_obj;
@@ -985,7 +985,7 @@ var calendar_delete_dialog = function calendar_delete_dialog(calendar_obj) {
     'class': 'addicon btn-icon-calendar-delete',
     'click': function() {
       var fake_form = {
-        url: AgenDAVConf.base_app_url + 'calendars/delete',
+        url: CaldaverConf.base_app_url + 'calendars/delete',
         data: $('#calendar_delete_form').serializeObject()
       };
 
@@ -1038,7 +1038,7 @@ var update_calendar_list = function update_calendar_list(maskbody) {
   }
 
   var updcalendar_ajax_req = $.ajax({
-    url: AgenDAVConf.base_app_url + 'calendars',
+    url: CaldaverConf.base_app_url + 'calendars',
     cache: false,
     dataType: 'json'
   });
@@ -1085,14 +1085,14 @@ var update_calendar_list = function update_calendar_list(maskbody) {
 
     $.each(calendars, function(key, calendar) {
       // This is a hidden calendar
-      if (AgenDAVUserPrefs.hidden_calendars[calendar.calendar] !== undefined) {
+      if (CaldaverUserPrefs.hidden_calendars[calendar.calendar] !== undefined) {
         return true; // Equivalent to 'continue' inside a $.each
       }
       count++;
 
       // Some values need to be generated
       if (calendar.color === undefined || calendar.color === null) {
-        calendar.color = AgenDAVConf.default_calendar_color;
+        calendar.color = CaldaverConf.default_calendar_color;
       } else {
         calendar.color = calendar.color.substr(0,7);
       }
@@ -1100,7 +1100,7 @@ var update_calendar_list = function update_calendar_list(maskbody) {
 
       var li = generate_calendar_entry(calendar);
 
-      if (calendar.calendar === AgenDAVUserPrefs.default_calendar) {
+      if (calendar.calendar === CaldaverUserPrefs.default_calendar) {
         li.addClass('default_calendar');
       }
 
@@ -1171,7 +1171,7 @@ var generate_event_source = function generate_event_source(calendar) {
   var ajax_options = {
       // If #calendar is not used, Fullcalendar will be confused when
       // calling removeEventSource, and will remove all calendars
-      url: AgenDAVConf.base_app_url + 'events#' + calendar,
+      url: CaldaverConf.base_app_url + 'events#' + calendar,
       cache: false,
       data: {
         calendar: calendar
@@ -1190,7 +1190,7 @@ var generate_event_source = function generate_event_source(calendar) {
  */
 var keep_session_active = function keep_session_active() {
   var sessrefresh_ajax_req = $.ajax({
-    url: AgenDAVConf.base_app_url + 'keepalive',
+    url: CaldaverConf.base_app_url + 'keepalive',
     cache: false,
     method: 'GET'
   });
@@ -1307,10 +1307,10 @@ var get_event_data = function get_event_data(id) {
 var load_base_event_for = function load_base_event_for(instance, success, fail) {
   // Query the server
   var search = $.getJSON(
-      AgenDAVConf.base_app_url + 'eventbase',
+      CaldaverConf.base_app_url + 'eventbase',
       {
         calendar: instance.calendar,
-        timezone: AgenDAVUserPrefs.timezone,
+        timezone: CaldaverUserPrefs.timezone,
         uid: instance.uid
       }
   );
@@ -1372,7 +1372,7 @@ var session_expired = function session_expired() {
   show_error(t('messages', 'error_sessexpired'),
       t('messages', 'error_loginagain'));
   setTimeout(function() {
-    window.location = AgenDAVConf.base_url;
+    window.location = CaldaverConf.base_url;
   }, 2000);
 };
 
@@ -1441,7 +1441,7 @@ var shares_manager_enable_autocomplete = function shares_manager_enable_autocomp
         return;
       }
 
-      lastXhr = $.getJSON(AgenDAVConf.base_app_url + 'principals',
+      lastXhr = $.getJSON(CaldaverConf.base_app_url + 'principals',
         request, function(data, status, xhr) {
           user_autocomplete_cache[term] = data;
           if (xhr === lastXhr) {
@@ -1572,10 +1572,10 @@ var event_click_callback = function event_click_callback(event,
 
   if (event_data.rrule !== undefined) {
     var rrule = RRule.fromString(event_data.rrule);
-    event_data.rrule_explained = AgenDAVRepeat.explainRRule(rrule);
+    event_data.rrule_explained = CaldaverRepeat.explainRRule(rrule);
   }
 
-  event_data.readable_dates = AgenDAVDateAndTime.formatEventDates(event_data);
+  event_data.readable_dates = CaldaverDateAndTime.formatEventDates(event_data);
 
   // Event details popup
   render_template('event_details_popup', event_data, function(out) {
@@ -1643,7 +1643,7 @@ var event_drop_callback = function event_drop_callback(event, delta, revertFunc,
  */
 var event_alter = function event_alter(alterType, event, delta, allDay, revertFunc, jsEvent, ui, view) {
   var fake_form = {
-    url: AgenDAVConf.base_app_url + 'events/' + alterType,
+    url: CaldaverConf.base_app_url + 'events/' + alterType,
     data: {
       uid: event.uid,
       calendar: event.calendar,
@@ -1651,7 +1651,7 @@ var event_alter = function event_alter(alterType, event, delta, allDay, revertFu
       delta: delta.asMinutes(),
       allday: allDay,
       was_allday: event.orig_allday,
-      timezone: AgenDAVUserPrefs.timezone,
+      timezone: CaldaverUserPrefs.timezone,
     }
   };
 
@@ -1740,7 +1740,7 @@ var event_delete_proceed = function event_delete_proceed(data, recurrence_id) {
 
   send_form({
     form_object: {
-      url: AgenDAVConf.base_app_url + 'events/delete',
+      url: CaldaverConf.base_app_url + 'events/delete',
       data: remove_params
     },
     success: function(rdata) {
@@ -2015,11 +2015,11 @@ var generate_iso8601_values = function generate_iso8601_values(element) {
 
 
     $(div).find('input.generated').val(
-        AgenDAVDateAndTime.convertISO8601(
+        CaldaverDateAndTime.convertISO8601(
           datepicker,
           timepicker,
           ignore_time,
-          AgenDAVUserPrefs.timezone
+          CaldaverUserPrefs.timezone
         )
     );
 
@@ -2033,13 +2033,13 @@ var generate_iso8601_values = function generate_iso8601_values(element) {
  * @param data Array of translations
  */
 var setTranslations = function setTranslations(data) {
-  AgenDAVConf.i18n = data;
+  CaldaverConf.i18n = data;
 
   // Localized names
   set_default_datepicker_options();
 
   // Set RRule language options
-  AgenDAVRepeat.language = AgenDAVRepeat.generateLanguage();
+  CaldaverRepeat.language = CaldaverRepeat.generateLanguage();
 };
 
 /**
@@ -2052,7 +2052,7 @@ var setTranslations = function setTranslations(data) {
  */
 var t = function t(domain, key, params) {
   var full_key = domain + '.' + key;
-  var result = AgenDAVConf.i18n[full_key];
+  var result = CaldaverConf.i18n[full_key];
 
   if (result === undefined) {
     return full_key;

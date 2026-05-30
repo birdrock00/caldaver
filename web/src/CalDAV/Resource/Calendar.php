@@ -1,28 +1,28 @@
 <?php
 
-namespace AgenDAV\CalDAV\Resource;
+namespace Caldaver\CalDAV\Resource;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use \AgenDAV\Data\Share;
-use \AgenDAV\Data\Principal;
+use \Caldaver\Data\Share;
+use \Caldaver\Data\Principal;
 
 /**
  * Stores information about a calendar collection
@@ -55,14 +55,14 @@ class Calendar
      *
      * Required on shared calendars
      *
-     * @var \AgenDAV\Data\Principal
+     * @var \Caldaver\Data\Principal
      */
     protected $owner;
 
     /**
      * Shares for this calendar, when working on shared calendars
      *
-     * @var \AgenDAV\Data\Share[]
+     * @var \Caldaver\Data\Share[]
      */
     protected $shares;
 
@@ -75,7 +75,7 @@ class Calendar
     const ORDER = '{http://apple.com/ns/ical/}calendar-order';
 
     /**
-     * Properties that AgenDAV can write
+     * Properties that Caldaver can write
      */
     public static $writable_properties = [
         '{DAV:}displayname',
@@ -207,7 +207,7 @@ class Calendar
     /*
      * Getter for shares
      *
-     * @return \AgenDAV\Data\Share[]
+     * @return \Caldaver\Data\Share[]
      */
     public function getShares()
     {
@@ -217,7 +217,7 @@ class Calendar
     /*
      * Setter for shares
      *
-     * @param \AgenDAV\Data\Share[]
+     * @param \Caldaver\Data\Share[]
      */
     public function setShares(array $shares)
     {
@@ -227,7 +227,7 @@ class Calendar
     /**
      * Adds a new share to this calendar
      *
-     * @param \AgenDAV\Data\Share $share
+     * @param \Caldaver\Data\Share $share
      */
     public function addShare(Share $share)
     {
@@ -237,7 +237,7 @@ class Calendar
     /**
      * Removes a Share from this calendar
      *
-     * @param \AgenDAV\Data\Share $share_to_remove
+     * @param \Caldaver\Data\Share $share_to_remove
      *
      * @return boolean true if the share was found and removed, false otherwise
      */

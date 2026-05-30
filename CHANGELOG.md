@@ -79,15 +79,15 @@
 - Upgraded Symfony components to 2.8.17
 - Moved all assets inside the assets/ root directory
 - Updated all translations
-- Switched to npm scripts to build AgenDAV
+- Switched to npm scripts to build Caldaver
 - Switched to Symfony Asset component to generate URLs for assets
 - Configuration is now loaded in last place, allowing further customization through settings.php
-- agendav.min.js is now ~100kB smaller
+- caldaver.min.js is now ~100kB smaller
 
 ## Fixed
 
 - Database upgrade failed on PostgreSQL (#188)
-- Custom display names and/or colors on shares coming from AgenDAV 1.x could not be modified due
+- Custom display names and/or colors on shares coming from Caldaver 1.x could not be modified due
   to old names having precedence over namespaced properties
 - Do not cache ORM metadata on development mode
 
@@ -151,10 +151,10 @@
 
 ### Changed
 
-- AgenDAV now requires PHP 5.5.0 or greater
+- Caldaver now requires PHP 5.5.0 or greater
 - HTML code is now allowed on the footer message
 - Replaced abandoned Keboola/php-encryption with phpseclib/phpseclib
-- Moved agendavcli out of the bin/ subdirectory to the root directory
+- Moved caldavercli out of the bin/ subdirectory to the root directory
 - Upgraded symfony/security and doctrine/* to non-vulnerable versions
 - Upgraded to Bootstrap 3.3.6
 - Upgraded to latest moment-timezone (0.4.1)
@@ -177,7 +177,7 @@
 
 ### Removed
 
-- Sessions are not encrypted anymore by AgenDAV
+- Sessions are not encrypted anymore by Caldaver
 
 ### Fixed
 
@@ -194,7 +194,7 @@ This is a beta release. Calendar sharing is not available.
 ### Changed
 - New PHP stack based on Silex framework, Doctrine and Sabre/VObject
 - Dialogs are now client-side generated. The UI feels faster
-- AgenDAV now requires PHP 5.4.0 or greater
+- Caldaver now requires PHP 5.4.0 or greater
 - Cleaner user interface
 - New color palette based on Material
 
@@ -210,7 +210,7 @@ This is a beta release. Calendar sharing is not available.
 
 ### Removed
 - Users cannot hide calendars anymore
-- The agenda view has been removed from AgenDAV
+- The agenda view has been removed from Caldaver
 
 ### Fixed
 - Exotic timezones are now handled the right way
@@ -265,7 +265,7 @@ This is a beta release. Calendar sharing is not available.
 - Weekend days have a different background color
 - Changed calendar list style
 - Switched to default cursor style instead of pointer
-- JavaScript and CSS compression and unification to make AgenDAV load faster
+- JavaScript and CSS compression and unification to make Caldaver load faster
 - Fixed translations, were not working in IE7
 - Now CalDAV URLs for principals and calendars can have different schemas
 - Calendar sharing can be disabled for those servers that don't have ACL support
@@ -273,7 +273,7 @@ This is a beta release. Calendar sharing is not available.
 - Upgraded to latest git qTip2
 - Upgraded to jQuery 1.7.1
 - Session cookies are now smaller
-- Added script (configtest.php) to check AgenDAV installation requisites and basic configuration
+- Added script (configtest.php) to check Caldaver installation requisites and basic configuration
 - Added fr_FR translation (thanks to Guillaume BF)
 - Added nl_NL translation (thanks to Henry Verdonschot)
 - More minor bugfixes
@@ -322,10 +322,10 @@ This is a beta release. Calendar sharing is not available.
 
 ## [1.1.1] - 2011-09-24
 - Fix DB schema. Wasn't properlty updated on sql/schema.sql, which caused a problem with sessions
-- Remove LDAP dependency. AgenDAV now authenticates against CalDAV server
+- Remove LDAP dependency. Caldaver now authenticates against CalDAV server
 
 ## [1.1] - 2011-09-18
-- AgenDAV has now a logo!
+- Caldaver has now a logo!
 - Added multiple calendars support. Auto discovered via PROPFIND
 - Added read+write calendar sharing, based on WebDAV ACLs
 - Changed from jQuery overlay to qTip tooltips
