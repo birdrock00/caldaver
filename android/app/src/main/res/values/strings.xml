@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Caldaver</string>
+    <string name="title_activity_main">Caldaver</string>
+    <string name="package_name">club.exampleapp.caldaver</string>
+    <string name="custom_url_scheme">club.exampleapp.caldaver</string>
+</resources>
