@@ -143,6 +143,10 @@ test('mobile navigation moves app sections into the topbar without removing desk
   const less = read('assets/less/caldaver.less');
 
   assert.match(navbar, /class="mobile-section-menu"/);
+  assert.ok(
+    navbar.indexOf('class="mobile-section-menu"') < navbar.indexOf('class="navbar-header"'),
+    'mobile section menu should render before the logo so it sits at the far left'
+  );
   assert.match(navbar, /app\.url_generator\.generate\('calendar'\)/);
   assert.match(navbar, /app\.url_generator\.generate\('cards'\)/);
   assert.match(navbar, /app\.url_generator\.generate\('mail'\)/);
@@ -151,12 +155,17 @@ test('mobile navigation moves app sections into the topbar without removing desk
   assert.match(mail, /\{% set active_section = 'mail' %\}/);
   assert.match(less, /\.mobile-section-menu\s*\{[\s\S]*display:\s*none;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mobile-section-menu\s*\{[\s\S]*display:\s*block;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.caldaver-brand-icon\s*\{[\s\S]*display:\s*none;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.app-nav,[\s\S]*\.cards-sidebar \.app-nav,[\s\S]*\.mail-sidebar \.app-nav[\s\S]*display:\s*none;/);
 });
 
 test('mobile calendar and contacts layouts are allowed to scroll', () => {
+  const app = read('assets/js/app/app.js');
   const less = read('assets/less/caldaver.less');
 
+  assert.match(app, /calendar_default_view_for_viewport[\s\S]*return fullcalendar_views\[CaldaverUserPrefs\.default_view\];/);
+  assert.doesNotMatch(app, /return 'customizable_list';/);
+  assert.match(app, /timezone:\s*CaldaverUserPrefs\.timezone \|\| 'UTC'/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*body\.caldaver-calendar-page\s*\{[\s\S]*overflow:\s*auto;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#wrapper\.calendar-layout\s*\{[\s\S]*height:\s*auto;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#calendar_view\s*\{[\s\S]*min-height:\s*720px;/);
@@ -425,7 +434,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   const appNav = read('web/templates/parts/appnav.html');
   const mail = read('web/templates/mail.html');
   const mailMessage = read('web/templates/mail_message.html');
+  const preferences = read('web/templates/preferences.html');
   const mailJs = read('web/templates/parts/mailjs.html');
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
   const mailMessageJs = read('web/templates/parts/mailmessagejs.html');
   const repository = read('web/src/Mail/MailAccountRepository.php');
   const imap = read('web/src/Mail/ImapClient.php');
@@ -445,12 +456,15 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(services, /\$app\['mail\.imap\.client'\]/);
   assert.match(appNav, /app\.url_generator\.generate\('mail'\)/);
   assert.match(mail, /id="mail_accounts"/);
-  assert.match(mail, /class="mail-actions-menu"/);
-  assert.match(mail, /id="mail_account_create"[\s\S]*labels\.addaccount/);
+  assert.doesNotMatch(mail, /id="mail_account_create"/);
+  assert.doesNotMatch(mail, /id="mail_account_form"/);
+  assert.match(preferences, /class="prefs-section prefs-mail-section"[\s\S]*labels\.mail/);
+  assert.match(preferences, /id="mail_account_create"[\s\S]*labels\.addaccount/);
+  assert.match(preferences, /id="mail_account_form"/);
+  assert.match(preferences, /mailaccountjs\.html/);
   assert.doesNotMatch(mail, /id="mail_account_create" class="btn btn-default compose-button"/);
-  assert.match(mail, /id="mail_account_form"/);
-  assert.match(mail, /name="refresh_interval_minutes"/);
-  assert.match(mail, /id="mail_account_error"/);
+  assert.match(preferences, /name="refresh_interval_minutes"/);
+  assert.match(preferences, /id="mail_account_error"/);
   assert.match(mail, /id="mail_loading"/);
   assert.match(mail, /id="mail_no_messages"/);
   assert.match(mail, /id="mail_no_messages"[\s\S]*labels\.nomessages/);
@@ -458,7 +472,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailMessage, /id="mail_reader"/);
   assert.match(mailMessage, /data-message-url/);
   assert.match(mailMessage, /data-unread-url/);
+  assert.match(mailMessage, /data-inbox-url/);
   assert.match(mailMessage, /id="mail_reader_unread"/);
+  assert.doesNotMatch(mailMessage, /compose-button[\s\S]*labels\.inbox/);
   assert.match(mailMessage, /id="mail_reader_html"/);
   assert.match(mailMessage, /sandbox="allow-popups allow-popups-to-escape-sandbox"/);
   assert.match(mailMessage, /mailmessagejs\.html/);
@@ -476,6 +492,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /setMailStatus\(account \? 'loading' : 'ready', account \? 'Checking the IMAP server for mail\.\.\.' : ''\)/);
   assert.match(mailJs, /setMailStatus\('syncing', 'Syncing with the IMAP server\.\.\.'\)/);
   assert.match(mailJs, /scrollIntoView\(\{ block: 'start', behavior: 'smooth' \}\)/);
+  assert.match(mailJs, /highlighted-unread/);
+  assert.match(mailJs, /URLSearchParams/);
   assert.match(mailJs, /window\.matchMedia\('\(max-width: 900px\)'\)/);
   assert.match(mailJs, /window\.location\.href/);
   assert.doesNotMatch(mailJs, /function loadMessage\(/);
@@ -484,6 +502,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailMessage, /app\.url_generator\.generate\('mail\.attachment'\)/);
   assert.match(mailMessageJs, /dataset\.messageUrl/);
   assert.match(mailMessageJs, /dataset\.unreadUrl/);
+  assert.match(mailMessageJs, /dataset\.inboxUrl/);
+  assert.match(mailMessageJs, /unread_uid/);
   assert.match(mailMessageJs, /mail_reader_unread/);
   assert.match(mailMessageJs, /srcdoc/);
   assert.match(mailMessageJs, /html_body/);
@@ -495,6 +515,10 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /Your session expired/);
   assert.match(mailJs, /AbortController/);
   assert.match(mailJs, /server did not respond in time/);
+  assert.match(mailAccountJs, /mail_account_create/);
+  assert.match(mailAccountJs, /mail_account_form/);
+  assert.match(mailAccountJs, /X-Requested-With/);
+  assert.match(mailAccountJs, /AbortController/);
   assert.match(mailJs, /data-testid="mail-attachments"/);
   assert.match(mailJs, /mail-attachment-download/);
   assert.match(mailJs, /messageRequestId/);
@@ -531,8 +555,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(validator, /dns_get_record/);
   assert.match(validator, /FILTER_FLAG_NO_PRIV_RANGE \| FILTER_FLAG_NO_RES_RANGE/);
   assert.match(less, /\.mail-account-tab/);
-  assert.match(less, /\.mail-actions-menu/);
-  assert.match(less, /\.mail-actions-menu-list/);
+  assert.match(less, /\.prefs-mail-account-create/);
+  assert.match(less, /\.highlighted-unread/);
   assert.match(less, /\.mail-row/);
   assert.match(less, /\.mail-nav-spinner/);
   assert.match(less, /\.mail-attachment/);
