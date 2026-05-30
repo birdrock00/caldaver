@@ -1,4 +1,4 @@
-name: AgenDAV DB schema
-migrations_namespace: AgenDAV\DB\Migrations
+name: Caldaver DB schema
+migrations_namespace: Caldaver\DB\Migrations
 table_name: schema_versions
 migrations_directory: web/src/DB/Migrations

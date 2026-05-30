@@ -1,20 +1,20 @@
 Development
 ===========
 
-Please, read this section if you want to contribute to AgenDAV with code. You can even use this
+Please, read this section if you want to contribute to Caldaver with code. You can even use this
 information to confirm a bug.
 
 Virtual Machine
 ---------------
 
-Configuring a working environment for AgenDAV can be difficult. There are so
+Configuring a working environment for Caldaver can be difficult. There are so
 many requirements (web server, PHP, PHP libraries, Composer, a CalDAV server...).
 
-To make the task of setting up an environment easier, AgenDAV ships with a
+To make the task of setting up an environment easier, Caldaver ships with a
 `Vagrant <https://www.vagrantup.com/>`_ file and an `Ansible
 <http://www.ansible.com/home>`_ playbook. If you don't know what that means,
 don't worry! They are just two tools used to generate a virtual machine with
-everything prepared to work on AgenDAV.
+everything prepared to work on Caldaver.
 
 Software you will need:
 
@@ -48,7 +48,7 @@ Accessing the virtual machine
 The environment created inside the virtual machine will be accessible using the
 following URLs and commands:
 
-* AgenDAV: http://localhost:8080/
+* Caldaver: http://localhost:8080/
 * Baïkal server: http://localhost:8081/
 * SSH: ``vagrant ssh``. Your local machine working directory will be mounted at
   ``/vagrant`` inside the virtual machine

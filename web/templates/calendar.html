@@ -1,6 +1,6 @@
 {% extends 'layout.html' %}
 
-{% block body_class %}agendav-calendar-page{% endblock %}
+{% block body_class %}caldaver-calendar-page{% endblock %}
 
 {% block content %}
 {% include 'parts/navbar.html' %}
@@ -21,6 +21,6 @@
 
 {% block bottom %}
   {% set load_fullcalendar_locale = true %}
-  {% include 'parts/agendavjs.html' %}
+  {% include 'parts/caldaverjs.html' %}
   {% include 'parts/bottom.html' %}
 {% endblock %}

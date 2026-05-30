@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Docker packaging based on https://github.com/nagimov/agendav-docker.
+# Docker packaging based on the Docker packaging noted in README.md.
 # Original Docker packaging copyright (c) 2018 Ruslan Nagimov, MIT licensed.
 
 ARG PHP_VERSION=apache
@@ -22,7 +22,7 @@ FROM docker.io/library/composer:2 AS composer-bin
 FROM docker.io/library/php:${PHP_VERSION}
 
 LABEL org.opencontainers.image.title="caldaver" \
-      org.opencontainers.image.description="AgenDAV CalDAV web client Docker image" \
+      org.opencontainers.image.description="Caldaver CalDAV web client Docker image" \
       org.opencontainers.image.source="https://github.com/caldaver-app/caldaver" \
       org.opencontainers.image.licenses="GPL-3.0-or-later AND MIT"
 
@@ -47,27 +47,27 @@ RUN apt-get update \
 
 COPY --from=composer-bin /usr/bin/composer /usr/local/bin/composer
 
-WORKDIR /var/www/agendav
-COPY --chown=www-data:www-data . /var/www/agendav
-COPY --from=assets --chown=www-data:www-data /src/web/public/dist /var/www/agendav/web/public/dist
-COPY docker/agendav.conf /etc/apache2/sites-available/agendav.conf
-COPY docker/settings.php /var/www/agendav/web/config/settings.php.template
-COPY docker/initialize-database.php /var/www/agendav/docker/initialize-database.php
+WORKDIR /var/www/caldaver
+COPY --chown=www-data:www-data . /var/www/caldaver
+COPY --from=assets --chown=www-data:www-data /src/web/public/dist /var/www/caldaver/web/public/dist
+COPY docker/caldaver.conf /etc/apache2/sites-available/caldaver.conf
+COPY docker/settings.php /var/www/caldaver/web/config/settings.php.template
+COPY docker/initialize-database.php /var/www/caldaver/docker/initialize-database.php
 COPY docker/run.sh /usr/local/bin/run.sh
 
 RUN set -eux; \
     chmod 644 /etc/ssl/certs/cacert.pem; \
     chmod +x /usr/local/bin/run.sh; \
-    chown -R www-data:www-data "$PHP_INI_DIR" /var/run/apache2 "$APACHE_LOG_DIR" /var/www/agendav; \
+    chown -R www-data:www-data "$PHP_INI_DIR" /var/run/apache2 "$APACHE_LOG_DIR" /var/www/caldaver; \
     chmod 755 "$APACHE_LOG_DIR"; \
     cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"; \
     echo 'date.timezone = "UTC"' >> "$PHP_INI_DIR/php.ini"; \
     echo 'openssl.cafile = "/etc/ssl/certs/cacert.pem"' >> "$PHP_INI_DIR/php.ini"; \
     echo 'curl.cainfo = "/etc/ssl/certs/cacert.pem"' >> "$PHP_INI_DIR/php.ini"; \
-    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --prefer-dist --no-progress --no-interaction --optimize-autoloader --working-dir=/var/www/agendav/web; \
-    mkdir -p /var/www/agendav/web/var/cache/twig; \
-    chown -R www-data:www-data /var/www/agendav/web/var; \
-    a2ensite agendav.conf; \
+    COMPOSER_ALLOW_SUPERUSER=1 composer install --no-dev --prefer-dist --no-progress --no-interaction --optimize-autoloader --working-dir=/var/www/caldaver/web; \
+    mkdir -p /var/www/caldaver/web/var/cache/twig; \
+    chown -R www-data:www-data /var/www/caldaver/web/var; \
+    a2ensite caldaver.conf; \
     a2dissite 000-default; \
     a2enmod rewrite; \
     echo "Listen 127.0.0.1:8080" > /etc/apache2/ports.conf; \

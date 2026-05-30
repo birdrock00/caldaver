@@ -2,14 +2,14 @@
  * Functions used to manage the 'Repeat' tab interactions
  */
 
-var AgenDAVRepeat = AgenDAVRepeat || {};
+var CaldaverRepeat = CaldaverRepeat || {};
 
 /**
  * Handles interaction with the form controls
  *
  * @param jQuery $form jQuery element containing the form
  */
-AgenDAVRepeat.handleForm = function handleForm($form) {
+CaldaverRepeat.handleForm = function handleForm($form) {
   var $fixed_repeat_rule = $('#fixed_repeat_rule');
   var $repeat_frequency = $('#repeat_frequency');
   var $repeat_ends = $('#repeat_ends');
@@ -18,12 +18,12 @@ AgenDAVRepeat.handleForm = function handleForm($form) {
     $form.find('select, input').attr('disabled', 'disabled');
 
     var original_rrule = RRule.fromString($('#rrule_original').val());
-    $('#fixed_repeat_rule_explanation').html(AgenDAVRepeat.explainRRule(original_rrule));
+    $('#fixed_repeat_rule_explanation').html(CaldaverRepeat.explainRRule(original_rrule));
     return;
   }
 
   $form.on('change', 'input,select.secondary', function(e) {
-    AgenDAVRepeat.regenerate();
+    CaldaverRepeat.regenerate();
   });
 
   $repeat_frequency.on('change', function() {
@@ -34,7 +34,7 @@ AgenDAVRepeat.handleForm = function handleForm($form) {
       $form.find('.container_repeat_options').hide();
     } else {
       $form.find('.container_repeat_options').show();
-      AgenDAVRepeat.showAllowedFieldsByFrequency(frequency);
+      CaldaverRepeat.showAllowedFieldsByFrequency(frequency);
     }
 
     $repeat_ends.trigger('change');
@@ -67,7 +67,7 @@ AgenDAVRepeat.handleForm = function handleForm($form) {
     generate_iso8601_values($form); // Required to have a valid date
 
     // serialize* can't be called on a div
-    var new_rrule = AgenDAVRepeat.generateRRule(
+    var new_rrule = CaldaverRepeat.generateRRule(
         $form.find('input,select').serializeArray()
     );
 
@@ -80,18 +80,18 @@ AgenDAVRepeat.handleForm = function handleForm($form) {
 
     $('#rrule').val(new_rrule.toString());
     $('#repeat_explanation').html(
-        AgenDAVRepeat.explainRRule(new_rrule)
+        CaldaverRepeat.explainRRule(new_rrule)
       );
   });
 
   // Trigger it for the first time
-  AgenDAVRepeat.regenerate();
+  CaldaverRepeat.regenerate();
 };
 
 /**
  * Triggers a RRULE regeneration
  */
-AgenDAVRepeat.regenerate = function regenerate() {
+CaldaverRepeat.regenerate = function regenerate() {
     $('#repeat_frequency').trigger('change');
 };
 
@@ -102,13 +102,13 @@ AgenDAVRepeat.regenerate = function regenerate() {
  * @param Object data Form data from serializeArray()
  * @return RRule|null Repeat rule, or null if recurrence is disabled
  */
-AgenDAVRepeat.generateRRule = function generateRRule(data) {
+CaldaverRepeat.generateRRule = function generateRRule(data) {
   var frequency = -1;
   var options = {};
   var ends;
   var by_day = [];
 
-  // Used to keep the original RRULE, when AgenDAV can't
+  // Used to keep the original RRULE, when Caldaver can't
   // reproduce the same RRULE
   var keep_original_rrule = false;
 
@@ -139,11 +139,11 @@ AgenDAVRepeat.generateRRule = function generateRRule(data) {
       options.freq = value;
     }
 
-    if (field.name === 'repeat_by_day' && AgenDAVRepeat.shouldConsider(frequency, field.name)) {
-      by_day.push(AgenDAVRepeat.getRRuleJsByDay(value));
+    if (field.name === 'repeat_by_day' && CaldaverRepeat.shouldConsider(frequency, field.name)) {
+      by_day.push(CaldaverRepeat.getRRuleJsByDay(value));
     }
 
-    if (field.name === 'repeat_by_month_day' && AgenDAVRepeat.shouldConsider(frequency, field.name)) {
+    if (field.name === 'repeat_by_month_day' && CaldaverRepeat.shouldConsider(frequency, field.name)) {
       options.bymonthday = value;
     }
 
@@ -161,7 +161,7 @@ AgenDAVRepeat.generateRRule = function generateRRule(data) {
 
     if (field.name === 'repeat_until_date' && ends === 'date') {
       var is_all_day = $('input.allday').is(':checked');
-      options.until = AgenDAVRepeat.generateUntilDate(is_all_day);
+      options.until = CaldaverRepeat.generateUntilDate(is_all_day);
       options.onlydate = is_all_day;
     }
   });
@@ -190,7 +190,7 @@ AgenDAVRepeat.generateRRule = function generateRRule(data) {
  * @param string day form value
  * @return RRule constant
  */
-AgenDAVRepeat.getRRuleJsByDay = function getRRuleJsByDay(day) {
+CaldaverRepeat.getRRuleJsByDay = function getRRuleJsByDay(day) {
   if (day === 'sunday') {
     return RRule.SU;
   }
@@ -227,7 +227,7 @@ AgenDAVRepeat.getRRuleJsByDay = function getRRuleJsByDay(day) {
  * @param int byday value
  * @return string
  */
-AgenDAVRepeat.getLabelForByDay = function gettLabelForByDay(day) {
+CaldaverRepeat.getLabelForByDay = function gettLabelForByDay(day) {
   var days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
   return days[day];
@@ -238,8 +238,8 @@ AgenDAVRepeat.getLabelForByDay = function gettLabelForByDay(day) {
  *
  * @param RRule rrule
  */
-AgenDAVRepeat.explainRRule = function explainRRule(rrule) {
-  return rrule.toText(rrule_gettext, AgenDAVRepeat.language);
+CaldaverRepeat.explainRRule = function explainRRule(rrule) {
+  return rrule.toText(rrule_gettext, CaldaverRepeat.language);
 };
 
 /**
@@ -247,30 +247,30 @@ AgenDAVRepeat.explainRRule = function explainRRule(rrule) {
  *
  * @return Object
  */
-AgenDAVRepeat.generateLanguage = function generateLanguage() {
+CaldaverRepeat.generateLanguage = function generateLanguage() {
   return {
     'dayNames': [
-      AgenDAVConf.i18n['labels.sunday'],
-      AgenDAVConf.i18n['labels.monday'],
-      AgenDAVConf.i18n['labels.tuesday'],
-      AgenDAVConf.i18n['labels.wednesday'],
-      AgenDAVConf.i18n['labels.thursday'],
-      AgenDAVConf.i18n['labels.friday'],
-      AgenDAVConf.i18n['labels.saturday']
+      CaldaverConf.i18n['labels.sunday'],
+      CaldaverConf.i18n['labels.monday'],
+      CaldaverConf.i18n['labels.tuesday'],
+      CaldaverConf.i18n['labels.wednesday'],
+      CaldaverConf.i18n['labels.thursday'],
+      CaldaverConf.i18n['labels.friday'],
+      CaldaverConf.i18n['labels.saturday']
     ],
     'monthNames': [
-      AgenDAVConf.i18n['labels.january'],
-      AgenDAVConf.i18n['labels.february'],
-      AgenDAVConf.i18n['labels.march'],
-      AgenDAVConf.i18n['labels.april'],
-      AgenDAVConf.i18n['labels.may'],
-      AgenDAVConf.i18n['labels.june'],
-      AgenDAVConf.i18n['labels.july'],
-      AgenDAVConf.i18n['labels.august'],
-      AgenDAVConf.i18n['labels.september'],
-      AgenDAVConf.i18n['labels.october'],
-      AgenDAVConf.i18n['labels.november'],
-      AgenDAVConf.i18n['labels.december'],
+      CaldaverConf.i18n['labels.january'],
+      CaldaverConf.i18n['labels.february'],
+      CaldaverConf.i18n['labels.march'],
+      CaldaverConf.i18n['labels.april'],
+      CaldaverConf.i18n['labels.may'],
+      CaldaverConf.i18n['labels.june'],
+      CaldaverConf.i18n['labels.july'],
+      CaldaverConf.i18n['labels.august'],
+      CaldaverConf.i18n['labels.september'],
+      CaldaverConf.i18n['labels.october'],
+      CaldaverConf.i18n['labels.november'],
+      CaldaverConf.i18n['labels.december'],
     ]
   };
 };
@@ -281,7 +281,7 @@ AgenDAVRepeat.generateLanguage = function generateLanguage() {
 /**
  * All frequency dependent fields
  */
-AgenDAVRepeat.allOptionalFields = [
+CaldaverRepeat.allOptionalFields = [
   'repeat_by_day',
   'repeat_by_month_day'
 ];
@@ -291,7 +291,7 @@ AgenDAVRepeat.allOptionalFields = [
  *
  * @param string frequency
  */
-AgenDAVRepeat.getFieldsForFrequency = function getFieldsForFrequency(frequency) {
+CaldaverRepeat.getFieldsForFrequency = function getFieldsForFrequency(frequency) {
   if (frequency === RRule.DAILY) {
     return ['repeat_by_day'];
   }
@@ -312,13 +312,13 @@ AgenDAVRepeat.getFieldsForFrequency = function getFieldsForFrequency(frequency) 
 /**
  * Shows allowed fields for a chosen frequency
  */
-AgenDAVRepeat.showAllowedFieldsByFrequency = function showAllowedFieldsByFrequency(frequency) {
-  var total_fields = AgenDAVRepeat.allOptionalFields.length;
+CaldaverRepeat.showAllowedFieldsByFrequency = function showAllowedFieldsByFrequency(frequency) {
+  var total_fields = CaldaverRepeat.allOptionalFields.length;
 
   for (var i=0;i<total_fields;i++) {
-    var current_field= AgenDAVRepeat.allOptionalFields[i];
+    var current_field= CaldaverRepeat.allOptionalFields[i];
 
-    if (AgenDAVRepeat.shouldConsider(frequency, current_field)) {
+    if (CaldaverRepeat.shouldConsider(frequency, current_field)) {
       $('.container_' + current_field).show();
     } else {
       $('.container_' + current_field).hide();
@@ -332,8 +332,8 @@ AgenDAVRepeat.showAllowedFieldsByFrequency = function showAllowedFieldsByFrequen
  * @param string frequency
  * @param string field name
  */
-AgenDAVRepeat.shouldConsider = function shouldConsider(frequency, field) {
-  var allowed = AgenDAVRepeat.getFieldsForFrequency(frequency);
+CaldaverRepeat.shouldConsider = function shouldConsider(frequency, field) {
+  var allowed = CaldaverRepeat.getFieldsForFrequency(frequency);
 
   if (allowed.indexOf(field) === -1) {
     return false;
@@ -348,7 +348,7 @@ AgenDAVRepeat.shouldConsider = function shouldConsider(frequency, field) {
  * @param string rrule
  * @param jQuery form
  */
-AgenDAVRepeat.setRepeatRuleOnForm = function setRepeatRuleOnForm(rrule, form) {
+CaldaverRepeat.setRepeatRuleOnForm = function setRepeatRuleOnForm(rrule, form) {
   var rrulejs = RRule.fromString(rrule);
 
   for (var param in rrulejs.origOptions) {
@@ -392,7 +392,7 @@ AgenDAVRepeat.setRepeatRuleOnForm = function setRepeatRuleOnForm(rrule, form) {
         value = rrulejs.origOptions[param];
       }
       for (var i=0;i<value.length;i++) {
-        var label = AgenDAVRepeat.getLabelForByDay(value[i]);
+        var label = CaldaverRepeat.getLabelForByDay(value[i]);
         form.find('.container_repeat_by_day [value=' + label + ']').prop('checked', true);
       }
       continue;
@@ -408,7 +408,7 @@ AgenDAVRepeat.setRepeatRuleOnForm = function setRepeatRuleOnForm(rrule, form) {
     console.log('Ooops, property ' + param + ' not supported');
   }
 
-  AgenDAVRepeat.regenerate();
+  CaldaverRepeat.regenerate();
 
   // Does this generated RRULE match the original one?
   var generated_rrule = RRule.fromString($('#rrule').val());
@@ -421,7 +421,7 @@ AgenDAVRepeat.setRepeatRuleOnForm = function setRepeatRuleOnForm(rrule, form) {
     );
     $('#repeat_warning_rrule_unreproducible').show();
     $('#repeat_frequency').val('keep-original');
-    AgenDAVRepeat.regenerate();
+    CaldaverRepeat.regenerate();
   }
 };
 
@@ -433,7 +433,7 @@ AgenDAVRepeat.setRepeatRuleOnForm = function setRepeatRuleOnForm(rrule, form) {
  * @return Date
  */
 
-AgenDAVRepeat.generateUntilDate = function generateUntilDate(is_allday) {
+CaldaverRepeat.generateUntilDate = function generateUntilDate(is_allday) {
     if ($('#repeats_frequency').val() === '-1' || $('#repeat_ends').val() !== 'date') {
         return false;
     }
