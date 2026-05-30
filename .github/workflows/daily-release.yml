@@ -1,0 +1,155 @@
+name: Daily release
+
+on:
+  schedule:
+    - cron: "17 10 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: daily-release
+  cancel-in-progress: false
+
+env:
+  ANDROID_API_LEVEL: "36"
+  ANDROID_BUILD_TOOLS_VERSION: "36.0.0"
+  JAVA_VERSION: "21"
+  NODE_VERSION: "22"
+
+jobs:
+  prepare:
+    name: Prepare release tags
+    runs-on: ubuntu-latest
+    outputs:
+      date_tag: ${{ steps.release.outputs.date_tag }}
+      image_repo: ${{ steps.release.outputs.image_repo }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set release metadata
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          date_tag="$(date -u +'%Y-%m-%d')"
+          image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "date_tag=$date_tag"
+            echo "image_repo=$image_repo"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish date and latest git tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags --force
+          git tag -fa "${{ steps.release.outputs.date_tag }}" "$GITHUB_SHA" -m "Caldaver daily release ${{ steps.release.outputs.date_tag }}"
+          git tag -fa latest "$GITHUB_SHA" -m "Caldaver latest release"
+          git push --force origin "refs/tags/${{ steps.release.outputs.date_tag }}"
+          git push --force origin "refs/tags/latest"
+
+  docker:
+    name: Publish Docker image
+    runs-on: ubuntu-latest
+    needs: prepare
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ needs.prepare.outputs.image_repo }}:${{ needs.prepare.outputs.date_tag }}
+            ${{ needs.prepare.outputs.image_repo }}:latest
+
+  android:
+    name: Publish Android APK release
+    runs-on: ubuntu-latest
+    needs: prepare
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="$RUNNER_TEMP/android-sdk"
+          echo "ANDROID_HOME=$sdk_root" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
+          scripts/android-sdk-setup.sh \
+            --sdk-root "$sdk_root" \
+            --api-level "$ANDROID_API_LEVEL" \
+            --build-tools "$ANDROID_BUILD_TOOLS_VERSION"
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Capacitor Android APK
+        shell: bash
+        run: scripts/ci/build-capacitor-android-apk.sh
+
+      - name: Name APK with release date
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find build/android-apk -maxdepth 1 -type f -name '*.apk' | head -n 1)"
+          test -n "$apk"
+          mv "$apk" "build/android-apk/caldaver-android-${{ needs.prepare.outputs.date_tag }}.apk"
+
+      - name: Publish dated GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.date_tag }}
+          name: CalDaver ${{ needs.prepare.outputs.date_tag }}
+          files: build/android-apk/*.apk
+          overwrite_files: true
+          make_latest: false
+
+      - name: Publish latest GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: CalDaver latest
+          files: build/android-apk/*.apk
+          overwrite_files: true
+          make_latest: true
