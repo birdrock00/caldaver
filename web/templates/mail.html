@@ -9,18 +9,6 @@
   <aside class="mail-sidebar">
     {% include 'parts/sidebrand.html' %}
     {% include 'parts/appnav.html' %}
-    <details class="mail-actions-menu">
-      <summary aria-label="Mail actions" title="Mail actions">
-        <i class="fa fa-ellipsis-v"></i>
-        <span>{% trans %}labels.mail{% endtrans %}</span>
-      </summary>
-      <div class="mail-actions-menu-list">
-        <button id="mail_account_create" type="button">
-          <i class="fa fa-plus"></i>
-          <span>{% trans %}labels.addaccount{% endtrans %}</span>
-        </button>
-      </div>
-    </details>
     <nav id="mail_accounts" class="mail-accounts" aria-label="Mail accounts"></nav>
   </aside>
 
@@ -46,62 +34,6 @@
       <div id="mail_rows" class="mail-rows"></div>
     </section>
   </main>
-</div>
-
-<div id="mail_account_dialog" class="contact-dialog" hidden>
-  <form id="mail_account_form" action="{{ app.url_generator.generate('mail.accounts.save') }}" method="post">
-    <input type="hidden" name="_token" value="{{ csrf_token.getValue() }}">
-    <input type="hidden" name="id" value="">
-    <div class="contact-dialog-panel">
-      <div class="contact-dialog-header">
-        <h2>{% trans %}labels.addaccount{% endtrans %}</h2>
-        <button type="button" id="mail_account_cancel_icon" aria-label="{% trans %}labels.cancel{% endtrans %}">
-          <i class="fa fa-times"></i>
-        </button>
-      </div>
-      <label>
-        <span>{% trans %}labels.accountname{% endtrans %}</span>
-        <input required name="label" type="text" autocomplete="organization">
-      </label>
-      <label>
-        <span>{% trans %}labels.emailaddress{% endtrans %}</span>
-        <input required name="email_address" type="email" autocomplete="email">
-      </label>
-      <label>
-        <span>{% trans %}labels.imaphost{% endtrans %}</span>
-        <input required name="imap_host" type="text" autocomplete="off">
-      </label>
-      <label>
-        <span>{% trans %}labels.imapport{% endtrans %}</span>
-        <input required name="imap_port" type="number" min="1" max="65535" value="993">
-      </label>
-      <label>
-        <span>{% trans %}labels.encryption{% endtrans %}</span>
-        <select name="encryption">
-          <option value="ssl">SSL</option>
-          <option value="tls">STARTTLS</option>
-          <option value="none">None</option>
-        </select>
-      </label>
-      <label>
-        <span>{% trans %}labels.username{% endtrans %}</span>
-        <input required name="username" type="text" autocomplete="username">
-      </label>
-      <label>
-        <span>{% trans %}labels.password{% endtrans %}</span>
-        <input required name="password" type="password" autocomplete="current-password">
-      </label>
-      <label>
-        <span>{% trans %}labels.refresh_interval_minutes{% endtrans %}</span>
-        <input required name="refresh_interval_minutes" type="number" min="1" max="1440" value="1">
-      </label>
-      <div id="mail_account_error" class="mail-error" hidden></div>
-      <div class="contact-dialog-footer">
-        <button type="button" id="mail_account_cancel" class="btn btn-default">{% trans %}labels.cancel{% endtrans %}</button>
-        <button type="submit" class="btn btn-primary">{% trans %}labels.save{% endtrans %}</button>
-      </div>
-    </div>
-  </form>
 </div>
 {% endblock %}
 
