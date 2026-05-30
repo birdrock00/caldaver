@@ -122,7 +122,7 @@ jobs:
             --build-tools "$ANDROID_BUILD_TOOLS_VERSION"
 
       - name: Install Node dependencies
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
       - name: Build Capacitor Android APK
         shell: bash
