@@ -158,21 +158,13 @@ class MailAccountRepository
 
     public function replaceMessageCache($owner, $accountId, array $messages)
     {
-        $this->connection->beginTransaction();
-        try {
-            $this->connection->executeStatement(
-                'DELETE FROM mail_message_cache WHERE owner = ? AND account_id = ?',
-                [$owner, $accountId]
-            );
+        $this->connection->executeStatement(
+            'DELETE FROM mail_message_cache WHERE owner = ? AND account_id = ?',
+            [$owner, $accountId]
+        );
 
-            foreach (array_values($messages) as $position => $message) {
-                $this->insertCachedMessage($owner, $accountId, $message, $position);
-            }
-
-            $this->connection->commit();
-        } catch (\Exception $exception) {
-            $this->connection->rollBack();
-            throw $exception;
+        foreach (array_values($messages) as $position => $message) {
+            $this->insertCachedMessage($owner, $accountId, $message, $position);
         }
     }
 
