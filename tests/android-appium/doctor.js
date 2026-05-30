@@ -1,6 +1,6 @@
 const { execFileSync } = require('child_process');
 
-const adb = process.env.ADB_BINARY || 'adb';
+let adb = process.env.ADB_BINARY || 'adb';
 const appPackage = process.env.CALDAVER_ANDROID_APP_PACKAGE || 'club.exampleapp.caldaver';
 const adbTarget = process.env.ANDROID_UDID ? ['-s', process.env.ANDROID_UDID] : [];
 
@@ -17,6 +17,24 @@ function fail(message) {
 }
 
 try {
+  if (!process.env.ADB_BINARY) {
+    const sdkCandidates = [
+      process.env.ANDROID_HOME && `${process.env.ANDROID_HOME}/platform-tools/adb`,
+      process.env.ANDROID_SDK_ROOT && `${process.env.ANDROID_SDK_ROOT}/platform-tools/adb`,
+      `${process.env.HOME}/Android/Sdk/platform-tools/adb`
+    ].filter(Boolean);
+
+    try {
+      run(adb, ['version']);
+    } catch {
+      const fs = require('fs');
+      const candidate = sdkCandidates.find(item => fs.existsSync(item));
+      if (candidate) {
+        adb = candidate;
+      }
+    }
+  }
+
   const devices = run(adb, ['devices']);
   const attached = devices
     .split('\n')
