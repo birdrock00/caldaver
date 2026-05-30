@@ -496,7 +496,8 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
 
   const calendarScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
   expect(calendarScroll).toBeGreaterThan(120);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.mouse.wheel(0, 640);
+  await page.waitForTimeout(150);
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(80);
 
   await page.goto(`${baseURL}/cards`);
@@ -507,7 +508,8 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
 
   const contactsScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
   expect(contactsScroll).toBeGreaterThan(120);
-  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await page.mouse.wheel(0, 640);
+  await page.waitForTimeout(150);
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(80);
 });
 
