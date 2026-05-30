@@ -1,30 +1,30 @@
 <?php
 
-namespace AgenDAV\Event;
+namespace Caldaver\Event;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Event;
-use AgenDAV\EventInstance;
-use AgenDAV\Event\RecurrenceId;
-use AgenDAV\Data\Reminder;
+use Caldaver\Event;
+use Caldaver\EventInstance;
+use Caldaver\Event\RecurrenceId;
+use Caldaver\Data\Reminder;
 use Sabre\VObject\DateTimeParser;
 use Sabre\VObject\Component\VCalendar;
 use Sabre\VObject\Component\VEvent;
@@ -40,7 +40,7 @@ class VObjectEventInstance implements EventInstance
     /** @var \Sabre\VObject\Component\VEvent */
     protected $vevent;
 
-    /** @var \AgenDAV\Data\Reminder[] */
+    /** @var \Caldaver\Data\Reminder[] */
     protected $reminders;
 
     /** @var bool */
@@ -197,7 +197,7 @@ class VObjectEventInstance implements EventInstance
     /**
      * Gets the RECURRENCE-ID property of this instance
      *
-     * @return \AgenDAV\Event\RecurrenceId|null
+     * @return \Caldaver\Event\RecurrenceId|null
      */
     public function getRecurrenceId()
     {
@@ -214,7 +214,7 @@ class VObjectEventInstance implements EventInstance
     /**
      * Returns all recognized reminders for this instance
      *
-     * @return \AgenDAV\Data\Reminder[]
+     * @return \Caldaver\Data\Reminder[]
      */
     public function getReminders()
     {
@@ -225,9 +225,9 @@ class VObjectEventInstance implements EventInstance
     /**
      * Adds a new reminder
      *
-     * @param \AgenDAV\Data\Reminder $reminder
+     * @param \Caldaver\Data\Reminder $reminder
      */
-    public function addReminder(\AgenDAV\Data\Reminder $reminder)
+    public function addReminder(\Caldaver\Data\Reminder $reminder)
     {
         $this->reminders[] = $reminder;
         $this->addVAlarm($reminder);
@@ -352,7 +352,7 @@ class VObjectEventInstance implements EventInstance
     /**
      * Set the RECURRENCE-ID property for this event
      *
-     * @param \AgenDAV\Event\RecurrenceId|null $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId|null $recurrence_id
      */
     public function setRecurrenceId(?RecurrenceId $recurrence_id = null)
     {
@@ -438,7 +438,7 @@ class VObjectEventInstance implements EventInstance
     /**
      * Copies basic properties from another EventInstance to this instance
      *
-     * @param \AgenDAV\EventInstance $source
+     * @param \Caldaver\EventInstance $source
      */
     public function copyPropertiesFrom(EventInstance $source)
     {
@@ -479,7 +479,7 @@ class VObjectEventInstance implements EventInstance
      *
      * It is useful to generate a new recurrence exception
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      *
      * @return void
      */
@@ -519,7 +519,7 @@ class VObjectEventInstance implements EventInstance
     /**
      * Finds all VALARMs on this instance
      *
-     * @return \AgenDAV\Data\Reminder[]
+     * @return \Caldaver\Data\Reminder[]
      */
     protected function findReminders()
     {
@@ -564,14 +564,14 @@ class VObjectEventInstance implements EventInstance
     /**
      * Adds a VALARM on the internal VEVENT, based on a passed reminder
      *
-     * @param \AgenDAV\Data\Reminder $reminder
-     * @return \AgenDAV\Data\Reminder $reminder With updated position
+     * @param \Caldaver\Data\Reminder $reminder
+     * @return \Caldaver\Data\Reminder $reminder With updated position
      */
     protected function addVAlarm(Reminder $reminder)
     {
         $valarm = $this->vevent->add('VALARM', [
             'ACTION' => 'DISPLAY',
-            'DESCRIPTION' => 'Reminder set on AgenDAV',
+            'DESCRIPTION' => 'Reminder set on Caldaver',
             'TRIGGER' => $reminder->getISO8601String(),
         ]);
 

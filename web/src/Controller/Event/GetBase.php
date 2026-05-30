@@ -1,33 +1,33 @@
 <?php
 
-namespace AgenDAV\Controller\Event;
+namespace Caldaver\Controller\Event;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Controller\Event\Listing;
-use AgenDAV\CalDAV\Resource\Calendar;
-use AgenDAV\CalDAV\Resource\CalendarObject;
-use AgenDAV\DateHelper;
-use AgenDAV\Event\FullCalendarEvent;
-use AgenDAV\Data\Transformer\FullCalendarEventTransformer;
-use AgenDAV\Data\Serializer\PlainSerializer;;
+use Caldaver\Controller\Event\Listing;
+use Caldaver\CalDAV\Resource\Calendar;
+use Caldaver\CalDAV\Resource\CalendarObject;
+use Caldaver\DateHelper;
+use Caldaver\Event\FullCalendarEvent;
+use Caldaver\Data\Transformer\FullCalendarEventTransformer;
+use Caldaver\Data\Serializer\PlainSerializer;;
 use League\Fractal\Resource\Item;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -106,7 +106,7 @@ class GetBase extends Listing
     /**
      * Serialize a list of FullCalendar events using Fractal
      *
-     * @param \AgenDAV\Event\FullCalendarEvent $event FullCalendar event
+     * @param \Caldaver\Event\FullCalendarEvent $event FullCalendar event
      * @param \DateTimeZone $timezone Time zone the user has
      * @param \Silex\Application $app
      *

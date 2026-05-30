@@ -1,24 +1,24 @@
 <?php
 
-namespace AgenDAV\Data;
+namespace Caldaver\Data;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 use Sabre\VObject\Component\VAlarm;
@@ -57,7 +57,7 @@ class Reminder
      *                     - count: number of <units>
      *                     - unit: one of minutes, hours or days
      *                     - position (optional)
-     * @return \AgenDAV\Data\Reminder
+     * @return \Caldaver\Data\Reminder
      */
     public static function createFromInput(array $input)
     {
@@ -89,11 +89,11 @@ class Reminder
     /**
      * Receives an VObject VALARM and creates a new Reminder.
      *
-     * If the VALARM is not supported by AgenDAV, a null value will be returned
+     * If the VALARM is not supported by Caldaver, a null value will be returned
      *
      * @param \Sabre\VObject\Component\VAlarm $valarm
      * @param integer $position Position of this VALARM inside the VEVENT
-     * @return \AgenDAV\Data\Reminder|null
+     * @return \Caldaver\Data\Reminder|null
      */
     public static function createFromVObject(VAlarm $valarm, $position)
     {

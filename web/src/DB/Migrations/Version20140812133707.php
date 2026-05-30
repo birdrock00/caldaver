@@ -1,15 +1,15 @@
 <?php
 
-namespace AgenDAV\DB\Migrations;
+namespace Caldaver\DB\Migrations;
 
 use Doctrine\DBAL\Schema\Schema;
-use \AgenDAV\DB\Migrations\AgenDAVMigration;
+use \Caldaver\DB\Migrations\CaldaverMigration;
 
-class Version20140812133707 extends AgenDAVMigration
+class Version20140812133707 extends CaldaverMigration
 {
     public function up(Schema $schema)
     {
-        $this->write('Creating initial schema for AgenDAV');
+        $this->write('Creating initial schema for Caldaver');
         $this->createSessionsTable($schema);
         $this->createSharesTable($schema);
 

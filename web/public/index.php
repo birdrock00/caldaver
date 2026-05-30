@@ -4,7 +4,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\ErrorHandler\Debug;
 
 // Available environments: prod, dev
-$environment = getenv('AGENDAV_ENVIRONMENT');
+$environment = getenv('CALDAVER_ENVIRONMENT');
 
 if ($environment !== 'prod' && $environment !== 'dev') {
   $environment = 'prod'; // Safe default

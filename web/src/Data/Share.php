@@ -1,28 +1,28 @@
 <?php
 
-namespace AgenDAV\Data;
+namespace Caldaver\Data;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\CalDAV\Resource\Calendar;
-use AgenDAV\Data\Principal;
+use Caldaver\CalDAV\Resource\Calendar;
+use Caldaver\Data\Principal;
 use Doctrine\ORM\Mapping\Column;
 use Doctrine\ORM\Mapping\Entity;
 use Doctrine\ORM\Mapping\HasLifecycleCallbacks;
@@ -141,7 +141,7 @@ class Share
     /*
      * Returns Share associated principal, if set
      *
-     * @return AgenDAV\Data\Principal
+     * @return Caldaver\Data\Principal
      */
     public function getPrincipal()
     {
@@ -151,7 +151,7 @@ class Share
     /*
      * Sets this share associated Principal
      *
-     * @param AgenDAV\Data\Principal $principal
+     * @param Caldaver\Data\Principal $principal
      */
     public function setPrincipal(Principal $principal)
     {
@@ -230,7 +230,7 @@ class Share
     /**
      * Applies custom properties to passed calendar object
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
      */
     public function applyCustomPropertiesTo(Calendar $calendar)
     {
