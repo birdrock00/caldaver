@@ -78,6 +78,14 @@ div#logo {
   text-align: center;
 }
 
+.caldaver-sidebrand {
+  color: #202124;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 32px;
+}
+
 #sidebar div.block {
   margin-bottom: 15px;
 }
@@ -493,6 +501,78 @@ body.caldaver-calendar-page {
 
 .caldaver-brand-title {
   white-space: nowrap;
+}
+
+.mobile-section-menu {
+  position: relative;
+  display: none;
+  margin-left: 10px;
+
+  summary {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    color: #5f6368;
+    border-radius: 50%;
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &:hover,
+    &:focus {
+      background: #f1f3f4;
+      outline: 0;
+    }
+  }
+}
+
+.mobile-section-menu-list {
+  position: absolute;
+  top: 46px;
+  left: 0;
+  z-index: 1200;
+  min-width: 178px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(60, 64, 67, .2);
+
+  a {
+    display: flex;
+    min-height: 40px;
+    align-items: center;
+    padding: 0 12px;
+    color: #3c4043;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+
+    i {
+      width: 20px;
+      margin-right: 12px;
+      color: #5f6368;
+      text-align: center;
+    }
+
+    &:hover,
+    &:focus,
+    &.active {
+      color: #001d35;
+      background: #c2e7ff;
+      outline: 0;
+
+      i {
+        color: #001d35;
+      }
+    }
+  }
 }
 
 #usermenu .user-pill {
@@ -1827,12 +1907,73 @@ body.caldaver-calendar-page {
     overflow: auto;
   }
 
+  body.caldaver-calendar-page {
+    overflow: auto;
+  }
+
+  .caldaver-topbar.navbar {
+    min-height: 56px;
+
+    .container-fluid {
+      min-height: 56px;
+      padding: 0 8px;
+    }
+
+    .navbar-brand {
+      height: 56px;
+      max-width: 136px;
+      font-size: 20px;
+      line-height: 56px;
+    }
+
+    .navbar-nav {
+      gap: 0;
+
+      > li > a {
+        padding: 8px;
+      }
+    }
+  }
+
+  .topbar-menu {
+    display: none;
+  }
+
+  .caldaver-brand-icon {
+    width: 30px;
+    height: 30px;
+    margin-right: 8px;
+  }
+
+  .caldaver-brand-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-section-menu {
+    display: block;
+  }
+
+  #usermenu .user-pill {
+    max-width: 86px;
+    overflow: hidden;
+    padding: 0 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #loading {
+    display: none;
+  }
+
   .calendar-shell {
     height: auto;
+    min-height: ~"calc(100vh - 56px)";
   }
 
   #wrapper.calendar-layout {
     display: block;
+    height: auto;
   }
 
   #sidebar {
@@ -1840,26 +1981,45 @@ body.caldaver-calendar-page {
     min-width: 0;
     max-width: none;
     height: auto;
+    padding: 12px;
+    overflow: visible;
+  }
+
+  #sidebar #logo,
+  #sidebar .app-nav,
+  .cards-sidebar #logo,
+  .cards-sidebar .app-nav,
+  .mail-sidebar #logo,
+  .mail-sidebar .app-nav {
+    display: none;
   }
 
   #content {
-    height: 75vh;
+    height: auto;
+    min-height: 720px;
     padding: 0 12px 12px;
+    overflow-x: auto;
   }
 
   #calendar_view {
     border-radius: 18px;
+    min-width: 760px;
+    min-height: 720px;
+    overflow: visible;
   }
 
   .cards-shell {
     display: block;
     height: auto;
+    min-height: ~"calc(100vh - 56px)";
   }
 
   .cards-sidebar {
     width: 100%;
     min-width: 0;
     height: auto;
+    padding: 12px;
+    overflow: visible;
   }
 
   .cards-content {
@@ -1883,6 +2043,8 @@ body.caldaver-calendar-page {
 
   .contacts-panel {
     height: auto;
+    min-height: 620px;
+    overflow: visible;
   }
 
   .contacts-table-header {
@@ -1902,12 +2064,15 @@ body.caldaver-calendar-page {
   .mail-shell {
     display: block;
     height: auto;
+    min-height: ~"calc(100vh - 56px)";
   }
 
   .mail-sidebar {
     width: 100%;
     min-width: 0;
     height: auto;
+    padding: 12px;
+    overflow: visible;
   }
 
   .mail-content {

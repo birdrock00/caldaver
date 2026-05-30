@@ -3,15 +3,11 @@
 {% block body_class %}caldaver-cards-page{% endblock %}
 
 {% block content %}
+{% set active_section = 'cards' %}
 {% include 'parts/navbar.html' %}
 <div class="container-fluid cards-shell">
   <aside class="cards-sidebar">
-    {% if logo %}
-    <div id="logo" class="block">
-      <img src="{{ asset(logo, 'img') }}" alt="Logo">
-    </div>
-    {% endif %}
-    {% set active_section = 'cards' %}
+    {% include 'parts/sidebrand.html' %}
     {% include 'parts/appnav.html' %}
     <button id="contact_create" class="btn btn-default create-contact-button">
       <i class="fa fa-plus"></i> {% trans %}labels.createcontact{% endtrans %}

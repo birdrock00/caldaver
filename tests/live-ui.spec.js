@@ -208,6 +208,28 @@ async function mockMailApi(page, options = {}) {
   });
 }
 
+async function mockCardsApi(page, count = 36) {
+  const contacts = Array.from({ length: count }, (_, index) => ({
+    full_name: `Mobile Contact ${String(index + 1).padStart(2, '0')}`,
+    email: `mobile${index + 1}@example.test`,
+    phone: `555-010${index % 10}`,
+    organization: 'Example Co',
+    job_title: 'Tester',
+    company_line: 'Tester, Example Co',
+    labels: [],
+    url: `/contacts/mobile-${index + 1}.vcf`,
+    etag: `"${index + 1}"`
+  }));
+
+  await page.route('**/cards/list', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: contacts })
+    });
+  });
+}
+
 function captureConsoleErrors(page) {
   const consoleErrors = [];
   page.on('console', message => {
@@ -437,6 +459,7 @@ test('login form labels do not overlap input fields', async ({ page }) => {
   await page.setViewportSize({ width: 486, height: 240 });
   await page.goto(`${baseURL}/login`);
 
+  await expect(page.locator('.caldaver-sidebrand')).toHaveText('Caldaver');
   const userLabel = await visibleBox(page, 'label[for="user"]');
   const userInput = await visibleBox(page, 'input[name="user"]');
   const passwordLabel = await visibleBox(page, 'label[for="password"]');
@@ -446,6 +469,71 @@ test('login form labels do not overlap input fields', async ({ page }) => {
   expect(overlaps(passwordLabel, passwordInput)).toBe(false);
   expect(userLabel.x + userLabel.width).toBeLessThanOrEqual(userInput.x - 8);
   expect(passwordLabel.x + passwordLabel.width).toBeLessThanOrEqual(passwordInput.x - 8);
+});
+
+test('mobile layout uses topbar section menu and keeps calendar and contacts scrollable', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCardsApi(page, 42);
+  await login(page);
+  await page.goto(`${baseURL}/`);
+
+  await expect(page.locator('.caldaver-brand-title')).toHaveText('Caldaver');
+  await expect(page.locator('.mobile-section-menu')).toBeVisible();
+  await expect(page.locator('#usermenu .prefs')).toBeVisible();
+  await expect(page.locator('#usermenu .user-pill')).toBeVisible();
+  await expect(page.locator('#sidebar .app-nav')).toBeHidden();
+  await expect(page.locator('#own_calendar_list')).toBeVisible();
+
+  const prefs = await visibleBox(page, '#usermenu .prefs');
+  const user = await visibleBox(page, '#usermenu .user-pill');
+  expect(Math.abs((prefs.y + prefs.height / 2) - (user.y + user.height / 2))).toBeLessThan(10);
+
+  const menu = page.locator('.mobile-section-menu');
+  await menu.locator('summary').click();
+  await expect(menu.locator('a', { hasText: 'Calendar' })).toBeVisible();
+  await expect(menu.locator('a', { hasText: 'Contacts' })).toBeVisible();
+  await expect(menu.locator('a', { hasText: 'Mail' })).toBeVisible();
+
+  const calendarScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  expect(calendarScroll).toBeGreaterThan(120);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(80);
+
+  await page.goto(`${baseURL}/cards`);
+  await expect(page.locator('.mobile-section-menu')).toBeVisible();
+  await expect(page.locator('.cards-sidebar .app-nav')).toBeHidden();
+  await expect(page.locator('.contacts-nav-item.active')).toBeVisible();
+  await expect(page.locator('#contacts_rows .contact-row')).toHaveCount(42);
+
+  const contactsScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
+  expect(contactsScroll).toBeGreaterThan(120);
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(80);
+});
+
+test('desktop layout keeps side navigation after mobile changes', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await mockCardsApi(page, 8);
+  await login(page);
+  await page.goto(`${baseURL}/`);
+
+  await expect(page.locator('.mobile-section-menu')).toBeHidden();
+  await expect(page.locator('#sidebar .app-nav')).toBeVisible();
+  await expect(page.locator('#sidebar .caldaver-sidebrand')).toHaveText('Caldaver');
+
+  const sidebar = await visibleBox(page, '#sidebar');
+  const content = await visibleBox(page, '#content');
+  expect(overlaps(sidebar, content)).toBe(false);
+
+  await page.goto(`${baseURL}/cards`);
+  await expect(page.locator('.mobile-section-menu')).toBeHidden();
+  await expect(page.locator('.cards-sidebar .app-nav')).toBeVisible();
+  await expect(page.locator('.cards-sidebar .caldaver-sidebrand')).toHaveText('Caldaver');
+  await expect(page.locator('#contacts_rows .contact-row')).toHaveCount(8);
+
+  const cardsSidebar = await visibleBox(page, '.cards-sidebar');
+  const cardsContent = await visibleBox(page, '.cards-content');
+  expect(overlaps(cardsSidebar, cardsContent)).toBe(false);
 });
 
 test('mail page renders mocked messages, message detail, search, and attachment download', async ({ page }) => {
