@@ -2,6 +2,7 @@
 (function() {
   var contacts = [];
   var view = 'list';
+  var userSelectedView = false;
   var colors = ['#3367d6', '#188038', '#9334e6', '#d93025', '#00897b', '#5f6368', '#c5221f', '#7b1fa2'];
 
   function $(selector) {
@@ -63,8 +64,8 @@
       row.children[2].textContent = text(contact.phone);
       row.children[3].textContent = text(contact.company_line);
       row.children[4].textContent = (contact.labels || []).join(', ');
-      row.querySelector('.contact-delete').addEventListener('click', function() {
-        deleteContact(contact);
+      row.querySelector('.contact-delete').addEventListener('click', function(event) {
+        deleteContact(contact, event.currentTarget);
       });
       rows.appendChild(row);
     });
@@ -101,8 +102,8 @@
       deleteButton.className = 'contact-delete card-delete';
       deleteButton.title = '{{ 'labels.delete'|trans }}';
       deleteButton.innerHTML = '<i class="fa fa-trash"></i>';
-      deleteButton.addEventListener('click', function() {
-        deleteContact(contact);
+      deleteButton.addEventListener('click', function(event) {
+        deleteContact(contact, event.currentTarget);
       });
       card.appendChild(deleteButton);
       grid.appendChild(card);
@@ -119,6 +120,26 @@
 
     renderList(data);
     renderCards(data);
+  }
+
+  function narrowViewport() {
+    if (window.matchMedia) {
+      return window.matchMedia('(max-width: 900px)').matches;
+    }
+
+    return window.innerWidth <= 900;
+  }
+
+  function defaultContactView() {
+    return narrowViewport() ? 'cards' : 'list';
+  }
+
+  function setContactView(nextView) {
+    view = nextView;
+    document.querySelectorAll('.contacts-view-switch button').forEach(function(button) {
+      button.classList.toggle('active', button.dataset.view === view);
+    });
+    render();
   }
 
   function loadContacts() {
@@ -138,10 +159,23 @@
       })
       .catch(function(error) {
         $('#contacts_rows').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
+        $('#contacts_cards').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
       });
   }
 
-  function deleteContact(contact) {
+  function deleteContact(contact, button) {
+    if (button && button.disabled) {
+      return;
+    }
+
+    if (!window.confirm('Delete ' + (contact.full_name || 'this contact') + '?')) {
+      return;
+    }
+
+    if (button) {
+      button.disabled = true;
+    }
+
     var formData = new FormData();
     formData.append('_token', $('#contact_form input[name="_token"]').value);
     formData.append('url', contact.url);
@@ -167,6 +201,10 @@
       })
       .catch(function(error) {
         $('#contacts_rows').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
+        $('#contacts_cards').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
+        if (button) {
+          button.disabled = false;
+        }
       });
   }
 
@@ -189,13 +227,24 @@
 
     document.querySelectorAll('.contacts-view-switch button').forEach(function(button) {
       button.addEventListener('click', function() {
-        view = button.dataset.view;
-        document.querySelectorAll('.contacts-view-switch button').forEach(function(item) {
-          item.classList.toggle('active', item === button);
-        });
-        render();
+        userSelectedView = true;
+        setContactView(button.dataset.view);
       });
     });
+
+    var contactViewQuery = window.matchMedia && window.matchMedia('(max-width: 900px)');
+    if (contactViewQuery) {
+      var handleContactViewQueryChange = function() {
+        if (!userSelectedView) {
+          setContactView(defaultContactView());
+        }
+      };
+      if (contactViewQuery.addEventListener) {
+        contactViewQuery.addEventListener('change', handleContactViewQueryChange);
+      } else if (contactViewQuery.addListener) {
+        contactViewQuery.addListener(handleContactViewQueryChange);
+      }
+    }
 
     $('#contact_form').addEventListener('submit', function(event) {
       event.preventDefault();
@@ -221,6 +270,7 @@
         });
     });
 
+    setContactView(defaultContactView());
     loadContacts();
   });
 })();
