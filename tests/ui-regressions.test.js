@@ -114,6 +114,14 @@ test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
   );
 });
 
+test('login form labels cannot overlap input fields under Bootstrap 5', () => {
+  const less = read('assets/less/agendav.less');
+
+  assert.match(less, /\.loginform\s*\{[\s\S]*grid-template-columns:\s*96px minmax\(0, 1fr\)/);
+  assert.match(less, /\.loginform\s*\{[\s\S]*white-space:\s*nowrap/);
+  assert.match(less, /\.form-horizontal \.col-sm-3,\n  \.form-horizontal \.col-sm-9/);
+});
+
 test('plain Fractal serializer keeps PHP 8 compatible method signatures', () => {
   const serializer = read('web/src/Data/Serializer/PlainSerializer.php');
 
@@ -289,6 +297,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailMessage, /data-message-url/);
   assert.match(mailMessage, /data-unread-url/);
   assert.match(mailMessage, /id="mail_reader_unread"/);
+  assert.match(mailMessage, /id="mail_reader_html"/);
+  assert.match(mailMessage, /sandbox="allow-popups allow-popups-to-escape-sandbox"/);
   assert.match(mailMessage, /mailmessagejs\.html/);
   assert.match(appNav, /id="mail_nav_item"/);
   assert.match(appNav, /mail-nav-spinner/);
@@ -308,6 +318,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailMessageJs, /dataset\.messageUrl/);
   assert.match(mailMessageJs, /dataset\.unreadUrl/);
   assert.match(mailMessageJs, /mail_reader_unread/);
+  assert.match(mailMessageJs, /srcdoc/);
+  assert.match(mailMessageJs, /html_body/);
   assert.match(mailMessageJs, /dataset\.attachmentUrl/);
   assert.match(mailJs, /jsonFetch/);
   assert.match(mailJs, /X-Requested-With/);
@@ -320,6 +332,7 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /mail_error'\)\.hidden = false/);
   assert.match(repository, /mail_accounts/);
   assert.match(repository, /mail_message_cache/);
+  assert.match(repository, /html_body/);
   assert.match(repository, /refresh_interval_seconds/);
   assert.match(repository, /cachedMessages/);
   assert.match(repository, /replaceMessageCache/);
@@ -337,6 +350,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(imap, /downloadAttachment/);
   assert.match(imap, /attachmentsForMessage/);
   assert.match(imap, /fetchMessage/);
+  assert.match(imap, /htmlMessageBody/);
+  assert.match(imap, /sanitizeHtml/);
+  assert.match(imap, /preg_replace/);
   assert.match(imap, /markSeen/);
   assert.match(imap, /imap_setflag_full/);
   assert.match(imap, /imap_clearflag_full/);
@@ -350,6 +366,7 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(less, /\.mail-attachment/);
   assert.match(less, /\.mail-reader/);
   assert.match(less, /\.mail-reader-message/);
+  assert.match(less, /\.mail-reader-html/);
 });
 
 test('pages can be rendered without loading JavaScript via nojs query option and user preference', () => {
