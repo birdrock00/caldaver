@@ -18,7 +18,7 @@ async function login(page) {
   await page.locator('input[name="login"]').click();
   await expect(page.locator('#calendar_view')).toBeVisible({ timeout: 30000 });
   await page.waitForFunction(() => {
-    if (!window.jQuery || !window.translations || !window.AgenDAVConf || !window.AgenDAVConf.i18n) {
+    if (!window.jQuery || !window.translations || !window.CaldaverConf || !window.CaldaverConf.i18n) {
       return false;
     }
 
@@ -269,7 +269,7 @@ test('created events are persisted through the configured local CalDAV server', 
   await login(page);
   await page.waitForFunction(() => document.querySelectorAll('div.calendar_list li.available_calendar').length > 0);
 
-  const title = `CalDAVer storage smoke ${Date.now()}`;
+  const title = `Caldaver storage smoke ${Date.now()}`;
   let createdEvent = null;
   let csrf = null;
 
@@ -340,7 +340,7 @@ test('created contacts are persisted through the configured local CardDAV server
   await expect(page.locator('#contact_form input[name="_token"]')).toHaveCount(1);
 
   const csrf = await page.locator('#contact_form input[name="_token"]').inputValue();
-  const fullName = `CalDAVer Contact Smoke ${Date.now()}`;
+  const fullName = `Caldaver Contact Smoke ${Date.now()}`;
   let createdContact = null;
 
   const saveResponse = await page.request.post(`${baseURL}/cards/save`, {
@@ -349,7 +349,7 @@ test('created contacts are persisted through the configured local CardDAV server
       full_name: fullName,
       email: 'caldaver-smoke@example.com',
       phone: '+14155550199',
-      organization: 'CalDAVer',
+      organization: 'Caldaver',
       job_title: 'Smoke Test'
     },
     headers: { 'X-Requested-With': 'XMLHttpRequest' }

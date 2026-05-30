@@ -2,7 +2,7 @@
 /**
  * Site configuration
  *
- * IMPORTANT: These are AgenDAV defaults. Do not change this file, apply your
+ * IMPORTANT: These are Caldaver defaults. Do not change this file, apply your
  * changes to settings.php
  */
 
@@ -10,20 +10,20 @@
 $app['site.title'] = 'Our calendar';
 
 // Site logo (should be placed in public/img). Optional
-$app['site.logo'] = 'agendav_100transp.png';
+$app['site.logo'] = 'caldaver_100transp.png';
 
 // Site favicon (should be placed in public/img). Optional
 $app['site.favicon'] = 'favicon.ico';
 
 // Site footer. Optional
-$app['site.footer'] = 'AgenDAV ' . \AgenDAV\Version::V;
+$app['site.footer'] = 'Caldaver ' . \Caldaver\Version::V;
 
 // Trusted proxy ips
 $app['proxies'] = [];
 
 // Database settings
 $app['db.options'] = [
-        'dbname' => 'agendav',
+        'dbname' => 'caldaver',
         'user' => 'root',
         'password' => '',
         'host' => 'localhost',
@@ -39,7 +39,7 @@ $app['log.path'] = __DIR__.'/../var/log/';
 // Logging level
 $app['log.level'] = 'INFO';
 
-// Optional local AgenDAV login. Leave empty to authenticate directly with the DAV server.
+// Optional local Caldaver login. Leave empty to authenticate directly with the DAV server.
 $app['auth.local.username'] = '';
 $app['auth.local.password'] = '';
 
@@ -170,4 +170,4 @@ $app['calendar.colors'] = [
 ];
 
 // Additionnal authentication methods
-//$app['auth.methods'] = ['AgenDAV\Authentication\HttpBasic'];
+//$app['auth.methods'] = ['Caldaver\Authentication\HttpBasic'];

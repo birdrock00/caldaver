@@ -7,16 +7,16 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Silex\Application;
 
-use AgenDAV\DateHelper;
+use Caldaver\DateHelper;
 
 // Authentication
-$app->get('/login', '\AgenDAV\Controller\Authentication::loginAction')->bind('login');
-$app->post('/login', '\AgenDAV\Controller\Authentication::loginAction');
-$app->get('/logout', '\AgenDAV\Controller\Authentication::logoutAction')->bind('logout');
+$app->get('/login', '\Caldaver\Controller\Authentication::loginAction')->bind('login');
+$app->post('/login', '\Caldaver\Controller\Authentication::loginAction');
+$app->get('/logout', '\Caldaver\Controller\Authentication::logoutAction')->bind('logout');
 
 // CSRF protection
 $app->before(function(Request $request, Application $app) {
-    return \AgenDAV\Csrf::check($request, $app);
+    return \Caldaver\Csrf::check($request, $app);
 });
 
 
@@ -26,40 +26,40 @@ $controllers->get('/', function () use ($app) {
 })
 ->bind('calendar');
 
-$controllers->get('/cards', '\AgenDAV\Controller\Cards::indexAction')->bind('cards');
-$controllers->get('/cards/list', '\AgenDAV\Controller\Cards::listAction')->bind('cards.list');
-$controllers->post('/cards/save', '\AgenDAV\Controller\Cards::saveAction')->bind('cards.save');
-$controllers->post('/cards/delete', '\AgenDAV\Controller\Cards::deleteAction')->bind('cards.delete');
+$controllers->get('/cards', '\Caldaver\Controller\Cards::indexAction')->bind('cards');
+$controllers->get('/cards/list', '\Caldaver\Controller\Cards::listAction')->bind('cards.list');
+$controllers->post('/cards/save', '\Caldaver\Controller\Cards::saveAction')->bind('cards.save');
+$controllers->post('/cards/delete', '\Caldaver\Controller\Cards::deleteAction')->bind('cards.delete');
 
-$controllers->get('/mail', '\AgenDAV\Controller\Mail::indexAction')->bind('mail');
-$controllers->get('/mail/accounts', '\AgenDAV\Controller\Mail::accountsAction')->bind('mail.accounts');
-$controllers->post('/mail/accounts/save', '\AgenDAV\Controller\Mail::saveAccountAction')->bind('mail.accounts.save');
-$controllers->get('/mail/read', '\AgenDAV\Controller\Mail::readAction')->bind('mail.read');
-$controllers->get('/mail/messages', '\AgenDAV\Controller\Mail::messagesAction')->bind('mail.messages');
-$controllers->get('/mail/messages/sync', '\AgenDAV\Controller\Mail::syncMessagesAction')->bind('mail.messages.sync');
-$controllers->get('/mail/message', '\AgenDAV\Controller\Mail::messageAction')->bind('mail.message');
-$controllers->post('/mail/message/unread', '\AgenDAV\Controller\Mail::markUnreadAction')->bind('mail.message.unread');
-$controllers->get('/mail/attachment', '\AgenDAV\Controller\Mail::attachmentAction')->bind('mail.attachment');
+$controllers->get('/mail', '\Caldaver\Controller\Mail::indexAction')->bind('mail');
+$controllers->get('/mail/accounts', '\Caldaver\Controller\Mail::accountsAction')->bind('mail.accounts');
+$controllers->post('/mail/accounts/save', '\Caldaver\Controller\Mail::saveAccountAction')->bind('mail.accounts.save');
+$controllers->get('/mail/read', '\Caldaver\Controller\Mail::readAction')->bind('mail.read');
+$controllers->get('/mail/messages', '\Caldaver\Controller\Mail::messagesAction')->bind('mail.messages');
+$controllers->get('/mail/messages/sync', '\Caldaver\Controller\Mail::syncMessagesAction')->bind('mail.messages.sync');
+$controllers->get('/mail/message', '\Caldaver\Controller\Mail::messageAction')->bind('mail.message');
+$controllers->post('/mail/message/unread', '\Caldaver\Controller\Mail::markUnreadAction')->bind('mail.message.unread');
+$controllers->get('/mail/attachment', '\Caldaver\Controller\Mail::attachmentAction')->bind('mail.attachment');
 
-$controllers->get('/preferences', '\AgenDAV\Controller\Preferences::indexAction')->bind('preferences');
-$controllers->post('/preferences', '\AgenDAV\Controller\Preferences::saveAction')->bind('preferences.save');
+$controllers->get('/preferences', '\Caldaver\Controller\Preferences::indexAction')->bind('preferences');
+$controllers->post('/preferences', '\Caldaver\Controller\Preferences::saveAction')->bind('preferences.save');
 
 
-$controllers->get('/calendars', '\AgenDAV\Controller\Calendars\Listing::doAction')->bind('calendars.list');
-$controllers->post('/calendars', '\AgenDAV\Controller\Calendars\Create::doAction')->bind('calendar.create');
-$controllers->post('/calendars/delete', '\AgenDAV\Controller\Calendars\Delete::doAction')->bind('calendar.delete');
-$controllers->post('/calendars/save', '\AgenDAV\Controller\Calendars\Save::doAction')->bind('calendar.save');
-$controllers->get('/events', '\AgenDAV\Controller\Event\Listing::doAction')->bind('events.list');
-$controllers->get('/eventbase', '\AgenDAV\Controller\Event\GetBase::doAction')->bind('event.getBase');
-$controllers->post('/events/drop', '\AgenDAV\Controller\Event\Drop::doAction')->bind('event.drop');
-$controllers->post('/events/resize', '\AgenDAV\Controller\Event\Resize::doAction')->bind('event.resize');
-$controllers->post('/events/delete', '\AgenDAV\Controller\Event\Delete::doAction')->bind('event.delete');
-$controllers->post('/events/save', '\AgenDAV\Controller\Event\Save::doAction')->bind('event.save');
+$controllers->get('/calendars', '\Caldaver\Controller\Calendars\Listing::doAction')->bind('calendars.list');
+$controllers->post('/calendars', '\Caldaver\Controller\Calendars\Create::doAction')->bind('calendar.create');
+$controllers->post('/calendars/delete', '\Caldaver\Controller\Calendars\Delete::doAction')->bind('calendar.delete');
+$controllers->post('/calendars/save', '\Caldaver\Controller\Calendars\Save::doAction')->bind('calendar.save');
+$controllers->get('/events', '\Caldaver\Controller\Event\Listing::doAction')->bind('events.list');
+$controllers->get('/eventbase', '\Caldaver\Controller\Event\GetBase::doAction')->bind('event.getBase');
+$controllers->post('/events/drop', '\Caldaver\Controller\Event\Drop::doAction')->bind('event.drop');
+$controllers->post('/events/resize', '\Caldaver\Controller\Event\Resize::doAction')->bind('event.resize');
+$controllers->post('/events/delete', '\Caldaver\Controller\Event\Delete::doAction')->bind('event.delete');
+$controllers->post('/events/save', '\Caldaver\Controller\Event\Save::doAction')->bind('event.save');
 
-$controllers->get('/principals', '\AgenDAV\Controller\Principals::search')->bind('principals.search');
+$controllers->get('/principals', '\Caldaver\Controller\Principals::search')->bind('principals.search');
 
 // Dynamic JavaScript code
-$controllers->get('/jssettings', '\AgenDAV\Controller\JavaScriptCode::settingsAction')->bind('settings.js');
+$controllers->get('/jssettings', '\Caldaver\Controller\JavaScriptCode::settingsAction')->bind('settings.js');
 
 // Session keepalive
 $controllers->get('/keepalive', function() { return ''; });

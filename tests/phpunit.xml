@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <phpunit colors="true" bootstrap="bootstrap.php" cacheDirectory=".phpunit.cache">
-  <testsuite name="AgenDAV">
-    <directory>AgenDAV/</directory>
+  <testsuite name="Caldaver">
+    <directory>Caldaver/</directory>
   </testsuite>
   <source>
     <include>
