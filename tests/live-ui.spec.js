@@ -712,7 +712,7 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
         subject: 'Rich newsletter',
         date: 'Fri, 29 May 2026 13:00:00 -0700',
         body: 'Plain fallback body',
-        html_body: '<article><h2>Rich newsletter</h2><p><strong>Styled content</strong></p><img src="https://example.test/image.png" alt="hero"><script>window.top.__messageScriptRan = true;</script></article>'
+        html_body: '<article><h2>Rich newsletter</h2><p><strong>Styled content</strong></p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="hero"><script>window.top.__messageScriptRan = true;</script></article>'
       }
     }
   });
