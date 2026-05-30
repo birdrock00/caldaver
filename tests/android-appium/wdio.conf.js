@@ -3,6 +3,7 @@ const path = require('path');
 const appiumHost = process.env.APPIUM_HOST || '127.0.0.1';
 const appiumPort = Number(process.env.APPIUM_PORT || 4723);
 const useExternalAppium = process.env.CALDAVER_ANDROID_EXTERNAL_APPIUM === '1';
+const chromedriverAutodownload = process.env.CALDAVER_ANDROID_CHROMEDRIVER_AUTODOWNLOAD === '1';
 
 const capability = {
   platformName: 'Android',
@@ -14,6 +15,7 @@ const capability = {
   'appium:autoWebview': true,
   'appium:autoWebviewTimeout': Number(process.env.CALDAVER_ANDROID_WEBVIEW_TIMEOUT_MS || 30000),
   'appium:ensureWebviewsHavePages': true,
+  'appium:recreateChromeDriverSessions': true,
   'appium:newCommandTimeout': 120
 };
 
@@ -29,7 +31,7 @@ if (process.env.CALDAVER_ANDROID_SYSTEM_PORT) {
   capability['appium:systemPort'] = Number(process.env.CALDAVER_ANDROID_SYSTEM_PORT);
 }
 
-if (process.env.CALDAVER_ANDROID_CHROMEDRIVER_AUTODOWNLOAD === '1') {
+if (chromedriverAutodownload) {
   capability['appium:chromedriverAutodownload'] = true;
 }
 
@@ -57,7 +59,8 @@ exports.config = {
         command: process.env.APPIUM_BINARY || 'appium',
         args: {
           address: appiumHost,
-          port: appiumPort
+          port: appiumPort,
+          ...(chromedriverAutodownload ? { 'allow-insecure': 'chromedriver_autodownload' } : {})
         }
       }
     ]],
