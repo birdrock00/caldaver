@@ -1,13 +1,13 @@
-var AgenDAVDateAndTime = AgenDAVDateAndTime || {};
+var CaldaverDateAndTime = CaldaverDateAndTime || {};
 
 // Time formats for fullcalendar axis and time
-AgenDAVDateAndTime.fullCalendarFormat = {
+CaldaverDateAndTime.fullCalendarFormat = {
     '24': 'H:mm',
     '12': 'h(:mm)a'
 };
 
 // Time and date moment.js formats
-AgenDAVDateAndTime.momentFormat = {
+CaldaverDateAndTime.momentFormat = {
     '24': 'HH:mm',
     '12': 'hh:mm A',
     'ymd': 'YYYY-MM-DD',
@@ -16,14 +16,14 @@ AgenDAVDateAndTime.momentFormat = {
 };
 
 // Datepicker  formats
-AgenDAVDateAndTime.datepickerFormat = {
+CaldaverDateAndTime.datepickerFormat = {
     'ymd': 'yy-mm-dd',
     'dmy': 'dd/mm/yy',
     'mdy': 'mm/dd/yy',
 };
 
 // Timepicker options
-AgenDAVDateAndTime.timepickerSettings = {
+CaldaverDateAndTime.timepickerSettings = {
     '12': {
         'timeFormat': 'h:i A',
         'step': 30,
@@ -39,21 +39,21 @@ AgenDAVDateAndTime.timepickerSettings = {
 /*
  * Extracts the time from a Date object, and returns it as an string
  */
-AgenDAVDateAndTime.extractTime = function extractTime(dateobj) {
-    return moment(dateobj).format(AgenDAVDateAndTime.momentFormat[AgenDAVUserPrefs.time_format]);
+CaldaverDateAndTime.extractTime = function extractTime(dateobj) {
+    return moment(dateobj).format(CaldaverDateAndTime.momentFormat[CaldaverUserPrefs.time_format]);
 };
 
 /*
  * Extracts the date from a Date object, and returns it as an string
  */
-AgenDAVDateAndTime.extractDate = function extractDate(dateobj) {
-    return moment(dateobj).format(AgenDAVDateAndTime.momentFormat[AgenDAVUserPrefs.date_format]);
+CaldaverDateAndTime.extractDate = function extractDate(dateobj) {
+    return moment(dateobj).format(CaldaverDateAndTime.momentFormat[CaldaverUserPrefs.date_format]);
 };
 
 /*
  * Approximates a date to the nearest quarter
  */
-AgenDAVDateAndTime.approxNearest = function approxNearest(dt) {
+CaldaverDateAndTime.approxNearest = function approxNearest(dt) {
     var now = moment();
     var minutes = Math.ceil(now.minutes()/15)*15;
     // Clone original moment object, and set new minutes
@@ -73,7 +73,7 @@ AgenDAVDateAndTime.approxNearest = function approxNearest(dt) {
  *
  * @param Object Event data
  */
-AgenDAVDateAndTime.endDate = function endDate(event) {
+CaldaverDateAndTime.endDate = function endDate(event) {
 
     if (event.end === undefined || event.end === null || event.start.diff(event.end) === 0) {
         if (event.allDay === true) {
@@ -89,7 +89,7 @@ AgenDAVDateAndTime.endDate = function endDate(event) {
 /**
  * Parses a set of start and end moment objects and returns them formatted
  */
-AgenDAVDateAndTime.formatEventDates = function formatEventDates(event_data) {
+CaldaverDateAndTime.formatEventDates = function formatEventDates(event_data) {
     var result = '';
     var start = moment(event_data.start);
     var end = moment(event_data.end);
@@ -134,7 +134,7 @@ AgenDAVDateAndTime.formatEventDates = function formatEventDates(event_data) {
  * @param string timezone
  * @return string
  */
-AgenDAVDateAndTime.convertISO8601 = function convertISO8601(datepicker, timepicker, allday, timezone) {
+CaldaverDateAndTime.convertISO8601 = function convertISO8601(datepicker, timepicker, allday, timezone) {
     var result = datepicker.datepicker('getDate');
 
     // Events with no time set (all day, recurrences, etc)
@@ -160,6 +160,6 @@ AgenDAVDateAndTime.convertISO8601 = function convertISO8601(datepicker, timepick
  * @param string timezone
  * @return Moment
  */
-AgenDAVDateAndTime.getMoment = function getMoment(iso8601string, timezone) {
+CaldaverDateAndTime.getMoment = function getMoment(iso8601string, timezone) {
     return moment.tz(iso8601string, timezone);
 };

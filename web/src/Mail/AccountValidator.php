@@ -1,5 +1,5 @@
 <?php
-namespace AgenDAV\Mail;
+namespace Caldaver\Mail;
 
 class AccountValidator
 {

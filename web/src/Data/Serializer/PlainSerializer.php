@@ -1,5 +1,5 @@
 <?php
-namespace AgenDAV\Data\Serializer;
+namespace Caldaver\Data\Serializer;
 
 use League\Fractal\Pagination\CursorInterface;
 use League\Fractal\Pagination\PaginatorInterface;

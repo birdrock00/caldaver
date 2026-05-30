@@ -1,4 +1,4 @@
-# Contributing guidelines for AgenDAV
+# Contributing guidelines for Caldaver
 
 Great to have you here. Here are a few ways you can help make this project better!
 
@@ -10,7 +10,7 @@ Great to have you here. Here are a few ways you can help make this project bette
 
 When reporting a bug make sure you specify the following data:
 
-* Your AgenDAV version
+* Your Caldaver version
 * What CalDAV server you are using
 * A brief description of the issue
 * Step by step guide of what you did, screenshots are welcome
@@ -26,26 +26,26 @@ implement it.
 
 ## Translation
 
-AgenDAV uses [Transifex](https://www.transifex.com/adobo/agendav/) for translations.
+Caldaver uses [Transifex](https://www.transifex.com/birdrock00/caldaver/) for translations.
 
 Have a look at [Transifex documentation](http://docs.transifex.com/) for more information about
 adding a new language or upadting an existing translation.
 
 ## Documentation
 
-Documentation is automatically generated and placed on https://agendav.readthedocs.io/.
+Documentation is automatically generated and placed on https://caldaver.readthedocs.io/.
 Updating the documentation requires some [Sphinx](http://sphinx-doc.org/) knowledge.
 
 Have a look at the `doc/` directory.
 
 ## Contributing code
 
-There are some facts that will help you when contributing code to AgenDAV:
+There are some facts that will help you when contributing code to Caldaver:
 
-* AgenDAV ships with a [Vagrant environment](https://agendav.readthedocs.io/en/latest/development/#virtual-machine)
+* Caldaver ships with a [Vagrant environment](https://caldaver.readthedocs.io/en/latest/development/#virtual-machine)
   that is absolutely recommended when developing
-* AgenDAV includes unit tests as well, run via `./web/vendor/bin/phpunit tests`
-* AgenDAV repository uses [nvie's git flow](http://nvie.com/posts/a-successful-git-branching-model/)
+* Caldaver includes unit tests as well, run via `./web/vendor/bin/phpunit tests`
+* Caldaver repository uses [nvie's git flow](http://nvie.com/posts/a-successful-git-branching-model/)
 
 ### Pull requests
 
@@ -94,17 +94,17 @@ Manual release steps done by project maintainers.
   - `web/src/Version.php`
 - Run some manual test in the Vagrant box
 - Create a release commit
-  ([example commit](https://github.com/agendav/agendav/commit/7d2f1bba00deb090943f14bf9c47c4a6ac4d1387))
+  ([example commit](https://github.com/birdrock00/caldaver/commit/7d2f1bba00deb090943f14bf9c47c4a6ac4d1387))
 - Merge »development« branch to »main«
 - Tag the »main« branch with the new version
 - Push branch and tag
 - Update the documentation & website
-- Add release download file to release page ([example file](https://github.com/agendav/agendav/releases/tag/2.2.0))
+- Add release download file to release page ([example file](https://github.com/birdrock00/caldaver/releases/tag/2.2.0))
   - Clone the git repository using
-    `git clone -b <version> https://github.com/agendav/agendav.git agendav-<version>`
+    `git clone -b <version> https://github.com/birdrock00/caldaver.git caldaver-<version>`
   - Run `npm install && npm run-script dist`
     - Creates build files in `web/public/dist/css/`, `web/public/dist/js/`
       and `web/vendor/`
     - Removes `.git`, `ansible`, `node_modules`
-  - Zip directory `tar -czf ../agendav-<version>.tar.gz ../agendav-<version>`
+  - Zip directory `tar -czf ../caldaver-<version>.tar.gz ../caldaver-<version>`
 - Sip a tea
