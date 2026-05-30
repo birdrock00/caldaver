@@ -114,6 +114,50 @@ test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
   );
 });
 
+test('Caldaver branding does not render the legacy image logo', () => {
+  const sidebrand = read('web/templates/parts/sidebrand.html');
+  const templates = [
+    'web/templates/parts/sidebar.html',
+    'web/templates/cards.html',
+    'web/templates/mail.html',
+    'web/templates/mail_message.html',
+    'web/templates/login.html'
+  ].map(read).join('\n');
+
+  assert.match(sidebrand, />\s*Caldaver\s*</);
+  assert.doesNotMatch(templates, /asset\(logo,\s*'img'\)/);
+  assert.doesNotMatch(templates, /<img[^>]+Logo/);
+  assert.match(templates, /parts\/sidebrand\.html/);
+});
+
+test('mobile navigation moves app sections into the topbar without removing desktop side nav', () => {
+  const navbar = read('web/templates/parts/navbar.html');
+  const calendar = read('web/templates/calendar.html');
+  const cards = read('web/templates/cards.html');
+  const mail = read('web/templates/mail.html');
+  const less = read('assets/less/caldaver.less');
+
+  assert.match(navbar, /class="mobile-section-menu"/);
+  assert.match(navbar, /app\.url_generator\.generate\('calendar'\)/);
+  assert.match(navbar, /app\.url_generator\.generate\('cards'\)/);
+  assert.match(navbar, /app\.url_generator\.generate\('mail'\)/);
+  assert.match(calendar, /\{% set active_section = 'calendar' %\}/);
+  assert.match(cards, /\{% set active_section = 'cards' %\}/);
+  assert.match(mail, /\{% set active_section = 'mail' %\}/);
+  assert.match(less, /\.mobile-section-menu\s*\{[\s\S]*display:\s*none;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mobile-section-menu\s*\{[\s\S]*display:\s*block;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.app-nav,[\s\S]*\.cards-sidebar \.app-nav,[\s\S]*\.mail-sidebar \.app-nav[\s\S]*display:\s*none;/);
+});
+
+test('mobile calendar and contacts layouts are allowed to scroll', () => {
+  const less = read('assets/less/caldaver.less');
+
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*body\.caldaver-calendar-page\s*\{[\s\S]*overflow:\s*auto;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#wrapper\.calendar-layout\s*\{[\s\S]*height:\s*auto;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#calendar_view\s*\{[\s\S]*min-height:\s*720px;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.contacts-panel\s*\{[\s\S]*overflow:\s*visible;/);
+});
+
 test('login form labels cannot overlap input fields under Bootstrap 5', () => {
   const less = read('assets/less/caldaver.less');
 
