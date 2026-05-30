@@ -155,7 +155,9 @@ test('mobile navigation moves app sections into the topbar without removing desk
   assert.match(mail, /\{% set active_section = 'mail' %\}/);
   assert.match(less, /\.mobile-section-menu\s*\{[\s\S]*display:\s*none;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mobile-section-menu\s*\{[\s\S]*display:\s*block;/);
-  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.caldaver-brand-icon\s*\{[\s\S]*display:\s*none;/);
+  assert.doesNotMatch(navbar, /caldaver-brand-icon/);
+  assert.doesNotMatch(navbar, />31<\/span>/);
+  assert.doesNotMatch(less, /\.caldaver-brand-icon/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.app-nav,[\s\S]*\.cards-sidebar \.app-nav,[\s\S]*\.mail-sidebar \.app-nav[\s\S]*display:\s*none;/);
 });
 
@@ -165,11 +167,22 @@ test('mobile calendar and contacts layouts are allowed to scroll', () => {
 
   assert.match(app, /calendar_default_view_for_viewport[\s\S]*return fullcalendar_views\[CaldaverUserPrefs\.default_view\];/);
   assert.doesNotMatch(app, /return 'customizable_list';/);
-  assert.match(app, /timezone:\s*CaldaverUserPrefs\.timezone \|\| 'UTC'/);
+  assert.match(app, /var calendar_timezone = function calendar_timezone\(\)[\s\S]*return CaldaverUserPrefs\.timezone \|\| 'UTC';/);
+  assert.match(app, /timezone:\s*calendar_timezone\(\)/);
+  assert.match(app, /return Math\.max\(720, calculated_height\);/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*body\.caldaver-calendar-page\s*\{[\s\S]*overflow:\s*auto;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#wrapper\.calendar-layout\s*\{[\s\S]*height:\s*auto;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#calendar_view\s*\{[\s\S]*min-height:\s*720px;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.contacts-panel\s*\{[\s\S]*overflow:\s*visible;/);
+});
+
+test('mobile calendar event loading ignores aborted viewport refreshes', () => {
+  const app = read('assets/js/app/app.js');
+
+  assert.match(app, /var should_ignore_event_load_error = function should_ignore_event_load_error\(jqXHR, textStatus\)/);
+  assert.match(app, /textStatus === 'abort'/);
+  assert.match(app, /jqXHR !== undefined && jqXHR\.status === 0/);
+  assert.match(app, /error: function \(jqXHR, textStatus, errorThrown\) \{[\s\S]*should_ignore_event_load_error\(jqXHR, textStatus\)[\s\S]*return;[\s\S]*show_error/);
 });
 
 test('calendar, contacts, and mail startup states show loading instead of zero counts', () => {
