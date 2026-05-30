@@ -133,6 +133,33 @@ class ImapClient
         }
     }
 
+    public function markSeen(array $account, $uid, $seen)
+    {
+        AccountValidator::assertValid($account);
+
+        if (!function_exists('imap_open')) {
+            throw new \RuntimeException('The PHP IMAP extension is not installed.');
+        }
+
+        $stream = $this->openMailbox($account, false);
+
+        if ($stream === false) {
+            throw new \RuntimeException('Unable to connect to the IMAP account.');
+        }
+
+        try {
+            $result = $seen
+                ? imap_setflag_full($stream, (string)$uid, '\\Seen', ST_UID)
+                : imap_clearflag_full($stream, (string)$uid, '\\Seen', ST_UID);
+
+            if (!$result) {
+                throw new \RuntimeException('Unable to update the message read status.');
+            }
+        } finally {
+            imap_close($stream);
+        }
+    }
+
     protected function mailboxString(array $account)
     {
         $flags = '/imap';
@@ -147,12 +174,12 @@ class ImapClient
         return sprintf('{%s:%d%s}INBOX', $account['imap_host'], $account['imap_port'], $flags);
     }
 
-    protected function openMailbox(array $account)
+    protected function openMailbox(array $account, $readOnly = true)
     {
         $this->configureTimeouts();
 
         foreach ($this->candidateUsernames($account) as $username) {
-            $stream = @imap_open($this->mailboxString($account), $username, $account['password'], OP_READONLY, 1, [
+            $stream = @imap_open($this->mailboxString($account), $username, $account['password'], $readOnly ? OP_READONLY : 0, 1, [
                 'DISABLE_AUTHENTICATOR' => 'GSSAPI',
             ]);
 
