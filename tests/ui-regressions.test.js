@@ -112,6 +112,11 @@ test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
     /\.navbar-nav\s*\{[\s\S]*display:\s*flex;[\s\S]*flex-direction:\s*row;[\s\S]*align-items:\s*center;/,
     'Bootstrap 5 makes navbar-nav a column by default, so the topbar must force the user actions back into a row'
   );
+  assert.match(
+    cssBlock(less, '#usermenu .user-pill'),
+    /text-decoration:\s*none;/,
+    'the username pill should not show browser link underlines'
+  );
 });
 
 test('Caldaver branding does not render the legacy image logo', () => {
@@ -156,6 +161,31 @@ test('mobile calendar and contacts layouts are allowed to scroll', () => {
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#wrapper\.calendar-layout\s*\{[\s\S]*height:\s*auto;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#calendar_view\s*\{[\s\S]*min-height:\s*720px;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.contacts-panel\s*\{[\s\S]*overflow:\s*visible;/);
+});
+
+test('calendar, contacts, and mail startup states show loading instead of zero counts', () => {
+  const sidebar = read('web/templates/parts/sidebar.html');
+  const calendarApp = read('assets/js/app/app.js');
+  const cards = read('web/templates/cards.html');
+  const cardsJs = read('web/templates/parts/cardsjs.html');
+  const mailJs = read('web/templates/parts/mailjs.html');
+
+  assert.match(sidebar, /class="calendar-list-loading"[\s\S]*Loading calendars/);
+  assert.match(sidebar, /class="calendar-list-loading"[\s\S]*Loading shared calendars/);
+  assert.match(calendarApp, /\.calendar-list-loading'\)\.remove\(\)/);
+  assert.match(calendarApp, /\.calendar-list-loading'\)\.text\('Unable to load calendars'\)/);
+
+  assert.match(cards, /id="contact_count_nav" class="contacts-nav-count">\.\.\.<\/span>/);
+  assert.match(cards, /id="contact_count">Loading\.\.\.<\/span>/);
+  assert.match(cards, /id="contacts_loading"/);
+  assert.doesNotMatch(cards, /id="contact_count_nav" class="contacts-nav-count">0<\/span>/);
+  assert.doesNotMatch(cards, /id="contact_count">\(0\)<\/span>/);
+  assert.match(cardsJs, /var contactsLoading = true;/);
+  assert.match(cardsJs, /contactsLoading \? 'Loading\.\.\.' : \(data\.length > 0 \? '\(' \+ data\.length \+ '\)' : ''\)/);
+  assert.match(cardsJs, /contactsLoading \? '\.\.\.' : \(contacts\.length > 0 \? contacts\.length : ''\)/);
+
+  assert.match(mailJs, /var mailStatus = 'loading';/);
+  assert.match(mailJs, /setMailStatus\('loading', 'Loading cached mail\.\.\.'\);/);
 });
 
 test('login form labels cannot overlap input fields under Bootstrap 5', () => {

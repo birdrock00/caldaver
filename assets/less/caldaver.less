@@ -297,6 +297,14 @@ td.fc-day-number.fc-today {
   display: none;
 }
 
+.calendar-list-loading {
+  display: block;
+  padding: 8px 12px;
+  color: #5f6368;
+  font-size: 13px;
+  list-style: none;
+}
+
 i.calendar_color {
   margin-right: 6px;
 }
@@ -634,11 +642,13 @@ body.caldaver-calendar-page {
   border-radius: 999px;
   font-weight: 500;
   line-height: 40px;
+  text-decoration: none;
 
   &:hover,
   &:focus {
     color: #fff;
     background: #7b1fa2;
+    text-decoration: none;
   }
 }
 
