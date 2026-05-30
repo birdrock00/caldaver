@@ -54,6 +54,7 @@
     "@wdio/mocha-framework": "^8.46.0",
     "@wdio/spec-reporter": "^8.43.0",
     "appium": "^2.19.0",
+    "appium-uiautomator2-driver": "^3.10.0",
     "bootstrap": "5.3.8",
     "clean-css": "~3.4.22",
     "dustjs-helpers": "~1.7.0",
