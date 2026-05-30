@@ -1,0 +1,13 @@
+{
+  "appId": "club.exampleapp.caldaver",
+  "appName": "Caldaver",
+  "webDir": "web/public",
+  "server": {
+    "url": "https://caldaver.example.test",
+    "cleartext": false
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true
+  }
+}
