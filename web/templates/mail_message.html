@@ -3,15 +3,11 @@
 {% block body_class %}caldaver-mail-page{% endblock %}
 
 {% block content %}
+{% set active_section = 'mail' %}
 {% include 'parts/navbar.html' %}
 <div class="container-fluid mail-shell mail-read-shell">
   <aside class="mail-sidebar">
-    {% if logo %}
-    <div id="logo" class="block">
-      <img src="{{ asset(logo, 'img') }}" alt="Logo">
-    </div>
-    {% endif %}
-    {% set active_section = 'mail' %}
+    {% include 'parts/sidebrand.html' %}
     {% include 'parts/appnav.html' %}
     <a href="{{ app.url_generator.generate('mail') }}" class="btn btn-default compose-button">
       <i class="fa fa-arrow-left"></i> {% trans %}labels.inbox{% endtrans %}
