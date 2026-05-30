@@ -6,8 +6,8 @@
   var messageRequestId = 0;
   var autoRefreshTimer = null;
   var activeSyncs = 0;
-  var mailStatus = 'idle';
-  var mailStatusMessage = '';
+  var mailStatus = 'loading';
+  var mailStatusMessage = 'Loading cached mail...';
   var defaultRequestTimeoutMs = 20000;
 
   function $(selector) {
@@ -356,6 +356,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', function() {
+    setMailStatus('loading', 'Loading cached mail...');
     $('#mail_account_create').addEventListener('click', openDialog);
     $('#mail_account_cancel').addEventListener('click', closeDialog);
     $('#mail_account_cancel_icon').addEventListener('click', closeDialog);

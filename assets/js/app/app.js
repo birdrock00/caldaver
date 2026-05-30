@@ -1144,6 +1144,7 @@ var update_calendar_list = function update_calendar_list(maskbody) {
 
   updcalendar_ajax_req.fail(function(jqXHR, textStatus, errorThrown) {
     var message = errorThrown;
+    $('.calendar-list-loading').text('Unable to load calendars');
 
     // Avoid double warning if the session expired
     if (jqXHR.status === undefined || jqXHR.status != 401) {
@@ -1227,12 +1228,14 @@ var update_calendar_list = function update_calendar_list(maskbody) {
       }
 
       // Calendar list received empty twice
+      $('.calendar-list-loading').text('No calendars found');
       show_error(t('messages','notice_no_calendars'), '');
       $('#shortcut_add_event').attr('disabled', 'disabled');
       return;
     }
 
     $('#calendar_view').data('calendar-count', count);
+    $('.calendar-list-loading').remove();
 
     $('#own_calendar_list ul')[0]
       .appendChild(own_calendars);
