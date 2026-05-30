@@ -17,6 +17,11 @@ class Version20260530000000 extends AbstractMigration
         }
 
         if ($schema->hasTable('mail_message_cache')) {
+            $cache = $schema->getTable('mail_message_cache');
+            if (!$cache->hasColumn('html_body')) {
+                $cache->addColumn('html_body', 'text', ['notnull' => false]);
+            }
+
             return;
         }
 
@@ -33,6 +38,7 @@ class Version20260530000000 extends AbstractMigration
         $cache->addColumn('seen', 'boolean', ['default' => false]);
         $cache->addColumn('attachments', 'text');
         $cache->addColumn('body', 'text', ['notnull' => false]);
+        $cache->addColumn('html_body', 'text', ['notnull' => false]);
         $cache->addColumn('updated_at', 'datetime');
         $cache->setPrimaryKey(['id']);
         $cache->addUniqueIndex(['account_id', 'uid'], 'UNIQ_MAIL_MESSAGE_CACHE_ACCOUNT_UID');
