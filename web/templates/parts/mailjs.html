@@ -6,6 +6,8 @@
   var messageRequestId = 0;
   var autoRefreshTimer = null;
   var activeSyncs = 0;
+  var mailStatus = 'idle';
+  var mailStatusMessage = '';
   var defaultRequestTimeoutMs = 20000;
 
   function $(selector) {
@@ -40,7 +42,7 @@
       button.querySelector('span').textContent = account.label;
       button.querySelector('small').textContent = account.email_address;
       button.addEventListener('click', function() {
-        selectAccount(account.id, true);
+        selectAccount(account.id, true, true);
       });
       nav.appendChild(button);
     });
@@ -49,10 +51,8 @@
   function renderMessages() {
     var rows = $('#mail_rows');
     rows.innerHTML = '';
-    $('#mail_error').hidden = true;
 
     var data = filteredMessages();
-    $('#mail_no_messages').hidden = data.length > 0 || !activeAccount() || !$('#mail_error').hidden;
 
     data.forEach(function(message) {
       var row = document.createElement('article');
@@ -81,6 +81,8 @@
       });
       rows.appendChild(row);
     });
+
+    renderMailStatus(data.length);
   }
 
   function renderAttachments(container, message, accountId) {
@@ -125,6 +127,48 @@
     }
   }
 
+  function renderMailStatus(visibleMessageCount) {
+    var account = activeAccount();
+    var loading = mailStatus === 'loading' || mailStatus === 'syncing';
+    var error = mailStatus === 'error';
+    var count = typeof visibleMessageCount === 'number' ? visibleMessageCount : filteredMessages().length;
+
+    $('#mail_loading').textContent = mailStatusMessage || 'Checking the IMAP server for mail...';
+    $('#mail_loading').hidden = !loading;
+    $('#mail_error').hidden = !error;
+    $('#mail_no_messages').hidden = loading || error || !account || count > 0;
+    $('#mail_empty').hidden = accounts.length > 0 || error || loading;
+  }
+
+  function setMailStatus(status, message) {
+    mailStatus = status;
+    mailStatusMessage = message || '';
+    if (status === 'error') {
+      $('#mail_error').textContent = mailStatusMessage;
+    } else {
+      $('#mail_error').hidden = true;
+    }
+    renderMailStatus();
+  }
+
+  function narrowViewport() {
+    if (window.matchMedia) {
+      return window.matchMedia('(max-width: 900px)').matches;
+    }
+
+    return window.innerWidth <= 900;
+  }
+
+  function scrollMailContentIntoView() {
+    if (!narrowViewport()) {
+      return;
+    }
+
+    window.requestAnimationFrame(function() {
+      $('.mail-content').scrollIntoView({ block: 'start', behavior: 'smooth' });
+    });
+  }
+
   function refreshIntervalMs(account) {
     return Math.max(60, Number(account && account.refresh_interval_seconds || 60)) * 1000;
   }
@@ -145,10 +189,13 @@
     }, refreshIntervalMs(account));
   }
 
-  function selectAccount(accountId, syncAfterLoad) {
+  function selectAccount(accountId, syncAfterLoad, scrollAfterSelect) {
     activeAccountId = accountId;
     renderAccounts();
     scheduleAutoRefresh();
+    if (scrollAfterSelect) {
+      scrollMailContentIntoView();
+    }
     return loadMessages(syncAfterLoad);
   }
 
@@ -210,8 +257,7 @@
       .then(function(payload) {
         accounts = payload.data || [];
         activeAccountId = activeAccountId || (accounts[0] && accounts[0].id);
-        $('#mail_empty').hidden = accounts.length > 0;
-        $('#mail_error').hidden = true;
+        setMailStatus('ready');
         renderAccounts();
         if (activeAccountId) {
           scheduleAutoRefresh();
@@ -219,9 +265,7 @@
         }
       })
       .catch(function(error) {
-        $('#mail_error').textContent = error.message;
-        $('#mail_error').hidden = false;
-        $('#mail_empty').hidden = true;
+        setMailStatus('error', error.message);
       });
   }
 
@@ -230,7 +274,7 @@
     var requestId = ++messageRequestId;
     messages = [];
     $('#mail_account_title').textContent = account ? account.label : '{{ 'labels.mail'|trans }}';
-    $('#mail_no_messages').hidden = true;
+    setMailStatus(account ? 'loading' : 'ready', account ? 'Checking the IMAP server for mail...' : '');
     renderMessages();
 
     if (!account) {
@@ -247,18 +291,18 @@
           return;
         }
         messages = payload.data || [];
-        renderMessages();
         if (syncAfterLoad) {
+          renderMessages();
           return syncMessages(requestId);
         }
+        setMailStatus('ready');
+        renderMessages();
       })
       .catch(function(error) {
         if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
           return;
         }
-        $('#mail_error').textContent = error.message;
-        $('#mail_error').hidden = false;
-        $('#mail_no_messages').hidden = true;
+        setMailStatus('error', error.message);
       });
   }
 
@@ -269,6 +313,7 @@
     }
 
     setMailSyncing(true);
+    setMailStatus('syncing', 'Syncing with the IMAP server...');
     return jsonFetch(
       '{{ app.url_generator.generate('mail.messages.sync') }}?account_id=' + encodeURIComponent(account.id),
       {},
@@ -279,14 +324,14 @@
           return;
         }
         messages = payload.data || [];
+        setMailStatus('ready');
         renderMessages();
       })
       .catch(function(error) {
         if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
           return;
         }
-        $('#mail_error').textContent = error.message;
-        $('#mail_error').hidden = false;
+        setMailStatus('error', error.message);
       })
       .finally(function() {
         setMailSyncing(false);
