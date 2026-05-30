@@ -4,6 +4,8 @@
   var messages = [];
   var activeAccountId = null;
   var messageRequestId = 0;
+  var autoRefreshTimer = null;
+  var activeSyncs = 0;
   var defaultRequestTimeoutMs = 20000;
 
   function $(selector) {
@@ -38,9 +40,7 @@
       button.querySelector('span').textContent = account.label;
       button.querySelector('small').textContent = account.email_address;
       button.addEventListener('click', function() {
-        activeAccountId = account.id;
-        renderAccounts();
-        loadMessages();
+        selectAccount(account.id, true);
       });
       nav.appendChild(button);
     });
@@ -107,6 +107,51 @@
     });
   }
 
+  function setMailSyncing(syncing) {
+    var nav = $('#mail_nav_item');
+    if (!nav) {
+      return;
+    }
+
+    if (syncing) {
+      activeSyncs += 1;
+      nav.classList.add('syncing');
+      return;
+    }
+
+    activeSyncs = Math.max(0, activeSyncs - 1);
+    if (activeSyncs === 0) {
+      nav.classList.remove('syncing');
+    }
+  }
+
+  function refreshIntervalMs(account) {
+    return Math.max(60, Number(account && account.refresh_interval_seconds || 60)) * 1000;
+  }
+
+  function scheduleAutoRefresh() {
+    if (autoRefreshTimer !== null) {
+      window.clearInterval(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
+
+    var account = activeAccount();
+    if (!account) {
+      return;
+    }
+
+    autoRefreshTimer = window.setInterval(function() {
+      syncMessages(++messageRequestId);
+    }, refreshIntervalMs(account));
+  }
+
+  function selectAccount(accountId, syncAfterLoad) {
+    activeAccountId = accountId;
+    renderAccounts();
+    scheduleAutoRefresh();
+    return loadMessages(syncAfterLoad);
+  }
+
   function jsonFetch(url, options, fallbackMessage) {
     options = options || {};
     options.headers = options.headers || {};
@@ -169,7 +214,8 @@
         $('#mail_error').hidden = true;
         renderAccounts();
         if (activeAccountId) {
-          return loadMessages();
+          scheduleAutoRefresh();
+          return loadMessages(true);
         }
       })
       .catch(function(error) {
@@ -179,7 +225,7 @@
       });
   }
 
-  function loadMessages() {
+  function loadMessages(syncAfterLoad) {
     var account = activeAccount();
     var requestId = ++messageRequestId;
     messages = [];
@@ -202,6 +248,9 @@
         }
         messages = payload.data || [];
         renderMessages();
+        if (syncAfterLoad) {
+          return syncMessages(requestId);
+        }
       })
       .catch(function(error) {
         if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
@@ -210,6 +259,37 @@
         $('#mail_error').textContent = error.message;
         $('#mail_error').hidden = false;
         $('#mail_no_messages').hidden = true;
+      });
+  }
+
+  function syncMessages(requestId) {
+    var account = activeAccount();
+    if (!account) {
+      return Promise.resolve();
+    }
+
+    setMailSyncing(true);
+    return jsonFetch(
+      '{{ app.url_generator.generate('mail.messages.sync') }}?account_id=' + encodeURIComponent(account.id),
+      {},
+      'Unable to download new mail'
+    )
+      .then(function(payload) {
+        if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
+          return;
+        }
+        messages = payload.data || [];
+        renderMessages();
+      })
+      .catch(function(error) {
+        if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
+          return;
+        }
+        $('#mail_error').textContent = error.message;
+        $('#mail_error').hidden = false;
+      })
+      .finally(function() {
+        setMailSyncing(false);
       });
   }
 
@@ -230,8 +310,14 @@
     $('#mail_account_create').addEventListener('click', openDialog);
     $('#mail_account_cancel').addEventListener('click', closeDialog);
     $('#mail_account_cancel_icon').addEventListener('click', closeDialog);
-    $('#mail_refresh').addEventListener('click', loadMessages);
+    $('#mail_refresh').addEventListener('click', function() {
+      syncMessages(++messageRequestId);
+    });
     $('#mail_search').addEventListener('input', renderMessages);
+    $('#mail_nav_item').addEventListener('click', function(event) {
+      event.preventDefault();
+      syncMessages(++messageRequestId);
+    });
 
     $('#mail_account_form').addEventListener('submit', function(event) {
       event.preventDefault();
@@ -256,7 +342,7 @@
           closeDialog();
           $('#mail_account_error').hidden = true;
           renderAccounts();
-          loadMessages();
+          selectAccount(payload.data.id, true);
         })
         .catch(function(error) {
           $('#mail_account_error').textContent = error.message;

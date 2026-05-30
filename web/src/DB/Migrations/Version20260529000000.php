@@ -24,6 +24,7 @@ class Version20260529000000 extends AbstractMigration
         $mailAccounts->addColumn('encryption', 'string', ['length' => 20, 'default' => 'ssl']);
         $mailAccounts->addColumn('username', 'string', ['length' => 255]);
         $mailAccounts->addColumn('password_encrypted', 'text');
+        $mailAccounts->addColumn('refresh_interval_seconds', 'integer', ['default' => 60]);
         $mailAccounts->addColumn('created_at', 'datetime');
         $mailAccounts->addColumn('updated_at', 'datetime');
         $mailAccounts->setPrimaryKey(['id']);
