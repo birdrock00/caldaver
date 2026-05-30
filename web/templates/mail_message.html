@@ -9,9 +9,6 @@
   <aside class="mail-sidebar">
     {% include 'parts/sidebrand.html' %}
     {% include 'parts/appnav.html' %}
-    <a href="{{ app.url_generator.generate('mail') }}" class="btn btn-default compose-button">
-      <i class="fa fa-arrow-left"></i> {% trans %}labels.inbox{% endtrans %}
-    </a>
   </aside>
 
   <main class="mail-content">
@@ -22,6 +19,7 @@
       data-uid="{{ uid }}"
       data-message-url="{{ app.url_generator.generate('mail.message') }}"
       data-unread-url="{{ app.url_generator.generate('mail.message.unread') }}"
+      data-inbox-url="{{ app.url_generator.generate('mail') }}"
       data-attachment-url="{{ app.url_generator.generate('mail.attachment') }}"
       data-csrf-token="{{ csrf_token.getValue() }}"
     >

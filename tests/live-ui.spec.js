@@ -209,7 +209,7 @@ async function mockMailApi(page, options = {}) {
 }
 
 async function openMailAccountDialog(page) {
-  await page.locator('.mail-actions-menu summary').click();
+  await page.goto(`${baseURL}/preferences`);
   await page.locator('#mail_account_create').click();
 }
 
@@ -280,6 +280,20 @@ test('calendar create and event create controls open usable dialogs', async ({ p
 });
 
 test('calendar event feed loads without server errors', async ({ page }) => {
+  const eventResponsePromise = eventResponses(page);
+  const pageErrors = await login(page);
+  const eventResponse = await eventResponsePromise;
+
+  if (eventResponse) {
+    expect(eventResponse.status()).toBeLessThan(500);
+  }
+
+  await expect(page.locator('.freeow')).not.toContainText(/error loading events/i);
+  expect(pageErrors).toEqual([]);
+});
+
+test('mobile calendar event feed loads without server errors', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const eventResponsePromise = eventResponses(page);
   const pageErrors = await login(page);
   const eventResponse = await eventResponsePromise;
@@ -431,18 +445,26 @@ test('preferences page remains vertically scrollable', async ({ page }) => {
 });
 
 test('preferences topbar actions stay in one horizontal row', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
   await page.goto(`${baseURL}/preferences`);
 
+  const menu = page.locator('.mobile-section-menu');
+  const brand = page.locator('.caldaver-brand-title');
   const prefs = page.locator('#usermenu .prefs');
   const logout = page.locator('#usermenu .logout');
   const user = page.locator('#usermenu .user-pill');
 
+  await expect(menu).toBeVisible();
+  await expect(brand).toBeVisible();
+  await expect(page.locator('.caldaver-brand-icon')).toBeHidden();
   await expect(prefs).toBeVisible();
   await expect(logout).toBeVisible();
   await expect(user).toBeVisible();
 
   const boxes = await Promise.all([
+    menu.boundingBox(),
+    brand.boundingBox(),
     prefs.boundingBox(),
     logout.boundingBox(),
     user.boundingBox()
@@ -458,6 +480,8 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
   expect(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y))).toBeLessThan(8);
   expect(centers[0].x).toBeLessThan(centers[1].x);
   expect(centers[1].x).toBeLessThan(centers[2].x);
+  expect(centers[2].x).toBeLessThan(centers[3].x);
+  expect(centers[3].x).toBeLessThan(centers[4].x);
 });
 
 test('login form labels do not overlap input fields', async ({ page }) => {
@@ -484,14 +508,24 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
 
   await expect(page.locator('.caldaver-brand-title')).toHaveText('Caldaver');
   await expect(page.locator('.mobile-section-menu')).toBeVisible();
+  await expect(page.locator('.caldaver-brand-icon')).toBeHidden();
   await expect(page.locator('#usermenu .prefs')).toBeVisible();
   await expect(page.locator('#usermenu .user-pill')).toBeVisible();
   await expect(page.locator('#sidebar .app-nav')).toBeHidden();
   await expect(page.locator('#own_calendar_list')).toBeVisible();
 
+  const menuBox = await visibleBox(page, '.mobile-section-menu');
+  const brand = await visibleBox(page, '.caldaver-brand-title');
   const prefs = await visibleBox(page, '#usermenu .prefs');
   const user = await visibleBox(page, '#usermenu .user-pill');
-  expect(Math.abs((prefs.y + prefs.height / 2) - (user.y + user.height / 2))).toBeLessThan(10);
+  const centers = [menuBox, brand, prefs, user].map(box => ({
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2
+  }));
+  expect(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y))).toBeLessThan(10);
+  expect(centers[0].x).toBeLessThan(centers[1].x);
+  expect(centers[1].x).toBeLessThan(centers[2].x);
+  expect(centers[2].x).toBeLessThan(centers[3].x);
 
   const menu = page.locator('.mobile-section-menu');
   await menu.locator('summary').click();
@@ -675,11 +709,12 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await page.locator('#mail_rows .mail-row').first().click();
   await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=101/);
   await expect(page.locator('#mail_reader_unread')).toBeVisible();
-  await page.locator('#mail_reader_unread').click();
-  await expect(page.locator('#mail_reader_unread')).toBeHidden();
-  await page.locator('#mail_reader_back').click();
-  await expect(page).toHaveURL(/\/mail$/);
+  await Promise.all([
+    page.waitForURL(/\/mail\?account_id=1&unread_uid=101/),
+    page.locator('#mail_reader_unread').click()
+  ]);
   await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/unread/);
+  await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/highlighted-unread/);
 
   await expect(page.locator('.mail-account-tab[data-account-id="2"]')).toBeVisible();
   await page.locator('.mail-account-tab[data-account-id="2"]').click();
@@ -964,6 +999,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
 
   await page.goto(`${baseURL}/mail`);
   await expect(page.locator('#mail_empty')).toBeVisible();
+  await expect(page.locator('#mail_account_create')).toHaveCount(0);
   await openMailAccountDialog(page);
   await expect(page.locator('#mail_account_dialog')).toBeVisible();
   await expect(page.locator('#mail_account_form input[name="imap_port"]')).toHaveValue('993');
@@ -978,8 +1014,6 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await page.locator('#mail_account_form button[type="submit"]').click();
 
   await expect(page.locator('#mail_account_dialog')).toBeHidden();
-  await expect(page.locator('.mail-account-tab[data-account-id="99"]')).toBeVisible();
-  await expect(page.locator('#mail_account_title')).toHaveText('Test Inbox');
   await openMailAccountDialog(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Second Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('second@example.com');
@@ -989,9 +1023,6 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await page.locator('#mail_account_form button[type="submit"]').click();
 
   await expect(page.locator('#mail_account_dialog')).toBeHidden();
-  await expect(page.locator('.mail-account-tab')).toHaveCount(2);
-  await expect(page.locator('.mail-account-tab[data-account-id="100"]')).toBeVisible();
-  await expect(page.locator('#mail_account_title')).toHaveText('Second Inbox');
   expect(postedForms).toHaveLength(2);
   expect(postedForms[0]).toMatchObject({
     label: 'Test Inbox',
@@ -1110,10 +1141,11 @@ test('mail page can render without loading JavaScript using nojs option', async 
   const mailHtml = await page.content();
   expect(mailHtml).toContain("document.addEventListener('DOMContentLoaded'");
   expect(mailHtml).toContain('loadAccounts();');
+  expect(mailHtml).not.toContain('id="mail_account_create"');
 
   await page.goto(`${baseURL}/mail?nojs=1`);
   await expect(page.locator('.mail-shell')).toBeVisible();
-  await expect(page.locator('.mail-actions-menu')).toBeVisible();
+  await expect(page.locator('#mail_account_create')).toHaveCount(0);
   expect(await page.locator('script[src*="/dist/js"], script[src*="/jssettings"]').count()).toBe(0);
   const noJsHtml = await page.content();
   expect(noJsHtml).not.toContain("document.addEventListener('DOMContentLoaded'");
@@ -1155,19 +1187,18 @@ test('mail layout keeps critical controls visible across desktop and mobile', as
     await page.goto(`${baseURL}/mail`);
     await expect(page.locator('#mail_rows .mail-row')).toHaveCount(1);
 
-    const actions = await visibleBox(page, '.mail-actions-menu summary');
     const accounts = await visibleBox(page, '#mail_accounts');
     const search = await visibleBox(page, '.mail-search');
     const panel = await visibleBox(page, '.mail-panel');
     const toolbar = await visibleBox(page, '.mail-toolbar');
     const row = await visibleBox(page, '.mail-row');
 
-    for (const box of [actions, accounts, search, panel, toolbar, row]) {
+    for (const box of [accounts, search, panel, toolbar, row]) {
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
       expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
     }
 
-    expect(actions.height).toBeLessThanOrEqual(44);
+    await expect(page.locator('#mail_account_create')).toHaveCount(0);
 
     if (viewport.width >= 900) {
       const sidebar = await visibleBox(page, '.mail-sidebar');
@@ -1181,6 +1212,7 @@ test('mail layout keeps critical controls visible across desktop and mobile', as
     await page.locator('#mail_rows .mail-row').first().click();
     await expect(page).toHaveURL(/\/mail\/read/);
     await expect(page.locator('#mail_reader_message')).toBeVisible();
+    await expect(page.locator('.mail-read-shell .compose-button')).toHaveCount(0);
     const reader = await visibleBox(page, '.mail-reader');
     const subject = await visibleBox(page, '#mail_reader_subject');
     const content = await visibleBox(page, '.mail-content');
