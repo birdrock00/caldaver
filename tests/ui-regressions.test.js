@@ -260,6 +260,8 @@ test('mail reader content uses the full available read pane width', () => {
   assert.match(message, /max-width:\s*none;/);
   assert.match(message, /box-sizing:\s*border-box;/);
   assert.match(message, /margin:\s*0;/);
+  assert.match(less, /\.mail-read-shell \.mail-content\s*\{[\s\S]*padding-right:\s*0;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-read-shell \.mail-content\s*\{[\s\S]*padding:\s*0;/);
   assert.match(body, /width:\s*100%;/);
   assert.match(body, /margin:\s*0 0 24px;/);
   assert.match(html, /width:\s*100%;/);
