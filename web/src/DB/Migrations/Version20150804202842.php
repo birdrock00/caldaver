@@ -1,6 +1,6 @@
 <?php
 
-namespace AgenDAV\DB\Migrations;
+namespace Caldaver\DB\Migrations;
 
 use Doctrine\DBAL\Migrations\AbstractMigration;
 use Doctrine\DBAL\Schema\Schema;

@@ -66,7 +66,7 @@
         ignore_errors: yes
 
       - name: create database
-        mysql_db: name=agendav state=present collation=utf8_general_ci encoding=utf8 login_user=root login_password="{{ mysql_password }}"
+        mysql_db: name=caldaver state=present collation=utf8_general_ci encoding=utf8 login_user=root login_password="{{ mysql_password }}"
 
       - name: check for baikal
         stat: path=/var/www/baikal
@@ -91,7 +91,7 @@
         notify: restart apache
 
       - name: configure apache 2/3
-        copy: src=apache/agendav dest=/etc/apache2/sites-available/000-default.conf owner=root mode=644 backup=yes
+        copy: src=apache/caldaver dest=/etc/apache2/sites-available/000-default.conf owner=root mode=644 backup=yes
         become: yes
         notify: restart apache
 
@@ -105,8 +105,8 @@
         become: yes
         notify: restart apache
 
-      - name: create agendav log directory
-        file: path=/var/log/agendav state=directory owner=www-data group=vagrant mode=0774
+      - name: create caldaver log directory
+        file: path=/var/log/caldaver state=directory owner=www-data group=vagrant mode=0774
         become: yes
 
       - name: create twig cache directory
@@ -114,7 +114,7 @@
         become: yes
 
       - name: create vendors/ directory outside of shared folder
-        file: path=/var/agendav-vendors state=directory owner=vagrant group=www-data mode=0775
+        file: path=/var/caldaver-vendors state=directory owner=vagrant group=www-data mode=0775
         become: yes
 
       - name: check if composer is installed
@@ -132,10 +132,10 @@
         become: yes
 
       - name: Append the COMPOSER_VENDOR_DIR variable to bashrc
-        lineinfile: dest=/home/vagrant/.bashrc line="export COMPOSER_VENDOR_DIR=/var/agendav-vendors"
+        lineinfile: dest=/home/vagrant/.bashrc line="export COMPOSER_VENDOR_DIR=/var/caldaver-vendors"
 
       - name: change log permissions again
-        file: path=/var/log/agendav recurse=true state=directory owner=www-data group=vagrant mode=0774
+        file: path=/var/log/caldaver recurse=true state=directory owner=www-data group=vagrant mode=0774
         become: yes
 
       - name: install node dependencies for development
@@ -143,16 +143,16 @@
 
       - name: run npm build (install PHP dependencies via Composer and build assets)
         environment:
-          COMPOSER_VENDOR_DIR: /var/agendav-vendors
+          COMPOSER_VENDOR_DIR: /var/caldaver-vendors
         command: npm run build chdir=/vagrant
 
-      - name: configure agendav
-        template: src=agendav/settings.php.j2 dest=/vagrant/web/config/settings.php backup=yes mode=0755
+      - name: configure caldaver
+        template: src=caldaver/settings.php.j2 dest=/vagrant/web/config/settings.php backup=yes mode=0755
 
       - name: apply latest schema updates
         environment:
-          COMPOSER_VENDOR_DIR: /var/agendav-vendors
-        command: /vagrant/agendavcli migrations:migrate --configuration=/vagrant/migrations.yml --no-interaction
+          COMPOSER_VENDOR_DIR: /var/caldaver-vendors
+        command: /vagrant/caldavercli migrations:migrate --configuration=/vagrant/migrations.yml --no-interaction
 
   handlers:
       - name: restart mysql

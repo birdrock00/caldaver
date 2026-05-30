@@ -56,7 +56,7 @@ Release notes
 -------------------
 
 * PHP 5.6 or greater is required.
-* Silex 2.0 is now being used, so any modifications prepared for AgenDAV 2.1.x (which was based
+* Silex 2.0 is now being used, so any modifications prepared for Caldaver 2.1.x (which was based
   on Silex 1.x) will probably be broken.
 
 .. _v2.0.0:
@@ -66,19 +66,19 @@ Release notes
 
 Relevant release notes from all 2.0.0 release candidates and betas:
 
-* Note that AgenDAV now requires PHP 5.5.9 or greater.
-* AgenDAV needs `Composer <http://getcomposer.org>`_. If you are using the
+* Note that Caldaver now requires PHP 5.5.9 or greater.
+* Caldaver needs `Composer <http://getcomposer.org>`_. If you are using the
   tarball from the website you don't have to worry at all. Otherwise, you'll
-  have to install it and fetch AgenDAV dependencies. You'll find instructions on
+  have to install it and fetch Caldaver dependencies. You'll find instructions on
   :ref:`download_dependencies`.
-* AgenDAV now uses a single ``settings.php`` file. Details on this file are provided on
+* Caldaver now uses a single ``settings.php`` file. Details on this file are provided on
   :ref:`configuration`.
 * Deep database changes are required. Instructions are provided on :ref:`dbupgrade`
-* If you want to upgrade from AgenDAV 1.2.6.2 and you use calendar sharing, note that running an SQL
+* If you want to upgrade from Caldaver 1.2.6.2 and you use calendar sharing, note that running an SQL
   statement is required to complete the upgrade.  More details can be found in the
   :doc:`admin/upgrading` section.
 * Read the `CHANGELOG
-  <https://github.com/adobo/agendav/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
+  <https://github.com/caldaver-app/caldaver/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
 
 .. _v2.0.0-rc2:
 
@@ -92,41 +92,41 @@ Relevant release notes from all 2.0.0 release candidates and betas:
 2.0.0-rc1 (2016-11-05)
 ------------------------
 
-* This release candidate handles shared calendars again. If you want to upgrade from AgenDAV 1.2.6.2 and
+* This release candidate handles shared calendars again. If you want to upgrade from Caldaver 1.2.6.2 and
   you use calendar sharing, note that running an SQL statement is required to complete the upgrade.
   More details can be found in the :doc:`admin/upgrading` section.
 * Read the `CHANGELOG
-  <https://github.com/adobo/agendav/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
+  <https://github.com/caldaver-app/caldaver/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
 
 .. _v2.0.0-beta2:
 
 2.0.0-beta2 (2016-04-20)
 ------------------------
 
-* Note that AgenDAV now requires PHP 5.5.0 or greater.
+* Note that Caldaver now requires PHP 5.5.0 or greater.
 * **This beta release cannot handle shared calendars yet**, and your existing shares will
   be removed from the database. Please, make sure you are not upgrading a production
   environment which uses calendar sharing.
 * Read the `CHANGELOG
-  <https://github.com/adobo/agendav/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
+  <https://github.com/caldaver-app/caldaver/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
 
 .. _v2.0.0-beta1:
 
 2.0.0-beta1 (2015-08-26)
 ------------------------
 
-* AgenDAV needs `Composer <http://getcomposer.org>`_. If you are using the
+* Caldaver needs `Composer <http://getcomposer.org>`_. If you are using the
   tarball from the website you don't have to worry at all. Otherwise, you'll
-  have to install it and fetch AgenDAV dependencies. You'll find instructions on
+  have to install it and fetch Caldaver dependencies. You'll find instructions on
   :ref:`download_dependencies`.
-* AgenDAV now uses a single ``settings.php`` file. Details on this file are provided on
+* Caldaver now uses a single ``settings.php`` file. Details on this file are provided on
   :ref:`configuration`.
 * Deep database changes are required. Instructions are provided on :ref:`dbupgrade`
 * **This beta release cannot handle shared calendars**, and your existing shares will
   be removed from the database. Please, make sure you are not upgrading a production
   environment which uses calendar sharing.
 * Read the `CHANGELOG
-  <https://github.com/adobo/agendav/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
+  <https://github.com/caldaver-app/caldaver/blob/develop/CHANGELOG.md>`_ for a detailed list of changes.
 
 .. _v1.2.6.2:
 
@@ -134,7 +134,7 @@ Relevant release notes from all 2.0.0 release candidates and betas:
 --------------------------------
 
 This release just fixes a problem with some timezones which have three
-components, such as America/Argentina/Cordoba. AgenDAV 1.2.6 refused to parse calendars
+components, such as America/Argentina/Cordoba. Caldaver 1.2.6 refused to parse calendars
 that contained events with those kind of timezones.
 
 .. _v1.2.6:
@@ -144,7 +144,7 @@ that contained events with those kind of timezones.
 ------------------
 
 * This release requires neither configuration changes nor DB schema updates.
-* Reminders feature has been added. Reminders will be attached to events, but this version of AgenDAV is not capable of showing popups for them yet. Other CalDAV clients, such as smartphones and desktop applications, will understand them.
+* Reminders feature has been added. Reminders will be attached to events, but this version of Caldaver is not capable of showing popups for them yet. Other CalDAV clients, such as smartphones and desktop applications, will understand them.
 * A new ``log_create_permissions`` option has been added to ``advanced.php`` configuration file. Default is ``0640``
 
 .. _v1.2.5.1:
@@ -155,8 +155,8 @@ that contained events with those kind of timezones.
 .. note::
 
    This version has a bug that will make :ref:`dbupgrade` to fail if you
-   have AgenDAV configured to use a language other than English. Please, set
-   :confval:`default_language` to ``en`` before running ``agendav
+   have Caldaver configured to use a language other than English. Please, set
+   :confval:`default_language` to ``en`` before running ``caldaver
    dbupdate``
 
 * This release fixes some invalid SQL queries included in the database update process
@@ -183,7 +183,7 @@ that contained events with those kind of timezones.
   :confval:`format_title_month`, :confval:`format_title_week`,
   :confval:`format_title_day` and :confval:`format_title_table`
 
-* Translations are now managed using `Transifex <https://www.transifex.net/projects/p/agendav/>`_. Note that default language has been renamed from ``en_US`` to ``en``, as I think it's a neutral English
+* Translations are now managed using `Transifex <https://www.transifex.net/projects/p/caldaver/>`_. Note that default language has been renamed from ``en_US`` to ``en``, as I think it's a neutral English
 
 .. _v1.2.4:
 
@@ -259,7 +259,7 @@ It requires no database upgrades.
   sessions table wasn't using InnoDB. Apply the changes on
   ``sql/changes/1.1.1_to_1.2.mysql``, which are the following::
 
-        ALTER DATABASE agendav CHARACTER SET utf8 COLLATE utf8_general_ci;
+        ALTER DATABASE caldaver CHARACTER SET utf8 COLLATE utf8_general_ci;
         ALTER TABLE sessions CONVERT TO CHARACTER SET utf8;
         ALTER TABLE sessions ENGINE InnoDB;
         ALTER TABLE shared CONVERT TO CHARACTER SET utf8;
@@ -269,9 +269,9 @@ It requires no database upgrades.
   as the base for a new ``config.php``
 
 * Interface translation and timezone configuration is now possible in
-  AgenDAV. Please, make sure you set correct values on ``config.php``
+  Caldaver. Please, make sure you set correct values on ``config.php``
 
-* AgenDAV has lots of corrections and fixes. See the ``CHANGELOG``
+* Caldaver has lots of corrections and fixes. See the ``CHANGELOG``
 
 .. _v1.1.1:
 
@@ -287,9 +287,9 @@ It requires no database upgrades.
         CREATE INDEX last_activity_idx ON sessions(last_activity);
         ALTER TABLE sessions MODIFY user_agent VARCHAR(120);
 
-* Remove LDAP dependency. AgenDAV now authenticates against CalDAV
+* Remove LDAP dependency. Caldaver now authenticates against CalDAV
   server.
 
-  Before this change, AgenDAV authenticated users at first using LDAP, and
+  Before this change, Caldaver authenticated users at first using LDAP, and
   then your CalDAV server had to authenticate them again. With this change,
-  AgenDAV completely relies on your CalDAV server.
+  Caldaver completely relies on your CalDAV server.
