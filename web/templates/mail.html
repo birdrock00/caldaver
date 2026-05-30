@@ -85,6 +85,10 @@
         <span>{% trans %}labels.password{% endtrans %}</span>
         <input required name="password" type="password" autocomplete="current-password">
       </label>
+      <label>
+        <span>{% trans %}labels.refresh_interval_minutes{% endtrans %}</span>
+        <input required name="refresh_interval_minutes" type="number" min="1" max="1440" value="1">
+      </label>
       <div id="mail_account_error" class="mail-error" hidden></div>
       <div class="contact-dialog-footer">
         <button type="button" id="mail_account_cancel" class="btn btn-default">{% trans %}labels.cancel{% endtrans %}</button>

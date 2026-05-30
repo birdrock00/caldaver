@@ -72,12 +72,31 @@ function parsePostedForm(request) {
 async function mockMailApi(page, options = {}) {
   const accounts = options.accounts || [];
   const messagesByAccount = options.messagesByAccount || {};
+  const cachedMessagesByAccount = options.cachedMessagesByAccount || messagesByAccount;
+  const syncMessagesByAccount = options.syncMessagesByAccount || messagesByAccount;
   const messageDetails = options.messageDetails || {};
   const accountStatus = options.accountStatus || 200;
   const attachmentBody = options.attachmentBody || 'mock attachment body';
   const attachmentFilename = options.attachmentFilename || 'report.pdf';
   const attachmentBodies = options.attachmentBodies || {};
   const attachmentRequests = options.attachmentRequests || [];
+  const messageRequests = options.messageRequests || [];
+  const syncRequests = options.syncRequests || [];
+  const unreadRequests = options.unreadRequests || [];
+
+  function setSeen(accountId, uid, seen) {
+    [messagesByAccount, cachedMessagesByAccount, syncMessagesByAccount].forEach(collection => {
+      (collection[accountId] || []).forEach(message => {
+        if (String(message.uid) === String(uid)) {
+          message.seen = seen;
+        }
+      });
+    });
+
+    if (messageDetails[uid]) {
+      messageDetails[uid].seen = seen;
+    }
+  }
 
   await page.route('**/mail/accounts', async route => {
     if (accountStatus >= 400) {
@@ -108,15 +127,17 @@ async function mockMailApi(page, options = {}) {
           imap_host: 'imap.example.test',
           imap_port: 993,
           encryption: 'ssl',
-          username: 'test@example.com'
+          username: 'test@example.com',
+          refresh_interval_seconds: 60
         }
       })
     });
   });
 
-  await page.route('**/mail/messages?**', async route => {
+  await page.route('**/mail/messages/sync?**', async route => {
     const url = new URL(route.request().url());
     const accountId = url.searchParams.get('account_id');
+    syncRequests.push(accountId);
 
     if (options.delays && options.delays[accountId]) {
       await new Promise(resolve => setTimeout(resolve, options.delays[accountId]));
@@ -125,18 +146,43 @@ async function mockMailApi(page, options = {}) {
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ result: 'SUCCESS', data: messagesByAccount[accountId] || [] })
+      body: JSON.stringify({ result: 'SUCCESS', cached: false, data: syncMessagesByAccount[accountId] || [] })
+    });
+  });
+
+  await page.route('**/mail/messages?**', async route => {
+    const url = new URL(route.request().url());
+    const accountId = url.searchParams.get('account_id');
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: 'SUCCESS', cached: true, data: cachedMessagesByAccount[accountId] || [] })
     });
   });
 
   await page.route('**/mail/message?**', async route => {
     const url = new URL(route.request().url());
+    const accountId = url.searchParams.get('account_id');
     const uid = url.searchParams.get('uid');
+    messageRequests.push({ account_id: accountId, uid });
+    setSeen(accountId, uid, true);
 
     return route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ result: 'SUCCESS', data: messageDetails[uid] })
+    });
+  });
+
+  await page.route('**/mail/message/unread', async route => {
+    const form = parsePostedForm(route.request());
+    unreadRequests.push(form);
+    setSeen(form.account_id, form.uid, false);
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: 'SUCCESS', data: { seen: false } })
     });
   });
 
@@ -391,6 +437,8 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
   const attachmentRequests = [];
+  const messageRequests = [];
+  const unreadRequests = [];
 
   await mockMailApi(page, {
     accounts: [
@@ -457,7 +505,9 @@ test('mail page renders mocked messages, message detail, search, and attachment 
       'report.pdf': 'dummy primary report contents',
       'flight-notes.txt': 'dummy archive attachment contents'
     },
-    attachmentRequests
+    attachmentRequests,
+    messageRequests,
+    unreadRequests
   });
 
   await page.goto(`${baseURL}/mail`);
@@ -480,6 +530,7 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await expect(page.locator('#mail_reader_message')).toBeVisible();
   await expect(page.locator('#mail_reader_subject')).toHaveText('Quarterly report');
   await expect(page.locator('#mail_reader_body')).toContainText('Attached is the quarterly report.');
+  await expect(page.locator('#mail_reader_unread')).toBeVisible();
   await expect(page.locator('#mail_message_detail')).toHaveCount(0);
 
   const attachmentHref = await page.locator('#mail_reader_message [data-testid="mail-attachment-download"]').getAttribute('href');
@@ -503,6 +554,17 @@ test('mail page renders mocked messages, message detail, search, and attachment 
 
   await page.locator('#mail_reader_back').click();
   await expect(page).toHaveURL(/\/mail$/);
+  await expect(page.locator('#mail_rows .mail-row').first()).not.toHaveClass(/unread/);
+
+  await page.locator('#mail_rows .mail-row').first().click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=101/);
+  await expect(page.locator('#mail_reader_unread')).toBeVisible();
+  await page.locator('#mail_reader_unread').click();
+  await expect(page.locator('#mail_reader_unread')).toBeHidden();
+  await page.locator('#mail_reader_back').click();
+  await expect(page).toHaveURL(/\/mail$/);
+  await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/unread/);
+
   await expect(page.locator('.mail-account-tab[data-account-id="2"]')).toBeVisible();
   await page.locator('.mail-account-tab[data-account-id="2"]').click();
   await expect(page.locator('#mail_account_title')).toHaveText('Archive Inbox');
@@ -534,6 +596,80 @@ test('mail page renders mocked messages, message detail, search, and attachment 
     { account_id: '1', uid: '101', part: '2' },
     { account_id: '2', uid: '201', part: '3' }
   ]);
+  expect(messageRequests).toEqual([
+    { account_id: '1', uid: '101' },
+    { account_id: '1', uid: '101' },
+    { account_id: '2', uid: '201' }
+  ]);
+  expect(unreadRequests).toHaveLength(1);
+  expect(unreadRequests[0]).toMatchObject({ account_id: '1', uid: '101' });
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail cache renders immediately while IMAP sync runs from nav click and configured interval', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  const syncRequests = [];
+
+  await page.addInitScript(() => {
+    const originalSetInterval = window.setInterval.bind(window);
+    window.__mailRefreshIntervals = [];
+    window.setInterval = function(callback, timeout) {
+      window.__mailRefreshIntervals.push(timeout);
+      return originalSetInterval(callback, timeout);
+    };
+  });
+
+  await mockMailApi(page, {
+    accounts: [
+      {
+        id: 1,
+        label: 'Cached Inbox',
+        email_address: 'cached@example.test',
+        refresh_interval_seconds: 120
+      },
+      {
+        id: 2,
+        label: 'Empty Inbox',
+        email_address: 'empty@example.test',
+        refresh_interval_seconds: 60
+      }
+    ],
+    cachedMessagesByAccount: {
+      1: [{ uid: 401, from: 'Cached Sender', subject: 'Cached message', date: 'Fri, 29 May 2026 12:00:00 -0700', seen: true }]
+    },
+    syncMessagesByAccount: {
+      1: [{ uid: 402, from: 'Fresh Sender', subject: 'Fresh IMAP message', date: 'Fri, 29 May 2026 12:01:00 -0700', seen: false }],
+      2: []
+    },
+    delays: { 1: 500, 2: 250 },
+    syncRequests
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('#mail_account_title')).toHaveText('Cached Inbox');
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Cached message');
+  await expect(page.locator('#mail_nav_item')).toHaveClass(/syncing/);
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Cached message');
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Fresh IMAP message');
+  await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/unread/);
+
+  const intervals = await page.evaluate(() => window.__mailRefreshIntervals || []);
+  expect(intervals).toContain(120000);
+
+  await page.locator('#mail_nav_item').click();
+  await expect(page.locator('#mail_nav_item')).toHaveClass(/syncing/);
+  await expect.poll(() => syncRequests.length).toBeGreaterThanOrEqual(2);
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Fresh IMAP message');
+
+  await page.locator('.mail-account-tab[data-account-id="2"]').click();
+  await expect(page.locator('#mail_account_title')).toHaveText('Empty Inbox');
+  await expect(page.locator('#mail_no_messages')).toBeVisible();
+  await expect(page.locator('#mail_no_messages')).toContainText('Checking the IMAP server for mail');
+  await expect(page.locator('#mail_no_messages')).not.toContainText('No messages');
+  await expect(page.locator('#mail_nav_item')).toHaveClass(/syncing/);
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
@@ -561,6 +697,16 @@ test('configured live mail accounts are deduplicated and can fetch messages', as
   const account = accounts.find(item => item.email_address === 'user@example.test') || accounts[0];
   test.skip(!account, 'No live IMAP account is configured');
 
+  const syncResponse = await page.request.get(`${baseURL}/mail/messages/sync?account_id=${account.id}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    timeout: 30000
+  });
+  expect(syncResponse.status()).toBe(200);
+
+  const syncPayload = await syncResponse.json();
+  expect(Array.isArray(syncPayload.data)).toBe(true);
+  expect(syncPayload.data.length).toBeGreaterThan(0);
+
   const messagesResponse = await page.request.get(`${baseURL}/mail/messages?account_id=${account.id}`, {
     headers: { 'X-Requested-With': 'XMLHttpRequest' },
     timeout: 30000
@@ -568,8 +714,10 @@ test('configured live mail accounts are deduplicated and can fetch messages', as
   expect(messagesResponse.status()).toBe(200);
 
   const messagesPayload = await messagesResponse.json();
+  expect(messagesPayload.cached).toBe(true);
   expect(Array.isArray(messagesPayload.data)).toBe(true);
   expect(messagesPayload.data.length).toBeGreaterThan(0);
+  expect(messagesPayload.data[0]).toHaveProperty('seen');
 });
 
 test('mail account load failure is visible and does not throw UI errors', async ({ page }) => {
@@ -645,7 +793,8 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
       imap_host: fixture.imap_host,
       imap_port: 993,
       encryption: 'ssl',
-      username: fixture.username
+      username: fixture.username,
+      refresh_interval_seconds: 60
     };
     savedAccounts.push(account);
 
@@ -665,6 +814,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await expect(page.locator('#mail_account_dialog')).toBeVisible();
   await expect(page.locator('#mail_account_form input[name="imap_port"]')).toHaveValue('993');
   await expect(page.locator('#mail_account_form select[name="encryption"]')).toHaveValue('ssl');
+  await expect(page.locator('#mail_account_form input[name="refresh_interval_minutes"]')).toHaveValue('1');
 
   await page.locator('#mail_account_form input[name="label"]').fill('Test Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('test@example.com');
@@ -696,7 +846,8 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
     imap_port: '993',
     encryption: 'ssl',
     username: 'test@example.com',
-    password: 'secret-password'
+    password: 'secret-password',
+    refresh_interval_minutes: '1'
   });
   expect(postedForms[1]).toMatchObject({
     label: 'Second Inbox',
@@ -705,7 +856,8 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
     imap_port: '993',
     encryption: 'ssl',
     username: 'second@example.com',
-    password: 'second-secret'
+    password: 'second-secret',
+    refresh_interval_minutes: '1'
   });
   expect(savedAccounts.map(account => account.label)).toEqual(['Test Inbox', 'Second Inbox']);
   expect(pageErrors).toEqual([]);
