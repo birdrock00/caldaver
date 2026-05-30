@@ -369,17 +369,14 @@ describe('Caldaver installed Android WebView', function () {
       x: box.x + box.width / 2,
       y: box.y + box.height / 2
     }));
-    const brandIconHidden = await browser.execute(() => {
-      const icon = document.querySelector('.caldaver-brand-icon');
-      return !icon || window.getComputedStyle(icon).display === 'none';
-    });
+    const dateIconRemoved = await browser.execute(() => document.querySelector('.caldaver-brand-icon') === null);
 
     assert.ok(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y)) < 10);
     assert.ok(centers[0].x < centers[1].x);
     assert.ok(centers[1].x < centers[2].x);
     assert.ok(centers[2].x < centers[3].x);
     assert.ok(centers[3].x < centers[4].x);
-    assert.equal(brandIconHidden, true, 'Mobile topbar should not show the date icon');
+    assert.equal(dateIconRemoved, true, 'Mobile topbar should not render the date icon');
     await waitForSelector('#mail_account_create');
     await $('#mail_account_create').click();
     await waitForSelector('#mail_account_dialog');
@@ -426,7 +423,26 @@ describe('Caldaver installed Android WebView', function () {
         await waitForSelector('#mail_reader_message');
         await waitForSelector('#mail_reader_subject');
         assert.equal(await exists('.mail-read-shell .compose-button'), false, 'Mail reader should rely on the toolbar back button');
-        await $('#mail_reader_back').click();
+        const inboxControlVisible = await browser.execute(() => {
+          return Array.from(document.querySelectorAll('a, button')).some(element => {
+            const text = (element.textContent || element.getAttribute('aria-label') || element.getAttribute('title') || '').trim();
+            const style = window.getComputedStyle(element);
+            return /^Inbox$/i.test(text) &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden' &&
+              element.getClientRects().length > 0;
+          });
+        });
+        assert.equal(inboxControlVisible, false, 'Mail reader should not show an Inbox button on mobile');
+
+        if (await exists('#mail_reader_unread')) {
+          await waitForSelector('#mail_reader_unread');
+          await $('#mail_reader_unread').click();
+          await waitForSelector('#mail_rows');
+          await waitForSelector('.mail-row.highlighted-unread');
+        } else {
+          await $('#mail_reader_back').click();
+        }
         await waitForSelector('#mail_rows');
       }
     } else {
@@ -441,11 +457,8 @@ describe('Caldaver installed Android WebView', function () {
     await waitForSelector('.caldaver-brand-title');
     assert.equal(await $('.caldaver-brand-title').getText(), 'Caldaver');
     await waitForSelector('.mobile-section-menu');
-    const brandIconHidden = await browser.execute(() => {
-      const icon = document.querySelector('.caldaver-brand-icon');
-      return !icon || window.getComputedStyle(icon).display === 'none';
-    });
-    assert.equal(brandIconHidden, true, 'Mobile topbar should not show the date icon');
+    const dateIconRemoved = await browser.execute(() => document.querySelector('.caldaver-brand-icon') === null);
+    assert.equal(dateIconRemoved, true, 'Mobile topbar should not render the date icon');
     await waitForSelector('#own_calendar_list');
 
     await $('.mobile-section-menu summary').click();
