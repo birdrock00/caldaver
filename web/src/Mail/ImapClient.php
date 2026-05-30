@@ -358,7 +358,7 @@ class ImapClient
         $html = preg_replace('#<\s*(script|iframe|object|embed|applet|meta|base|link)\b[^>]*?/?>#is', '', $html);
         $html = preg_replace('/\s+on[a-z]+\s*=\s*(".*?"|\'.*?\'|[^\s>]+)/is', '', $html);
         $html = preg_replace('/\s+(href|src|xlink:href)\s*=\s*([\'"])\s*javascript:[^\'"]*\2/is', ' $1="#"', $html);
-        $html = preg_replace('/\s+style\s*=\s*("|\')(.*?)\1/is', function($match) {
+        $html = preg_replace_callback('/\s+style\s*=\s*("|\')(.*?)\1/is', function($match) {
             $style = preg_replace('/expression\s*\(|javascript:/is', '', $match[2]);
             return ' style="' . htmlspecialchars($style, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
         }, $html);

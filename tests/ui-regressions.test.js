@@ -320,6 +320,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailMessageJs, /mail_reader_unread/);
   assert.match(mailMessageJs, /srcdoc/);
   assert.match(mailMessageJs, /html_body/);
+  assert.match(mailMessageJs, /function sanitizeHtml\(html\)/);
+  assert.match(mailMessageJs, /blockedTags/);
   assert.match(mailMessageJs, /dataset\.attachmentUrl/);
   assert.match(mailJs, /jsonFetch/);
   assert.match(mailJs, /X-Requested-With/);
@@ -352,7 +354,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(imap, /fetchMessage/);
   assert.match(imap, /htmlMessageBody/);
   assert.match(imap, /sanitizeHtml/);
-  assert.match(imap, /preg_replace/);
+  assert.match(imap, /preg_replace_callback/);
+  assert.doesNotMatch(imap, /preg_replace\('[^']*style[\s\S]*function\(\$match\)/);
   assert.match(imap, /markSeen/);
   assert.match(imap, /imap_setflag_full/);
   assert.match(imap, /imap_clearflag_full/);
