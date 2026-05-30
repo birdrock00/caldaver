@@ -9,6 +9,25 @@
         <span class="caldaver-brand-title">{{ title }}</span>
       </span>
    </div>
+   <details class="mobile-section-menu">
+     <summary aria-label="Sections">
+       <i class="fa fa-bars"></i>
+     </summary>
+     <nav class="mobile-section-menu-list" aria-label="Application sections">
+       <a class="{% if active_section|default('calendar') == 'calendar' %}active{% endif %}" href="{{ app.url_generator.generate('calendar') }}">
+         <i class="fa fa-calendar"></i>
+         <span>{% trans %}labels.calendar{% endtrans %}</span>
+       </a>
+       <a class="{% if active_section|default('calendar') == 'cards' %}active{% endif %}" href="{{ app.url_generator.generate('cards') }}">
+         <i class="fa fa-book"></i>
+         <span>{% trans %}labels.contacts{% endtrans %}</span>
+       </a>
+       <a class="{% if active_section|default('calendar') == 'mail' %}active{% endif %}" href="{{ app.url_generator.generate('mail') }}">
+         <i class="fa fa-envelope"></i>
+         <span>{% trans %}labels.mail{% endtrans %}</span>
+       </a>
+     </nav>
+   </details>
    <p class="navbar-text navbar-right" id="loading">
    <img src="{{ asset('loading.gif', 'img') }}" alt="">
    </p>

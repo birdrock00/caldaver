@@ -6,11 +6,7 @@
   <h1>{{ title }}</h1>
 </div>
 
-{% if logo %}
-<div id="logo" class="block">
-  <img src="{{ asset(logo, 'img') }}" alt="Logo">
-</div>
-{% endif %}
+{% include 'parts/sidebrand.html' %}
 
 {% if error is defined %}
 <div class="ui-widget loginerrors">
