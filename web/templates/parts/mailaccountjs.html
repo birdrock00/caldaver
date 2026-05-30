@@ -1,0 +1,101 @@
+<script>
+(function() {
+  var defaultRequestTimeoutMs = 20000;
+
+  function $(selector) {
+    return document.querySelector(selector);
+  }
+
+  function jsonFetch(url, options, fallbackMessage) {
+    options = options || {};
+    options.headers = options.headers || {};
+    options.headers.Accept = 'application/json';
+    options.headers['X-Requested-With'] = 'XMLHttpRequest';
+    options.credentials = options.credentials || 'same-origin';
+    var timeoutMs = Number(window.CALDAVER_MAIL_REQUEST_TIMEOUT_MS || defaultRequestTimeoutMs);
+    var controller = typeof AbortController !== 'undefined' && !options.signal ? new AbortController() : null;
+    var timeoutId = null;
+
+    if (controller) {
+      options.signal = controller.signal;
+      timeoutId = window.setTimeout(function() {
+        controller.abort();
+      }, timeoutMs > 0 ? timeoutMs : defaultRequestTimeoutMs);
+    }
+
+    return fetch(url, options).then(function(response) {
+      return response.text().then(function(body) {
+        var payload = {};
+        if (body) {
+          try {
+            payload = JSON.parse(body);
+          } catch (error) {
+            if (response.status === 401) {
+              throw new Error('Your session expired. Reload Caldaver and sign in again.');
+            }
+            throw new Error(fallbackMessage || 'Unable to complete mail request');
+          }
+        }
+
+        if (!response.ok) {
+          throw new Error(payload.message || (response.status === 401 ? 'Your session expired. Reload Caldaver and sign in again.' : fallbackMessage) || 'Unable to complete mail request');
+        }
+
+        return payload;
+      });
+    }).catch(function(error) {
+      if (error && error.name === 'AbortError') {
+        throw new Error((fallbackMessage || 'Mail request') + ' because the server did not respond in time.');
+      }
+      throw error;
+    }).finally(function() {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    });
+  }
+
+  function openDialog() {
+    $('#mail_account_form').reset();
+    $('#mail_account_form input[name="id"]').value = '';
+    $('#mail_account_error').hidden = true;
+    $('#mail_account_error').textContent = '';
+    $('#mail_account_dialog').hidden = false;
+    $('#mail_account_form input[name="label"]').focus();
+  }
+
+  function closeDialog() {
+    $('#mail_account_dialog').hidden = true;
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var createButton = $('#mail_account_create');
+    if (!createButton) {
+      return;
+    }
+
+    createButton.addEventListener('click', openDialog);
+    $('#mail_account_cancel').addEventListener('click', closeDialog);
+    $('#mail_account_cancel_icon').addEventListener('click', closeDialog);
+    $('#mail_account_form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      jsonFetch(
+        event.target.action,
+        {
+          method: 'POST',
+          body: new FormData(event.target)
+        },
+        'Unable to save mail account'
+      )
+        .then(function() {
+          closeDialog();
+          $('#mail_account_error').hidden = true;
+        })
+        .catch(function(error) {
+          $('#mail_account_error').textContent = error.message;
+          $('#mail_account_error').hidden = false;
+        });
+    });
+  });
+})();
+</script>
