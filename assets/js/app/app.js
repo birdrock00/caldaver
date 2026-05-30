@@ -47,17 +47,7 @@ var calendar_header_for_viewport = function calendar_header_for_viewport() {
 };
 
 var calendar_default_view_for_viewport = function calendar_default_view_for_viewport(fullcalendar_views) {
-  var preferred_view = fullcalendar_views[CaldaverUserPrefs.default_view];
-
-  if (!is_mobile_viewport()) {
-    return preferred_view;
-  }
-
-  if (preferred_view === 'customizable_list' || preferred_view === 'agendaDay') {
-    return preferred_view;
-  }
-
-  return 'customizable_list';
+  return fullcalendar_views[CaldaverUserPrefs.default_view];
 };
 
 $(document).ready(function() {
@@ -1269,8 +1259,11 @@ var generate_event_source = function generate_event_source(calendar) {
       // calling removeEventSource, and will remove all calendars
       url: CaldaverConf.base_app_url + 'events#' + calendar,
       cache: false,
-      data: {
-        calendar: calendar
+      data: function() {
+        return {
+          calendar: calendar,
+          timezone: CaldaverUserPrefs.timezone || 'UTC'
+        };
       },
       error: function (jqXHR, textStatus, errorThrown) {
         show_error(t('messages', 'error_interfacefailure'),

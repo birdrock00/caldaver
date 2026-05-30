@@ -462,6 +462,7 @@ body.caldaver-calendar-page {
     display: flex;
     min-height: 64px;
     align-items: center;
+    flex-wrap: nowrap;
     padding: 0 16px 0 24px;
   }
 
@@ -469,11 +470,13 @@ body.caldaver-calendar-page {
     display: flex;
     align-items: center;
     float: none;
+    min-width: 0;
   }
 
   .navbar-brand {
     display: flex;
     align-items: center;
+    min-width: 0;
     height: 64px;
     padding: 0;
     color: #3c4043;
@@ -563,7 +566,8 @@ body.caldaver-calendar-page {
 .mobile-section-menu {
   position: relative;
   display: none;
-  margin-left: 10px;
+  flex: 0 0 auto;
+  margin-right: 10px;
 
   summary {
     display: inline-flex;
@@ -650,6 +654,13 @@ body.caldaver-calendar-page {
     background: #7b1fa2;
     text-decoration: none;
   }
+}
+
+.prefs-mail-account-create {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
 }
 
 .app-nav {
@@ -1789,6 +1800,11 @@ body.caldaver-calendar-page {
     background: #fff;
   }
 
+  &.highlighted-unread {
+    background: #fff8c5;
+    box-shadow: inset 4px 0 0 #fbbc04;
+  }
+
   span {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2104,14 +2120,20 @@ summary:focus-visible,
       padding: 0 ~"calc(8px + env(safe-area-inset-right))" 0 ~"calc(8px + env(safe-area-inset-left))";
     }
 
+    .navbar-header {
+      flex: 1 1 auto;
+    }
+
     .navbar-brand {
+      min-width: 0;
       height: 56px;
-      max-width: 136px;
-      font-size: 20px;
+      max-width: 120px;
+      font-size: 19px;
       line-height: 56px;
     }
 
     .navbar-nav {
+      flex: 0 0 auto;
       gap: 0;
 
       > li > a {
@@ -2127,9 +2149,7 @@ summary:focus-visible,
   }
 
   .caldaver-brand-icon {
-    width: 30px;
-    height: 30px;
-    margin-right: 8px;
+    display: none;
   }
 
   .caldaver-brand-title {
@@ -2139,6 +2159,7 @@ summary:focus-visible,
 
   .mobile-section-menu {
     display: block;
+    margin-right: 4px;
 
     summary {
       width: 44px;
@@ -2151,9 +2172,9 @@ summary:focus-visible,
   }
 
   #usermenu .user-pill {
-    max-width: 86px;
+    max-width: 76px;
     overflow: hidden;
-    padding: 0 10px;
+    padding: 0 9px;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -2319,10 +2340,6 @@ summary:focus-visible,
     min-width: 212px;
     min-height: 48px;
     border-radius: 24px;
-  }
-
-  .mail-actions-menu {
-    margin: 0 0 10px;
   }
 
   .mail-content {
