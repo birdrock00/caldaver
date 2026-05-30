@@ -1,29 +1,29 @@
 <?php
 
-namespace AgenDAV\Event\Parser;
+namespace Caldaver\Event\Parser;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Event;
-use AgenDAV\Event\Parser;
-use AgenDAV\Event\VObjectEvent;
+use Caldaver\Event;
+use Caldaver\Event\Parser;
+use Caldaver\Event\VObjectEvent;
 use Sabre\VObject\Reader;
 use Sabre\VObject\Component\VCalendar;
 use Sabre\VObject\Component\VEvent;
@@ -38,7 +38,7 @@ class VObjectParser implements Parser
      * Parses an iCalendar text resource
      *
      * @param string $icalendar
-     * @return \AgenDAV\Event
+     * @return \Caldaver\Event
      * @throws \UnexpectedValueException If $icalendar is not a valid iCalendar
      *                                   resource
      */

@@ -1,27 +1,27 @@
 <?php
 
-namespace AgenDAV\Controller;
+namespace Caldaver\Controller;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\CalDAV\Client;
+use Caldaver\CalDAV\Client;
 use Silex\Application;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -34,7 +34,7 @@ abstract class JSONController
 {
 
     /**
-     * @var \AgenDAV\CalDAV\Client
+     * @var \Caldaver\CalDAV\Client
      */
     protected $client;
 
@@ -102,22 +102,22 @@ abstract class JSONController
             $result = $this->execute($input, $app);
             return $result;
 
-        } catch (\AgenDAV\Exception\PermissionDenied $exception) {
+        } catch (\Caldaver\Exception\PermissionDenied $exception) {
             return $this->generateException(
                 $app['translator']->trans('messages.error_denied')
             );
 
-        } catch (\AgenDAV\Exception\NotFound $exception) {
+        } catch (\Caldaver\Exception\NotFound $exception) {
             return $this->generateException(
                 $app['translator']->trans('messages.error_element_not_found')
             );
 
-        } catch (\AgenDAV\Exception\ElementModified $exception) {
+        } catch (\Caldaver\Exception\ElementModified $exception) {
             return $this->generateException(
                 $app['translator']->trans('messages.error_element_changed')
             );
 
-        } catch (\AgenDAV\Exception\ConnectionProblem $exception) {
+        } catch (\Caldaver\Exception\ConnectionProblem $exception) {
             $app['monolog']->error(sprintf(
                 "Having issues contacting the CalDAV server: %s",
                 var_export($exception->getMessage(), true)
@@ -127,7 +127,7 @@ abstract class JSONController
 
             return $this->generateError($message, 503);
 
-        } catch (\AgenDAV\Exception $exception) {
+        } catch (\Caldaver\Exception $exception) {
             $app['monolog']->warning(sprintf(
                 "Received unexpected HTTP code %d (%s) for input: %s",
                 $exception->getCode(),

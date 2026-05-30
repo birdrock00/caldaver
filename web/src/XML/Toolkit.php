@@ -1,24 +1,24 @@
 <?php
 
-namespace AgenDAV\XML;
+namespace Caldaver\XML;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /**
@@ -77,8 +77,8 @@ class Toolkit
      *
      * @param string $request   One of MKCALENDAR, PROPFIND, PROPPATCH, REPORT-CALENDAR or
      *                          REPORT-PRINCIPAL-SEARCH
-     * @param mixed $parameters array of properties, \AgenDAV\CalDAV\ComponentFilter
-     *                          object if $request is REPORT or \AgenDAV\CalDAV\Share\ACL
+     * @param mixed $parameters array of properties, \Caldaver\CalDAV\ComponentFilter
+     *                          object if $request is REPORT or \Caldaver\CalDAV\Share\ACL
      *                          if $request is ACL
      * @return string XML body
      * @throws \InvalidArgumentException if $request is not recognized

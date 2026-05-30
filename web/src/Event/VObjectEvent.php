@@ -1,31 +1,31 @@
 <?php
 
-namespace AgenDAV\Event;
+namespace Caldaver\Event;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Event;
-use AgenDAV\EventInstance;
-use AgenDAV\Event\VObjectEventInstance;
-use AgenDAV\Event\VObjectHelper;
-use AgenDAV\Exception\NotFound;
+use Caldaver\Event;
+use Caldaver\EventInstance;
+use Caldaver\Event\VObjectEventInstance;
+use Caldaver\Event\VObjectHelper;
+use Caldaver\Exception\NotFound;
 use Sabre\VObject\Component\VCalendar;
 use Sabre\VObject\Component\VEvent;
 use Sabre\VObject\DateTimeParser;
@@ -120,7 +120,7 @@ class VObjectEvent implements Event
      *
      * @param \DateTimeInterface $start
      * @param \DateTimeInterface $end
-     * @return \AgenDAV\EventInstance[]
+     * @return \Caldaver\EventInstance[]
      */
     public function expand(\DateTimeInterface $start, \DateTimeInterface $end)
     {
@@ -157,7 +157,7 @@ class VObjectEvent implements Event
      * Checks if a RECURRENCE-ID string (that could be the result of
      * expanding a recurrent event) was an exception to the rule or not
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      * @return boolean
      */
     public function isException(?RecurrenceId $recurrence_id = null)
@@ -180,7 +180,7 @@ class VObjectEvent implements Event
     /**
      * Checks if a RECURRENCE-ID is a removed instance from the recurrence
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      * @return boolean
      */
     public function isRemovedInstance(?RecurrenceId $recurrence_id = null)
@@ -216,7 +216,7 @@ class VObjectEvent implements Event
      *
      * If not, a clean event instance will be returned.
      *
-     * @return \AgenDAV\EventInstance
+     * @return \Caldaver\EventInstance
      * @throws \LogicException If current event has no UID assigned
      */
     public function createEventInstance()
@@ -245,7 +245,7 @@ class VObjectEvent implements Event
      * or it is but this is not an recurrence exception, it will get stored as the
      * "base" event instance
      *
-     * @param \AgenDAV\EventInstance $instance
+     * @param \Caldaver\EventInstance $instance
      * @throws \InvalidArgumentException If event instance UID does not match
      *                                   current event UID
      * @throws \LogicException If a recurrence exception is passed for a date
@@ -318,9 +318,9 @@ class VObjectEvent implements Event
     /**
      * Removes an event instance by its RECURRENCE-ID from this event
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      * @throws \LogicException if this event is not recurrent
-     * @throws \AgenDAV\Exception\NotFound if the instance was already removed
+     * @throws \Caldaver\Exception\NotFound if the instance was already removed
      */
     public function removeInstance(RecurrenceId $recurrence_id)
     {
@@ -365,10 +365,10 @@ class VObjectEvent implements Event
      * If the passed RECURRENCE-ID does not match any existing exceptions,
      * a new EventInstance will be created with RECURRENCE-ID set
      *
-     * @param \AgenDAV\Event\RecurrenceId|null $recurrence_id
-     * @return \AgenDAV\EventInstance|null
+     * @param \Caldaver\Event\RecurrenceId|null $recurrence_id
+     * @return \Caldaver\EventInstance|null
      * @throws \LogicException if this event is not recurrent and a $recurrence_id
-     * @throws \AgenDAV\Exception\NotFound if the instance was removed
+     * @throws \Caldaver\Exception\NotFound if the instance was removed
      * is specified
      */
 
@@ -486,7 +486,7 @@ class VObjectEvent implements Event
      * it is
      *
      * @param \Sabre\VObject\Component\VEvent $vevent
-     * @return \AgenDAV\Event\VObjectEventInstance
+     * @return \Caldaver\Event\VObjectEventInstance
      */
     protected function getExpandedInstance(VEvent $vevent)
     {
@@ -513,10 +513,10 @@ class VObjectEvent implements Event
      *
      * If the event is not recurrent, a \LogicException will be thrown
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      * @return \Sabre\VObject\Component\VEvent
      * @throws \LogicException if this event is not recurrent
-     * @throws \AgenDAV\Exception\NotFound if the instance was removed
+     * @throws \Caldaver\Exception\NotFound if the instance was removed
      */
     protected function getRecurrenceExceptionVEvent(RecurrenceId $recurrence_id)
     {

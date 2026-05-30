@@ -1,30 +1,30 @@
 <?php
 
-namespace AgenDAV\XML;
+namespace Caldaver\XML;
 
 use Sabre\Xml\Service as XMLUtil;
 use Sabre\Xml\Writer;
-use AgenDAV\CalDAV\ComponentFilter;
-use AgenDAV\CalDAV\Share\ACL;
-use AgenDAV\CalDAV\Filter\PrincipalPropertySearch;
+use Caldaver\CalDAV\ComponentFilter;
+use Caldaver\CalDAV\Share\ACL;
+use Caldaver\CalDAV\Filter\PrincipalPropertySearch;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 /**
@@ -138,10 +138,10 @@ class Generator
     /**
      * Generates the REPORT XML body to get a list of events within a given range
      *
-     * @param \AgenDAV\CalDAV\ComponentFilter $component_filter Filter for this report
+     * @param \Caldaver\CalDAV\ComponentFilter $component_filter Filter for this report
      * @return string
      */
-    public function calendarQueryBody(\AgenDAV\CalDAV\ComponentFilter $component_filter)
+    public function calendarQueryBody(\Caldaver\CalDAV\ComponentFilter $component_filter)
     {
         $writer = $this->createNewWriter();
         $writer->startElement('{urn:ietf:params:xml:ns:caldav}calendar-query');
@@ -191,7 +191,7 @@ class Generator
     /**
      * Generates an XML body suitable for an ACL operation
      *
-     * @param \AgenDAV\CalDAV\Share\ACL $acl ACL definition to be applied
+     * @param \Caldaver\CalDAV\Share\ACL $acl ACL definition to be applied
      * @return string XML generated body
      */
     public function aclBody(ACL $acl)
@@ -214,7 +214,7 @@ class Generator
     /**
      * Generates the REPORT XML body to get a list of principals that match a given filter
      *
-     * @param \AgenDAV\CalDAV\Filter\PrincipalPropertySearch $filter
+     * @param \Caldaver\CalDAV\Filter\PrincipalPropertySearch $filter
      * @return string
      */
     public function principalPropertySearchBody(PrincipalPropertySearch $filter)
