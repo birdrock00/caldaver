@@ -433,6 +433,21 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
   expect(centers[1].x).toBeLessThan(centers[2].x);
 });
 
+test('login form labels do not overlap input fields', async ({ page }) => {
+  await page.setViewportSize({ width: 486, height: 240 });
+  await page.goto(`${baseURL}/login`);
+
+  const userLabel = await visibleBox(page, 'label[for="user"]');
+  const userInput = await visibleBox(page, 'input[name="user"]');
+  const passwordLabel = await visibleBox(page, 'label[for="password"]');
+  const passwordInput = await visibleBox(page, 'input[name="password"]');
+
+  expect(overlaps(userLabel, userInput)).toBe(false);
+  expect(overlaps(passwordLabel, passwordInput)).toBe(false);
+  expect(userLabel.x + userLabel.width).toBeLessThanOrEqual(userInput.x - 8);
+  expect(passwordLabel.x + passwordLabel.width).toBeLessThanOrEqual(passwordInput.x - 8);
+});
+
 test('mail page renders mocked messages, message detail, search, and attachment download', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
@@ -490,6 +505,7 @@ test('mail page renders mocked messages, message detail, search, and attachment 
         subject: 'Quarterly report',
         date: 'Fri, 29 May 2026 10:30:00 -0700',
         body: 'Attached is the quarterly report.',
+        html_body: '<section><h2>Quarterly report</h2><p>Attached is the <strong>quarterly report</strong>.</p><a href="https://example.test/report">Open report</a></section>',
         attachments: [{ part: '2', filename: 'report.pdf', content_type: 'application/pdf', size: 12345 }]
       },
       201: {
@@ -529,7 +545,12 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=101/);
   await expect(page.locator('#mail_reader_message')).toBeVisible();
   await expect(page.locator('#mail_reader_subject')).toHaveText('Quarterly report');
-  await expect(page.locator('#mail_reader_body')).toContainText('Attached is the quarterly report.');
+  await expect(page.locator('#mail_reader_body')).toBeHidden();
+  await expect(page.locator('#mail_reader_html')).toBeVisible();
+  const htmlFrame = page.frameLocator('#mail_reader_html');
+  await expect(htmlFrame.locator('h2')).toHaveText('Quarterly report');
+  await expect(htmlFrame.locator('strong')).toHaveText('quarterly report');
+  await expect(page.locator('#mail_reader_html')).toHaveAttribute('srcdoc', /<base target="_blank">/);
   await expect(page.locator('#mail_reader_unread')).toBeVisible();
   await expect(page.locator('#mail_message_detail')).toHaveCount(0);
 
@@ -670,6 +691,44 @@ test('mail cache renders immediately while IMAP sync runs from nav click and con
   await expect(page.locator('#mail_no_messages')).toContainText('Checking the IMAP server for mail');
   await expect(page.locator('#mail_no_messages')).not.toContainText('No messages');
   await expect(page.locator('#mail_nav_item')).toHaveClass(/syncing/);
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail reader renders HTML email bodies and blocks message scripts', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+
+  await mockMailApi(page, {
+    accounts: [{ id: 1, label: 'HTML Inbox', email_address: 'html@example.test' }],
+    messagesByAccount: {
+      1: [{ uid: 501, from: 'Designer <designer@example.test>', subject: 'Rich newsletter', date: 'Fri, 29 May 2026 13:00:00 -0700', seen: false }]
+    },
+    messageDetails: {
+      501: {
+        uid: 501,
+        from: 'Designer <designer@example.test>',
+        subject: 'Rich newsletter',
+        date: 'Fri, 29 May 2026 13:00:00 -0700',
+        body: 'Plain fallback body',
+        html_body: '<article><h2>Rich newsletter</h2><p><strong>Styled content</strong></p><img src="https://example.test/image.png" alt="hero"><script>window.top.__messageScriptRan = true;</script></article>'
+      }
+    }
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await page.locator('#mail_rows .mail-row').first().click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=501/);
+  await expect(page.locator('#mail_reader_html')).toBeVisible();
+  await expect(page.locator('#mail_reader_body')).toBeHidden();
+
+  const htmlFrame = page.frameLocator('#mail_reader_html');
+  await expect(htmlFrame.locator('h2')).toHaveText('Rich newsletter');
+  await expect(htmlFrame.locator('strong')).toHaveText('Styled content');
+  await expect(htmlFrame.locator('img[alt="hero"]')).toBeVisible();
+  await expect(htmlFrame.locator('script')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => window.__messageScriptRan || false)).toBe(false);
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);

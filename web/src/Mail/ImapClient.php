@@ -125,7 +125,8 @@ class ImapClient
                 'subject' => $this->decodeHeader($message->subject ?? '(No subject)'),
                 'date' => $message->date ?? '',
                 'seen' => !empty($message->seen),
-                'body' => $this->messageBody($stream, $uid, $structure),
+                'body' => $this->plainMessageBody($stream, $uid, $structure),
+                'html_body' => $this->htmlMessageBody($stream, $uid, $structure),
                 'attachments' => $this->collectAttachments($structure),
             ];
         } finally {
@@ -331,15 +332,38 @@ class ImapClient
         return $body;
     }
 
-    protected function messageBody($stream, $uid, $structure)
+    protected function plainMessageBody($stream, $uid, $structure)
     {
         $plain = $this->findTextPart($stream, $uid, $structure, 'plain');
         if ($plain !== '') {
             return $plain;
         }
 
-        $html = $this->findTextPart($stream, $uid, $structure, 'html');
+        $html = $this->htmlMessageBody($stream, $uid, $structure);
         return $html === '' ? '' : trim(html_entity_decode(strip_tags($html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    protected function htmlMessageBody($stream, $uid, $structure)
+    {
+        return $this->sanitizeHtml($this->findTextPart($stream, $uid, $structure, 'html'));
+    }
+
+    protected function sanitizeHtml($html)
+    {
+        if (trim((string)$html) === '') {
+            return '';
+        }
+
+        $html = preg_replace('#<\s*(script|iframe|object|embed|applet|meta|base|link)\b[^>]*>.*?<\s*/\s*\1\s*>#is', '', (string)$html);
+        $html = preg_replace('#<\s*(script|iframe|object|embed|applet|meta|base|link)\b[^>]*?/?>#is', '', $html);
+        $html = preg_replace('/\s+on[a-z]+\s*=\s*(".*?"|\'.*?\'|[^\s>]+)/is', '', $html);
+        $html = preg_replace('/\s+(href|src|xlink:href)\s*=\s*([\'"])\s*javascript:[^\'"]*\2/is', ' $1="#"', $html);
+        $html = preg_replace('/\s+style\s*=\s*("|\')(.*?)\1/is', function($match) {
+            $style = preg_replace('/expression\s*\(|javascript:/is', '', $match[2]);
+            return ' style="' . htmlspecialchars($style, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '"';
+        }, $html);
+
+        return trim($html);
     }
 
     protected function findTextPart($stream, $uid, $part, $subtype, $prefix = '')

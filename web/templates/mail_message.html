@@ -51,6 +51,14 @@
           </div>
         </div>
         <pre id="mail_reader_body"></pre>
+        <iframe
+          id="mail_reader_html"
+          class="mail-reader-html"
+          sandbox="allow-popups allow-popups-to-escape-sandbox"
+          referrerpolicy="no-referrer"
+          title="{% trans %}labels.mail{% endtrans %}"
+          hidden
+        ></iframe>
         <div id="mail_reader_attachments" class="mail-attachments" data-testid="mail-attachments"></div>
       </article>
       <div id="mail_reader_loading" class="mail-empty">{% trans %}labels.mail_loading{% endtrans %}</div>
