@@ -43,6 +43,7 @@ class Mail
             'encryption' => trim($request->request->get('encryption', 'ssl')),
             'username' => trim($request->request->get('username', '')),
             'password' => $request->request->get('password', ''),
+            'refresh_interval_minutes' => trim($request->request->get('refresh_interval_minutes', '1')),
         ];
 
         foreach (['label', 'email_address', 'imap_host', 'username'] as $field) {
@@ -97,8 +98,30 @@ class Mail
             ], 404);
         }
 
+        return new JsonResponse([
+            'result' => 'SUCCESS',
+            'data' => $app['mail.accounts']->cachedMessages($app['session']->get('username'), $account['id']),
+            'cached' => true,
+        ]);
+    }
+
+    public function syncMessagesAction(Request $request, Application $app)
+    {
+        $account = $app['mail.accounts']->findWithPassword(
+            $app['session']->get('username'),
+            (int)$request->query->get('account_id')
+        );
+
+        if ($account === null) {
+            return new JsonResponse([
+                'result' => 'ERROR',
+                'message' => 'Mail account not found',
+            ], 404);
+        }
+
         try {
             $messages = $app['mail.imap.client']->fetchInbox($account);
+            $app['mail.accounts']->replaceMessageCache($app['session']->get('username'), $account['id'], $messages);
         } catch (\RuntimeException $exception) {
             return new JsonResponse([
                 'result' => 'ERROR',
@@ -109,6 +132,7 @@ class Mail
         return new JsonResponse([
             'result' => 'SUCCESS',
             'data' => $messages,
+            'cached' => false,
         ]);
     }
 
@@ -173,6 +197,11 @@ class Mail
 
         try {
             $message = $app['mail.imap.client']->fetchMessage($account, $uid);
+            if ($message !== null) {
+                $app['mail.imap.client']->markSeen($account, $uid, true);
+                $message['seen'] = true;
+                $app['mail.accounts']->cacheMessage($app['session']->get('username'), $account['id'], $message);
+            }
         } catch (\RuntimeException $exception) {
             return new JsonResponse([
                 'result' => 'ERROR',
@@ -190,6 +219,47 @@ class Mail
         return new JsonResponse([
             'result' => 'SUCCESS',
             'data' => $message,
+        ]);
+    }
+
+    public function markUnreadAction(Request $request, Application $app)
+    {
+        $account = $app['mail.accounts']->findWithPassword(
+            $app['session']->get('username'),
+            (int)$request->request->get('account_id')
+        );
+
+        if ($account === null) {
+            return new JsonResponse([
+                'result' => 'ERROR',
+                'message' => 'Mail account not found',
+            ], 404);
+        }
+
+        $uid = (int)$request->request->get('uid');
+        if ($uid <= 0) {
+            return new JsonResponse([
+                'result' => 'ERROR',
+                'message' => 'Message not found',
+            ], 404);
+        }
+
+        try {
+            $app['mail.imap.client']->markSeen($account, $uid, false);
+            $app['mail.accounts']->markCachedSeen($app['session']->get('username'), $account['id'], $uid, false);
+        } catch (\RuntimeException $exception) {
+            return new JsonResponse([
+                'result' => 'ERROR',
+                'message' => $exception->getMessage(),
+            ], 502);
+        }
+
+        return new JsonResponse([
+            'result' => 'SUCCESS',
+            'data' => [
+                'uid' => $uid,
+                'seen' => false,
+            ],
         ]);
     }
 
