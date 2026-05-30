@@ -3,11 +3,11 @@
 Configuration
 =============
 
-Configuring AgenDAV requires creating a ``settings.php`` file in the
+Configuring Caldaver requires creating a ``settings.php`` file in the
 ``web/config/`` directory.
 
 You will find all available settings inside the file ``default.settings.php``. Please, do not
-modify ``default.settings.php``, as any changes will be lost if you upgrade AgenDAV.
+modify ``default.settings.php``, as any changes will be lost if you upgrade Caldaver.
 
 Save a copy of the ``default.settings.php`` file as ``settings.php``, or just copy the settings you want to
 modify,  and start configuring your instance.
@@ -41,7 +41,7 @@ modify,  and start configuring your instance.
    for a better reference. Example::
 
         $app['db.options'] = [
-            'dbname' => 'agendav',
+            'dbname' => 'caldaver',
             'user' => 'user',
             'password' => 'password',
             'host' => 'localhost',
@@ -70,7 +70,7 @@ modify,  and start configuring your instance.
 
    Full path where logs will be created. Add a trailing slash. Example::
 
-    $app['log.path'] = '/var/log/agendav/';
+    $app['log.path'] = '/var/log/caldaver/';
 
    Make sure the user that runs your web server has write permission on that
    directory.
@@ -79,7 +79,7 @@ modify,  and start configuring your instance.
 
    Base CalDAV URL used to build all CalDAV URLs.
 
-   If you want to pass the username you enter on login into AgenDAV,
+   If you want to pass the username you enter on login into Caldaver,
    then add a '%u' placeholder to your baseurl. It will be replaced dynamically.
 
    Examples::
@@ -95,7 +95,7 @@ modify,  and start configuring your instance.
 
 
    .. note::
-      If you are configuring AgenDAV to connect to a CalDAV server using HTTPS,
+      If you are configuring Caldaver to connect to a CalDAV server using HTTPS,
       certificate validation will be performed. Both CA and hostname will be verified. If you are
       having trouble with your certificate, make sure you have your CA recognized by your system.
       See `OpenSSL changes in PHP 5.6.x <http://php.net/manual/en/migration56.openssl.php>`_ for
@@ -185,7 +185,7 @@ modify,  and start configuring your instance.
 
 .. confval:: defaults.language
 
-   Default language to be used on AgenDAV interface.
+   Default language to be used on Caldaver interface.
 
    Have a look at directory ``web/lang`` for a list of available languages.
 
@@ -234,13 +234,13 @@ modify,  and start configuring your instance.
 
 .. confval:: defaults.default_view
 
-   Default calendar view when accessing AgenDAV. Allowed values: month, week, day and list
+   Default calendar view when accessing Caldaver. Allowed values: month, week, day and list
 
    Specify it as a string.
 
 .. confval:: logout.redirection
 
-   When logging out from AgenDAV, the URL the user will be redirected to.
+   When logging out from Caldaver, the URL the user will be redirected to.
 
    Can be left empty to redirect user to login page again.
 
@@ -248,7 +248,7 @@ modify,  and start configuring your instance.
 Sessions
 --------
 
-AgenDAV uses `php.ini session settings <http://php.net/session.configuration>`_. You can override
+Caldaver uses `php.ini session settings <http://php.net/session.configuration>`_. You can override
 most of them inside `settings.php` by using the `session.storage.options`. Just copy it from
 `prod.php` and set any parameters you wish.
 
@@ -256,7 +256,7 @@ The following example makes sessions expire after 20 minutes of closing your bro
 traffic instance::
 
     $app['session.storage.options'] = [
-       'name' => 'agendav_sess',
+       'name' => 'caldaver_sess',
        'cookie_lifetime' => 0,
        // Every request has 10% chance of triggering session GC
        'gc_probability' => 1,

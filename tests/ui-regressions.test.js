@@ -23,13 +23,13 @@ test('calendar creation posts to the backend save route', () => {
 
   assert.match(
     app,
-    /var form_url = AgenDAVConf\.base_app_url \+ 'calendars\/save';/,
+    /var form_url = CaldaverConf\.base_app_url \+ 'calendars\/save';/,
     'calendar_create_dialog must submit to the registered POST /calendars/save route'
   );
 
   assert.doesNotMatch(
     app,
-    /var form_url = AgenDAVConf\.base_app_url \+ 'calendars';/,
+    /var form_url = CaldaverConf\.base_app_url \+ 'calendars';/,
     'calendar_create_dialog must not submit to the unrouted /calendars path'
   );
 });
@@ -48,7 +48,7 @@ test('calendar-only overflow locking does not break preferences scrolling', () =
   const layout = read('web/templates/layout.html');
   const calendar = read('web/templates/calendar.html');
   const preferences = read('web/templates/preferences.html');
-  const less = read('assets/less/agendav.less');
+  const less = read('assets/less/caldaver.less');
 
   assert.match(
     layout,
@@ -58,18 +58,18 @@ test('calendar-only overflow locking does not break preferences scrolling', () =
 
   assert.match(
     calendar,
-    /\{% block body_class %\}agendav-calendar-page\{% endblock %\}/,
+    /\{% block body_class %\}caldaver-calendar-page\{% endblock %\}/,
     'only the calendar screen should opt into fixed-height overflow handling'
   );
 
   assert.doesNotMatch(
     preferences,
-    /agendav-calendar-page/,
+    /caldaver-calendar-page/,
     'preferences must not opt into the calendar overflow lock'
   );
 
   assert.match(
-    cssBlock(less, 'body.agendav-calendar-page'),
+    cssBlock(less, 'body.caldaver-calendar-page'),
     /overflow:\s*hidden;/,
     'overflow hidden should be scoped to the calendar screen'
   );
@@ -82,16 +82,16 @@ test('calendar-only overflow locking does not break preferences scrolling', () =
 });
 
 test('calendar page emits a concrete translation catalogue for frontend startup', () => {
-  const agendavJs = read('web/templates/parts/agendavjs.html');
+  const caldaverJs = read('web/templates/parts/caldaverjs.html');
 
   assert.match(
-    agendavJs,
+    caldaverJs,
     /var translations = \{\{ app\.translator\.getCatalogue\(app\.request\.locale\)\.all\('messages'\)\|json_encode\|raw \}\};/,
     'frontend translations must come from the active translator catalogue, not a nullable internal messages property'
   );
 
   assert.doesNotMatch(
-    agendavJs,
+    caldaverJs,
     /getMessages\(\)\.messages/,
     'the old expression can emit null and break all calendar click handlers'
   );
@@ -99,7 +99,7 @@ test('calendar page emits a concrete translation catalogue for frontend startup'
 
 test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
   const navbar = read('web/templates/parts/navbar.html');
-  const less = read('assets/less/agendav.less');
+  const less = read('assets/less/caldaver.less');
 
   assert.match(
     navbar,
@@ -115,7 +115,7 @@ test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
 });
 
 test('login form labels cannot overlap input fields under Bootstrap 5', () => {
-  const less = read('assets/less/agendav.less');
+  const less = read('assets/less/caldaver.less');
 
   assert.match(less, /\.loginform\s*\{[\s\S]*grid-template-columns:\s*96px minmax\(0, 1fr\)/);
   assert.match(less, /\.loginform\s*\{[\s\S]*white-space:\s*nowrap/);
@@ -144,10 +144,10 @@ test('cards section exposes CardDAV routes and a left navigation tab', () => {
   const appNav = read('web/templates/parts/appnav.html');
   const sidebar = read('web/templates/parts/sidebar.html');
 
-  assert.match(controllers, /->get\('\/cards', '\\AgenDAV\\Controller\\Cards::indexAction'\)->bind\('cards'\)/);
-  assert.match(controllers, /->get\('\/cards\/list', '\\AgenDAV\\Controller\\Cards::listAction'\)->bind\('cards\.list'\)/);
-  assert.match(controllers, /->post\('\/cards\/save', '\\AgenDAV\\Controller\\Cards::saveAction'\)->bind\('cards\.save'\)/);
-  assert.match(controllers, /->post\('\/cards\/delete', '\\AgenDAV\\Controller\\Cards::deleteAction'\)->bind\('cards\.delete'\)/);
+  assert.match(controllers, /->get\('\/cards', '\\Caldaver\\Controller\\Cards::indexAction'\)->bind\('cards'\)/);
+  assert.match(controllers, /->get\('\/cards\/list', '\\Caldaver\\Controller\\Cards::listAction'\)->bind\('cards\.list'\)/);
+  assert.match(controllers, /->post\('\/cards\/save', '\\Caldaver\\Controller\\Cards::saveAction'\)->bind\('cards\.save'\)/);
+  assert.match(controllers, /->post\('\/cards\/delete', '\\Caldaver\\Controller\\Cards::deleteAction'\)->bind\('cards\.delete'\)/);
   assert.match(services, /\$app\['carddav\.client'\]/);
   assert.match(appNav, /app\.url_generator\.generate\('cards'\)/);
   assert.match(sidebar, /include 'parts\/appnav\.html'/);
@@ -156,7 +156,7 @@ test('cards section exposes CardDAV routes and a left navigation tab', () => {
 test('cards page renders list and card views without loading the calendar bundle', () => {
   const cards = read('web/templates/cards.html');
   const cardsJs = read('web/templates/parts/cardsjs.html');
-  const less = read('assets/less/agendav.less');
+  const less = read('assets/less/caldaver.less');
 
   assert.match(cards, /id="contacts_list"/);
   assert.match(cards, /id="contacts_cards"/);
@@ -187,8 +187,8 @@ test('CardDAV support can discover, create, query, and write local addressbooks'
   assert.match(auth, /carddav\.http\.client/);
   assert.match(services, /\$app\['carddav\.baseurl'\]/);
   assert.match(services, /\$app\['carddav\.http\.client'\]/);
-  assert.match(settings, /\$app\['carddav\.baseurl'\] = 'AGENDAV_CARDDAV_SERVER';/);
-  assert.match(run, /AGENDAV_CARDDAV_SERVER:=\$AGENDAV_CALDAV_SERVER/);
+  assert.match(settings, /\$app\['carddav\.baseurl'\] = 'CALDAVER_CARDDAV_SERVER';/);
+  assert.match(run, /CALDAVER_CARDDAV_SERVER:=\$CALDAVER_CALDAV_SERVER/);
   assert.match(client, /getAddressBookHomeSet/);
   assert.match(client, /getOrCreateDefaultAddressBook/);
   assert.match(client, /fetchContactsFromAddressBooks/);
@@ -215,7 +215,7 @@ test('Radicale principal paths are not shown as the topbar display name', () => 
   );
 });
 
-test('CalDAVer login credentials are separate from DAV service credentials', () => {
+test('Caldaver login credentials are separate from DAV service credentials', () => {
   const auth = read('web/src/Controller/Authentication.php');
   const clientFactory = read('web/src/Http/ClientFactory.php');
   const services = read('web/app/services.php');
@@ -232,17 +232,17 @@ test('CalDAVer login credentials are separate from DAV service credentials', () 
   assert.match(auth, /set\('dav_password', \$davPassword\)/);
   assert.match(clientFactory, /has\('dav_username'\) && \$session->has\('dav_password'\)/);
   assert.match(services, /get\('dav_username', \$app\['session'\]->get\('username'\)\)/);
-  assert.match(settings, /\$app\['auth\.local\.username'\] = 'AGENDAV_AUTH_USERNAME';/);
-  assert.match(settings, /\$app\['auth\.local\.password'\] = 'AGENDAV_AUTH_PASSWORD';/);
-  assert.match(settings, /\$app\['caldav\.username'\] = 'AGENDAV_CALDAV_USERNAME';/);
-  assert.match(settings, /\$app\['caldav\.password'\] = 'AGENDAV_CALDAV_PASSWORD';/);
+  assert.match(settings, /\$app\['auth\.local\.username'\] = 'CALDAVER_AUTH_USERNAME';/);
+  assert.match(settings, /\$app\['auth\.local\.password'\] = 'CALDAVER_AUTH_PASSWORD';/);
+  assert.match(settings, /\$app\['caldav\.username'\] = 'CALDAVER_CALDAV_USERNAME';/);
+  assert.match(settings, /\$app\['caldav\.password'\] = 'CALDAVER_CALDAV_PASSWORD';/);
   assert.match(defaults, /\$app\['auth\.local\.username'\] = '';/);
   assert.match(defaults, /\$app\['caldav\.username'\] = '';/);
-  assert.match(run, /AGENDAV_AUTH_USERNAME:=/);
-  assert.match(run, /AGENDAV_CALDAV_PASSWORD:=/);
+  assert.match(run, /CALDAVER_AUTH_USERNAME:=/);
+  assert.match(run, /CALDAVER_CALDAV_PASSWORD:=/);
 });
 
-test('CalDAVer Docker image and runtime use Postgres instead of SQLite', () => {
+test('Caldaver Docker image and runtime use Postgres instead of SQLite', () => {
   const dockerfile = read('Dockerfile');
   const settings = read('docker/settings.php');
   const run = read('docker/run.sh');
@@ -252,9 +252,9 @@ test('CalDAVer Docker image and runtime use Postgres instead of SQLite', () => {
   assert.match(dockerfile, /imap/);
   assert.doesNotMatch(dockerfile, /pdo_sqlite/);
   assert.doesNotMatch(dockerfile, /db\.sqlite/);
-  assert.match(settings, /'driver' => 'AGENDAV_DB_DRIVER'/);
-  assert.match(settings, /'host' => 'AGENDAV_DB_HOST'/);
-  assert.match(run, /AGENDAV_DB_PASSWORD:\?AGENDAV_DB_PASSWORD is required/);
+  assert.match(settings, /'driver' => 'CALDAVER_DB_DRIVER'/);
+  assert.match(settings, /'host' => 'CALDAVER_DB_HOST'/);
+  assert.match(run, /CALDAVER_DB_PASSWORD:\?CALDAVER_DB_PASSWORD is required/);
   assert.match(run, /initialize-database\.php/);
   assert.match(init, /pgsql:host=/);
   assert.match(init, /CREATE TABLE IF NOT EXISTS mail_accounts/);
@@ -273,17 +273,17 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   const repository = read('web/src/Mail/MailAccountRepository.php');
   const imap = read('web/src/Mail/ImapClient.php');
   const validator = read('web/src/Mail/AccountValidator.php');
-  const less = read('assets/less/agendav.less');
+  const less = read('assets/less/caldaver.less');
 
-  assert.match(controllers, /->get\('\/mail', '\\AgenDAV\\Controller\\Mail::indexAction'\)->bind\('mail'\)/);
-  assert.match(controllers, /->get\('\/mail\/accounts', '\\AgenDAV\\Controller\\Mail::accountsAction'\)->bind\('mail\.accounts'\)/);
-  assert.match(controllers, /->post\('\/mail\/accounts\/save', '\\AgenDAV\\Controller\\Mail::saveAccountAction'\)->bind\('mail\.accounts\.save'\)/);
-  assert.match(controllers, /->get\('\/mail\/read', '\\AgenDAV\\Controller\\Mail::readAction'\)->bind\('mail\.read'\)/);
-  assert.match(controllers, /->get\('\/mail\/messages', '\\AgenDAV\\Controller\\Mail::messagesAction'\)->bind\('mail\.messages'\)/);
-  assert.match(controllers, /->get\('\/mail\/messages\/sync', '\\AgenDAV\\Controller\\Mail::syncMessagesAction'\)->bind\('mail\.messages\.sync'\)/);
-  assert.match(controllers, /->get\('\/mail\/message', '\\AgenDAV\\Controller\\Mail::messageAction'\)->bind\('mail\.message'\)/);
-  assert.match(controllers, /->post\('\/mail\/message\/unread', '\\AgenDAV\\Controller\\Mail::markUnreadAction'\)->bind\('mail\.message\.unread'\)/);
-  assert.match(controllers, /->get\('\/mail\/attachment', '\\AgenDAV\\Controller\\Mail::attachmentAction'\)->bind\('mail\.attachment'\)/);
+  assert.match(controllers, /->get\('\/mail', '\\Caldaver\\Controller\\Mail::indexAction'\)->bind\('mail'\)/);
+  assert.match(controllers, /->get\('\/mail\/accounts', '\\Caldaver\\Controller\\Mail::accountsAction'\)->bind\('mail\.accounts'\)/);
+  assert.match(controllers, /->post\('\/mail\/accounts\/save', '\\Caldaver\\Controller\\Mail::saveAccountAction'\)->bind\('mail\.accounts\.save'\)/);
+  assert.match(controllers, /->get\('\/mail\/read', '\\Caldaver\\Controller\\Mail::readAction'\)->bind\('mail\.read'\)/);
+  assert.match(controllers, /->get\('\/mail\/messages', '\\Caldaver\\Controller\\Mail::messagesAction'\)->bind\('mail\.messages'\)/);
+  assert.match(controllers, /->get\('\/mail\/messages\/sync', '\\Caldaver\\Controller\\Mail::syncMessagesAction'\)->bind\('mail\.messages\.sync'\)/);
+  assert.match(controllers, /->get\('\/mail\/message', '\\Caldaver\\Controller\\Mail::messageAction'\)->bind\('mail\.message'\)/);
+  assert.match(controllers, /->post\('\/mail\/message\/unread', '\\Caldaver\\Controller\\Mail::markUnreadAction'\)->bind\('mail\.message\.unread'\)/);
+  assert.match(controllers, /->get\('\/mail\/attachment', '\\Caldaver\\Controller\\Mail::attachmentAction'\)->bind\('mail\.attachment'\)/);
   assert.match(services, /\$app\['mail\.accounts'\]/);
   assert.match(services, /\$app\['mail\.imap\.client'\]/);
   assert.match(appNav, /app\.url_generator\.generate\('mail'\)/);

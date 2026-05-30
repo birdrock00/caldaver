@@ -1,26 +1,26 @@
 <?php
-namespace AgenDAV\Http;
+namespace Caldaver\Http;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Version;
+use Caldaver\Version;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\Stream\Stream;
 use GuzzleHttp\Psr7\Request;
@@ -28,7 +28,7 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\RequestInterface;
 
 /**
- * HTTP Client for AgenDAV, based on Guzzle
+ * HTTP Client for Caldaver, based on Guzzle
  */
 class Client
 {
@@ -150,11 +150,11 @@ class Client
      * @param string $url          URL to send the request to
      * @param string|null|resource $body
      * @return \GuzzleHttp\Psr7\Response
-     * @throws \AgenDAV\Exception\* (see available exceptions)
+     * @throws \Caldaver\Exception\* (see available exceptions)
      **/
     public function request($method, $url, $body = null)
     {
-        $this->setHeader('User-Agent', 'AgenDAV/' . Version::V);
+        $this->setHeader('User-Agent', 'Caldaver/' . Version::V);
 
         $this->request = new Request(
             $method,
@@ -171,22 +171,22 @@ class Client
         } catch (\GuzzleHttp\Exception\BadResponseException $exception) {
             switch ($exception->getCode()) {
                 case 401:
-                    throw new \AgenDAV\Exception\NotAuthenticated($exception);
+                    throw new \Caldaver\Exception\NotAuthenticated($exception);
                     break;
                 case 403:
-                    throw new \AgenDAV\Exception\PermissionDenied($exception);
+                    throw new \Caldaver\Exception\PermissionDenied($exception);
                     break;
                 case 404:
-                    throw new \AgenDAV\Exception\NotFound($exception);
+                    throw new \Caldaver\Exception\NotFound($exception);
                     break;
                 case 412:
-                    throw new \AgenDAV\Exception\ElementModified($exception);
+                    throw new \Caldaver\Exception\ElementModified($exception);
                     break;
                 default:
-                    throw new \AgenDAV\Exception($exception);
+                    throw new \Caldaver\Exception($exception);
             }
         } catch (\GuzzleHttp\Exception\ConnectException $exception) {
-            throw new \AgenDAV\Exception\ConnectionProblem(
+            throw new \Caldaver\Exception\ConnectionProblem(
                 $exception->getMessage()
             );
         }

@@ -1,29 +1,29 @@
 <?php
 
-namespace AgenDAV\CalDAV\Resource;
+namespace Caldaver\CalDAV\Resource;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\CalDAV\Resource\Calendar;
-use AgenDAV\Uuid;
-use AgenDAV\Event;
+use Caldaver\CalDAV\Resource\Calendar;
+use Caldaver\Uuid;
+use Caldaver\Event;
 
 /**
  * Represents a calendar object (with iCalendar contents) that is placed
@@ -40,7 +40,7 @@ class CalendarObject
     /**
      * Contained event
      *
-     * @var \AgenDAV\Event
+     * @var \Caldaver\Event
      */
     protected $event;
 
@@ -54,7 +54,7 @@ class CalendarObject
     /**
      * Calendar this object is stored at
      *
-     * @var \AgenDAV\CalDAV\Resource\Calendar
+     * @var \Caldaver\CalDAV\Resource\Calendar
      */
     protected $calendar;
 
@@ -68,7 +68,7 @@ class CalendarObject
 
     /**
      * @param string $url
-     * @param \AgenDAV\Event $event
+     * @param \Caldaver\Event $event
      */
     public function __construct($url, ?Event $event = null)
     {
@@ -79,7 +79,7 @@ class CalendarObject
     /*
      * Getter for event
      *
-     * @return AgenDAV\Event
+     * @return Caldaver\Event
      */
     public function getEvent()
     {
@@ -89,7 +89,7 @@ class CalendarObject
     /*
      * Setter for event
      *
-     * @param AgenDAV\Event $event
+     * @param Caldaver\Event $event
      */
     public function setEvent($event)
     {
@@ -121,7 +121,7 @@ class CalendarObject
     /*
      * Getter for calendar
      *
-     * @return AgenDAV\CalDAV\Resource\Calendar
+     * @return Caldaver\CalDAV\Resource\Calendar
      */
     public function getCalendar()
     {
@@ -131,7 +131,7 @@ class CalendarObject
     /*
      * Setter for calendar
      *
-     * @param AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param Caldaver\CalDAV\Resource\Calendar $calendar
      */
     public function setCalendar(Calendar $calendar)
     {
@@ -166,7 +166,7 @@ class CalendarObject
      *
      * @param \DateTimeInterface $start
      * @param \DateTimeInterface $end
-     * @return \AgenDAV\EventInstance[]
+     * @return \Caldaver\EventInstance[]
      */
     public function getEventInstances(\DateTimeInterface $start, \DateTimeInterface $end)
     {
@@ -195,9 +195,9 @@ class CalendarObject
     /**
      * Creates a new CalendarObject with a given UID
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
      * @param string $uid
-     * @return \AgenDAV\CalDAV\Resource\CalendarObject
+     * @return \Caldaver\CalDAV\Resource\CalendarObject
      */
     public static function generateOnCalendar(Calendar $calendar, $uid)
     {
