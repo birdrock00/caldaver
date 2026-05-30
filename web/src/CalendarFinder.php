@@ -1,29 +1,29 @@
 <?php
-namespace AgenDAV;
+namespace Caldaver;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Repositories\SharesRepository;
-use AgenDAV\CalDAV\Client;
-use AgenDAV\CalDAV\Resource\Calendar;
-use AgenDAV\Data\Principal;
+use Caldaver\Repositories\SharesRepository;
+use Caldaver\CalDAV\Client;
+use Caldaver\CalDAV\Resource\Calendar;
+use Caldaver\Data\Principal;
 use Symfony\Component\HttpFoundation\Session\Session;
 
 /**
@@ -34,21 +34,21 @@ class CalendarFinder
     /** @var boolean */
     protected $sharing_enabled;
 
-    /** @var \AgenDAV\CalDAV\Client */
+    /** @var \Caldaver\CalDAV\Client */
     protected $client;
 
-    /** @var \AgenDAV\Repositories\SharesRepository */
+    /** @var \Caldaver\Repositories\SharesRepository */
     protected $shares_repository;
 
     /** @var \Symfony\Component\HttpFoundation\Session\Session */
     protected $session;
 
-    /** @var \AgenDAV\Data\Principal */
+    /** @var \Caldaver\Data\Principal */
     protected $current_principal;
 
     /**
      * @param \Symfony\Component\HttpFoundation\Session\Session $session
-     * @param \AgenDAV\CalDAV\Client $client
+     * @param \Caldaver\CalDAV\Client $client
      */
     public function __construct(Session $session, Client $client)
     {
@@ -62,7 +62,7 @@ class CalendarFinder
      * Sets the shares repository for this finder. Until it is called,
      * the finder disables all functionalities related to shared calendars
      *
-     * @param \AgenDAV\Repositories\SharesRepository $shares_repository
+     * @param \Caldaver\Repositories\SharesRepository $shares_repository
      */
     public function setSharesRepository(SharesRepository $shares_repository)
     {
@@ -73,7 +73,7 @@ class CalendarFinder
     /**
      * Returns all calendars for the current user
      *
-     * @return \AgenDAV\CalDAV\Resource\Calendar[] Array of calendars
+     * @return \Caldaver\CalDAV\Resource\Calendar[] Array of calendars
      */
     public function getCalendars()
     {
@@ -100,8 +100,8 @@ class CalendarFinder
     /**
      * Gets all calendars shared with current principal
      *
-     * @param \AgenDAV\Data\Principal $principal Principal
-     * @return \AgenDAV\CalDAV\Resource\Calendar[]
+     * @param \Caldaver\Data\Principal $principal Principal
+     * @return \Caldaver\CalDAV\Resource\Calendar[]
      */
     protected function getCalendarSharedWith(Principal $principal)
     {
@@ -135,7 +135,7 @@ class CalendarFinder
     /**
      * Applies custom properties to a calendar
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar $calendar
+     * @param \Caldaver\CalDAV\Resource\Calendar $calendar
      * @param array $properties
      * @return void
      */
@@ -159,7 +159,7 @@ class CalendarFinder
     /**
      * Stores existing calendar shares inside each Calendar object
      *
-     * @param \AgenDAV\CalDAV\Resource\Calendar[] $calendars
+     * @param \Caldaver\CalDAV\Resource\Calendar[] $calendars
      */
     protected function addShares(Array $calendars)
     {

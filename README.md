@@ -1,20 +1,17 @@
-# AgenDAV - CalDAV web client
+# Caldaver - CalDAV web client
 
-[![Maintenance mode](https://img.shields.io/badge/maintenance_mode-%F0%9F%9A%A7-grey.svg?labelColor=orange)](https://github.com/agendav/agendav/#maintenance-mode)
-[![Build Status](https://img.shields.io/github/workflow/status/agendav/agendav/CI/main)](https://github.com/agendav/agendav/actions)
-[![Docs](https://readthedocs.org/projects/agendav/badge/?version=latest)](https://agendav.readthedocs.io/)
-[![Made With](https://img.shields.io/badge/made_with-php-blue)](https://github.com/agendav/agendav#requirements)
+[![Build Status](https://github.com/caldaver-app/caldaver/actions/workflows/ci.yml/badge.svg)](https://github.com/caldaver-app/caldaver/actions)
+[![Made With](https://img.shields.io/badge/made_with-php-blue)](https://github.com/caldaver-app/caldaver#requirements)
 [![License](https://img.shields.io/badge/license-gpl--3.0--or--later-blue.svg)](https://spdx.org/licenses/GPL-3.0-or-later.html)
-[![Contribution](https://img.shields.io/badge/contributions_welcome-%F0%9F%94%B0-brightgreen.svg?labelColor=brightgreen)](https://github.com/agendav/agendav/blob/development/CONTRIBUTING.md)
 
-AgenDAV is a CalDAV web client which features an AJAX interface to allow
+Caldaver is a CalDAV web client which features an AJAX interface to allow
 users to manage their own calendars and shared ones.
 
 ![Screenshot](./docs/screenshot.png)
 
 ## Requirements
 
-AgenDAV requires:
+Caldaver requires:
 
 - A CalDAV server like [Baïkal](http://baikal-server.com/),
   [DAViCal](http://www.davical.org/),
@@ -32,11 +29,12 @@ AgenDAV requires:
 
 ## Documentation
 
+The original upstream documentation is available at:
 https://agendav.readthedocs.io/
 
 ## Installation
 
-See [installation guide](https://agendav.readthedocs.io/en/latest/admin/installation/)
+See the original upstream [installation guide](https://agendav.readthedocs.io/en/latest/admin/installation/)
 
 ### Docker Image
 
@@ -50,42 +48,42 @@ to Ruslan Nagimov for making that work available as a basis for this image.
 
 Required runtime configuration:
 
-- `AGENDAV_CALDAV_SERVER`, for example `https://baikal.example.com/cal.php`
-- `AGENDAV_CSRF_SECRET`, set to a unique secret value
-- `AGENDAV_DB_HOST`
-- `AGENDAV_DB_NAME`
-- `AGENDAV_DB_USER`
-- `AGENDAV_DB_PASSWORD`
+- `CALDAVER_CALDAV_SERVER`, for example `https://baikal.example.com/cal.php`
+- `CALDAVER_CSRF_SECRET`, set to a unique secret value
+- `CALDAVER_DB_HOST`
+- `CALDAVER_DB_NAME`
+- `CALDAVER_DB_USER`
+- `CALDAVER_DB_PASSWORD`
 
 Common optional runtime configuration:
 
-- `AGENDAV_SERVER_NAME`, defaults to `localhost`
-- `AGENDAV_TITLE`, defaults to `AgenDAV`
-- `AGENDAV_FOOTER`, defaults to `AgenDAV`
-- `AGENDAV_AUTH_USERNAME` and `AGENDAV_AUTH_PASSWORD`, set these to use a local CalDAVer login instead of logging in directly with DAV server credentials
-- `AGENDAV_CALDAV_PUBLIC_URL`, defaults to `AGENDAV_CALDAV_SERVER`
-- `AGENDAV_CARDDAV_SERVER`, defaults to `AGENDAV_CALDAV_SERVER`
-- `AGENDAV_CALDAV_USERNAME` and `AGENDAV_CALDAV_PASSWORD`, service credentials used by CalDAVer when local login is enabled
-- `AGENDAV_TIMEZONE`, defaults to `UTC`
-- `AGENDAV_LANG`, defaults to `en`
-- `AGENDAV_WEEKSTART`, defaults to `0`
-- `AGENDAV_CALENDAR_SHARING`, defaults to `false`
+- `CALDAVER_SERVER_NAME`, defaults to `localhost`
+- `CALDAVER_TITLE`, defaults to `Caldaver`
+- `CALDAVER_FOOTER`, defaults to `Caldaver`
+- `CALDAVER_AUTH_USERNAME` and `CALDAVER_AUTH_PASSWORD`, set these to use a local Caldaver login instead of logging in directly with DAV server credentials
+- `CALDAVER_CALDAV_PUBLIC_URL`, defaults to `CALDAVER_CALDAV_SERVER`
+- `CALDAVER_CARDDAV_SERVER`, defaults to `CALDAVER_CALDAV_SERVER`
+- `CALDAVER_CALDAV_USERNAME` and `CALDAVER_CALDAV_PASSWORD`, service credentials used by Caldaver when local login is enabled
+- `CALDAVER_TIMEZONE`, defaults to `UTC`
+- `CALDAVER_LANG`, defaults to `en`
+- `CALDAVER_WEEKSTART`, defaults to `0`
+- `CALDAVER_CALENDAR_SHARING`, defaults to `false`
 
 Example:
 
 ```sh
 docker run -d --name caldaver \
   -p 8080:8080 \
-  -e AGENDAV_CALDAV_SERVER=https://baikal.example.com/cal.php \
-  -e AGENDAV_CSRF_SECRET="$(openssl rand -hex 32)" \
-  -e AGENDAV_DB_HOST=postgres.example.com \
-  -e AGENDAV_DB_NAME=agendav \
-  -e AGENDAV_DB_USER=agendav \
-  -e AGENDAV_DB_PASSWORD=change-this \
+  -e CALDAVER_CALDAV_SERVER=https://baikal.example.com/cal.php \
+  -e CALDAVER_CSRF_SECRET="$(openssl rand -hex 32)" \
+  -e CALDAVER_DB_HOST=postgres.example.com \
+  -e CALDAVER_DB_NAME=caldaver \
+  -e CALDAVER_DB_USER=caldaver \
+  -e CALDAVER_DB_PASSWORD=change-this \
   ghcr.io/caldaver-app/caldaver:latest
 ```
 
-## Source
+## Upstream Source
 
 https://github.com/agendav/agendav
 
@@ -96,25 +94,11 @@ https://spdx.org/licenses/GPL-3.0-or-later.html
 
 Docker packaging derived from `nagimov/agendav-docker` is additionally covered
 by Ruslan Nagimov's MIT license notice in
-[`LICENSES/NAGIMOV-AGENDAV-DOCKER-MIT.txt`](./LICENSES/NAGIMOV-AGENDAV-DOCKER-MIT.txt).
+[`LICENSES/NAGIMOV-CALDAVER-DOCKER-MIT.txt`](./LICENSES/NAGIMOV-CALDAVER-DOCKER-MIT.txt).
 
 ## Changelog
 
 See [CHANGELOG.md](./CHANGELOG.md)
-
-## Maintenance Mode
-
-AgenDAV is in maintenance mode currently. This means that the maintainers
-choose to prioritize stability and compatibility over new features for now.
-
-- There is no active development & new major features are not planned
-- New features may be added by PRs however
-  - New features may be proposed in issues tickets, send as Pull Requests,
-    and the maintainers will review and presumably merge them
-- *PRs for bugfixes are welcome* and will be reviewed & merged
-- PRs to keep the software compatible with new PHP versions or the like
-  are welcome and will be reviewed & merged
-- Critical security concerns will be addressed
 
 ## Contribution
 

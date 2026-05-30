@@ -18,15 +18,15 @@ $app->register(new TwigServiceProvider());
 $app->register(new SessionServiceProvider());
 $app->register(new DoctrineServiceProvider());
 $app->register(new MonologServiceProvider(), [
-    'monolog.name' => 'agendav',
+    'monolog.name' => 'caldaver',
 ]);
 
 $app->register(new AssetServiceProvider(), [
-    'assets.version' => 'v' . \AgenDAV\Version::V,
+    'assets.version' => 'v' . \Caldaver\Version::V,
     'assets.named_packages' => [
-        'css' => [ 'base_path' => '/dist/css', 'version' => \AgenDAV\Version::V ],
-        'js' => [ 'base_path' => '/dist/js', 'version' => \AgenDAV\Version::V ],
-        'img' => [ 'base_path' => '/img', 'version' => \AgenDAV\Version::V ],
+        'css' => [ 'base_path' => '/dist/css', 'version' => \Caldaver\Version::V ],
+        'js' => [ 'base_path' => '/dist/js', 'version' => \Caldaver\Version::V ],
+        'img' => [ 'base_path' => '/img', 'version' => \Caldaver\Version::V ],
     ],
 ]);
 
@@ -45,7 +45,7 @@ $app['twig'] = $app->extend('twig', function ($twig, $app) {
     $twig->addGlobal('scripts', $app['scripts']);
 
     // CSRF token
-    $twig->addGlobal('csrf_token', \AgenDAV\Csrf::getCurrentToken($app));
+    $twig->addGlobal('csrf_token', \Caldaver\Csrf::getCurrentToken($app));
 
     return $twig;
 });

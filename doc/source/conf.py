@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# AgenDAV documentation build configuration file, created by
+# Caldaver documentation build configuration file, created by
 # sphinx-quickstart on Mon Sep 12 13:51:17 2011.
 #
 # This file is execfile()d with the current directory set to its containing dir.
@@ -40,7 +40,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'AgenDAV'
+project = u'Caldaver'
 copyright = u'2011-2017, Jorge López Pérez'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -99,7 +99,7 @@ if not on_rtd:  # only import and set the theme if we're building docs locally
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = 'agendav_160px.png'
+html_logo = 'caldaver_160px.png'
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -153,7 +153,7 @@ html_show_sourcelink = False
 #html_file_suffix = None
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'AgenDAVdoc'
+htmlhelp_basename = 'Caldaverdoc'
 
 
 # -- Options for LaTeX output --------------------------------------------------
@@ -167,7 +167,7 @@ htmlhelp_basename = 'AgenDAVdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'AgenDAV.tex', u'AgenDAV Documentation',
+  ('index', 'Caldaver.tex', u'Caldaver Documentation',
    u'Jorge López Pérez', 'manual'),
 ]
 
@@ -200,7 +200,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    ('index', 'agendav', u'AgenDAV Documentation',
+    ('index', 'caldaver', u'Caldaver Documentation',
      [u'Jorge López Pérez'], 1)
 ]
 

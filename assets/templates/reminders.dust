@@ -16,4 +16,4 @@
 
 
 <hr>
-<p><small class="alert">{@i18n type="messages" name="info_reminders_agendav_support"/}</small></p>
+<p><small class="alert">{@i18n type="messages" name="info_reminders_caldaver_support"/}</small></p>
