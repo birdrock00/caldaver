@@ -1552,6 +1552,84 @@ body.caldaver-calendar-page {
   }
 }
 
+.mail-actions-menu {
+  position: relative;
+  display: inline-block;
+  margin: 6px 0 14px 8px;
+
+  summary {
+    display: inline-flex;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    color: #3c4043;
+    border-radius: 50%;
+    cursor: pointer;
+    list-style: none;
+
+    span {
+      display: none;
+    }
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &:hover,
+    &:focus {
+      background: #e8f0fe;
+      outline: 0;
+    }
+  }
+}
+
+.mail-actions-menu-list {
+  position: absolute;
+  top: 46px;
+  left: 0;
+  z-index: 1200;
+  min-width: 180px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(60, 64, 67, .2);
+
+  button {
+    display: flex;
+    width: 100%;
+    min-height: 40px;
+    align-items: center;
+    padding: 0 12px;
+    color: #3c4043;
+    background: transparent;
+    border: 0;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+
+    i {
+      width: 20px;
+      margin-right: 12px;
+      color: #5f6368;
+      text-align: center;
+    }
+
+    &:hover,
+    &:focus {
+      color: #001d35;
+      background: #c2e7ff;
+      outline: 0;
+
+      i {
+        color: #001d35;
+      }
+    }
+  }
+}
+
 .mail-accounts {
   display: grid;
   gap: 2px;
@@ -1764,6 +1842,8 @@ body.caldaver-calendar-page {
 }
 
 .mail-reader {
+  width: 100%;
+  min-width: 0;
   min-height: ~"calc(100% - 24px)";
   margin-top: 12px;
   overflow: auto;
@@ -1802,9 +1882,11 @@ body.caldaver-calendar-page {
 }
 
 .mail-reader-message {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 28px 48px 80px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 28px ~"clamp(16px, 3vw, 40px)" 80px;
 
   h1 {
     margin: 0 0 22px;
@@ -1849,8 +1931,10 @@ body.caldaver-calendar-page {
 }
 
 .mail-reader-message pre {
+  width: 100%;
+  box-sizing: border-box;
   min-height: 340px;
-  margin: 0 0 24px 56px;
+  margin: 0 0 24px;
   color: #202124;
   font-family: inherit;
   font-size: 14px;
@@ -1861,15 +1945,16 @@ body.caldaver-calendar-page {
 
 .mail-reader-html {
   display: block;
-  width: ~"calc(100% - 56px)";
+  width: 100%;
+  box-sizing: border-box;
   min-height: 340px;
-  margin: 0 0 24px 56px;
+  margin: 0 0 24px;
   background: #fff;
   border: 0;
 }
 
 .mail-reader-message .mail-attachments {
-  margin-left: 56px;
+  margin-left: 0;
 }
 
 .contact-dialog {
@@ -2222,6 +2307,10 @@ summary:focus-visible,
     border-radius: 24px;
   }
 
+  .mail-actions-menu {
+    margin: 0 0 10px;
+  }
+
   .mail-content {
     height: auto;
     padding: 0 12px 12px;
@@ -2262,17 +2351,10 @@ summary:focus-visible,
   }
 
   .mail-reader-message {
-    padding: 20px 18px 56px;
-  }
-
-  .mail-reader-message pre,
-  .mail-reader-message .mail-attachments,
-  .mail-reader-html {
-    margin-left: 0;
+    padding: 18px 12px 56px;
   }
 
   .mail-reader-html {
-    width: 100%;
     min-height: 280px;
     overflow: hidden;
   }

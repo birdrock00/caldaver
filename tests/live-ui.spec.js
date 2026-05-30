@@ -208,6 +208,11 @@ async function mockMailApi(page, options = {}) {
   });
 }
 
+async function openMailAccountDialog(page) {
+  await page.locator('.mail-actions-menu summary').click();
+  await page.locator('#mail_account_create').click();
+}
+
 async function mockCardsApi(page, count = 36) {
   const contacts = Array.from({ length: count }, (_, index) => ({
     full_name: `Mobile Contact ${String(index + 1).padStart(2, '0')}`,
@@ -959,7 +964,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
 
   await page.goto(`${baseURL}/mail`);
   await expect(page.locator('#mail_empty')).toBeVisible();
-  await page.locator('#mail_account_create').click();
+  await openMailAccountDialog(page);
   await expect(page.locator('#mail_account_dialog')).toBeVisible();
   await expect(page.locator('#mail_account_form input[name="imap_port"]')).toHaveValue('993');
   await expect(page.locator('#mail_account_form select[name="encryption"]')).toHaveValue('ssl');
@@ -975,7 +980,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await expect(page.locator('#mail_account_dialog')).toBeHidden();
   await expect(page.locator('.mail-account-tab[data-account-id="99"]')).toBeVisible();
   await expect(page.locator('#mail_account_title')).toHaveText('Test Inbox');
-  await page.locator('#mail_account_create').click();
+  await openMailAccountDialog(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Second Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('second@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap2.example.test');
@@ -1023,7 +1028,7 @@ test('mail add-account stalled backend response times out visibly', async ({ pag
   await page.evaluate(() => {
     window.CALDAVER_MAIL_REQUEST_TIMEOUT_MS = 250;
   });
-  await page.locator('#mail_account_create').click();
+  await openMailAccountDialog(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Slow Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('slow@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
@@ -1051,7 +1056,7 @@ test('mail add-account save failure stays visible in the dialog', async ({ page 
   });
 
   await page.goto(`${baseURL}/mail`);
-  await page.locator('#mail_account_create').click();
+  await openMailAccountDialog(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Bad Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('bad@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
@@ -1081,7 +1086,7 @@ test('mail add-account non-JSON auth failure shows a useful error', async ({ pag
   });
 
   await page.goto(`${baseURL}/mail`);
-  await page.locator('#mail_account_create').click();
+  await openMailAccountDialog(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Expired Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('expired@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
@@ -1108,7 +1113,7 @@ test('mail page can render without loading JavaScript using nojs option', async 
 
   await page.goto(`${baseURL}/mail?nojs=1`);
   await expect(page.locator('.mail-shell')).toBeVisible();
-  await expect(page.locator('#mail_account_create')).toBeVisible();
+  await expect(page.locator('.mail-actions-menu')).toBeVisible();
   expect(await page.locator('script[src*="/dist/js"], script[src*="/jssettings"]').count()).toBe(0);
   const noJsHtml = await page.content();
   expect(noJsHtml).not.toContain("document.addEventListener('DOMContentLoaded'");
@@ -1150,17 +1155,19 @@ test('mail layout keeps critical controls visible across desktop and mobile', as
     await page.goto(`${baseURL}/mail`);
     await expect(page.locator('#mail_rows .mail-row')).toHaveCount(1);
 
-    const create = await visibleBox(page, '#mail_account_create');
+    const actions = await visibleBox(page, '.mail-actions-menu summary');
     const accounts = await visibleBox(page, '#mail_accounts');
     const search = await visibleBox(page, '.mail-search');
     const panel = await visibleBox(page, '.mail-panel');
     const toolbar = await visibleBox(page, '.mail-toolbar');
     const row = await visibleBox(page, '.mail-row');
 
-    for (const box of [create, accounts, search, panel, toolbar, row]) {
+    for (const box of [actions, accounts, search, panel, toolbar, row]) {
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
       expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
     }
+
+    expect(actions.height).toBeLessThanOrEqual(44);
 
     if (viewport.width >= 900) {
       const sidebar = await visibleBox(page, '.mail-sidebar');
@@ -1176,7 +1183,9 @@ test('mail layout keeps critical controls visible across desktop and mobile', as
     await expect(page.locator('#mail_reader_message')).toBeVisible();
     const reader = await visibleBox(page, '.mail-reader');
     const subject = await visibleBox(page, '#mail_reader_subject');
+    const content = await visibleBox(page, '.mail-content');
     expect(reader.x + reader.width).toBeLessThanOrEqual(viewport.width + 1);
     expect(subject.x + subject.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(reader.width).toBeGreaterThanOrEqual(content.width - 1);
   }
 });

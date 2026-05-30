@@ -216,6 +216,30 @@ test('mobile shell CSS preserves tap targets, dialogs, safe areas, and focus rin
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-reader-html\s*\{[\s\S]*width:\s*100%;/);
 });
 
+test('mail reader content uses the full available read pane width', () => {
+  const less = read('assets/less/caldaver.less');
+  const reader = cssBlock(less, '.mail-reader');
+  const message = cssBlock(less, '.mail-reader-message');
+  const body = cssBlock(less, '.mail-reader-message pre');
+  const html = cssBlock(less, '.mail-reader-html');
+  const attachments = cssBlock(less, '.mail-reader-message .mail-attachments');
+
+  assert.match(reader, /width:\s*100%;/);
+  assert.match(reader, /min-width:\s*0;/);
+  assert.match(message, /width:\s*100%;/);
+  assert.match(message, /max-width:\s*none;/);
+  assert.match(message, /box-sizing:\s*border-box;/);
+  assert.match(message, /margin:\s*0;/);
+  assert.match(body, /width:\s*100%;/);
+  assert.match(body, /margin:\s*0 0 24px;/);
+  assert.match(html, /width:\s*100%;/);
+  assert.match(html, /margin:\s*0 0 24px;/);
+  assert.match(attachments, /margin-left:\s*0;/);
+  assert.doesNotMatch(message, /max-width:\s*1120px;/);
+  assert.doesNotMatch(body, /margin:\s*0 0 24px 56px;/);
+  assert.doesNotMatch(html, /calc\(100% - 56px\)/);
+});
+
 test('plain Fractal serializer keeps PHP 8 compatible method signatures', () => {
   const serializer = read('web/src/Data/Serializer/PlainSerializer.php');
 
@@ -389,6 +413,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(services, /\$app\['mail\.imap\.client'\]/);
   assert.match(appNav, /app\.url_generator\.generate\('mail'\)/);
   assert.match(mail, /id="mail_accounts"/);
+  assert.match(mail, /class="mail-actions-menu"/);
+  assert.match(mail, /id="mail_account_create"[\s\S]*labels\.addaccount/);
+  assert.doesNotMatch(mail, /id="mail_account_create" class="btn btn-default compose-button"/);
   assert.match(mail, /id="mail_account_form"/);
   assert.match(mail, /name="refresh_interval_minutes"/);
   assert.match(mail, /id="mail_account_error"/);
@@ -472,6 +499,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(validator, /dns_get_record/);
   assert.match(validator, /FILTER_FLAG_NO_PRIV_RANGE \| FILTER_FLAG_NO_RES_RANGE/);
   assert.match(less, /\.mail-account-tab/);
+  assert.match(less, /\.mail-actions-menu/);
+  assert.match(less, /\.mail-actions-menu-list/);
   assert.match(less, /\.mail-row/);
   assert.match(less, /\.mail-nav-spinner/);
   assert.match(less, /\.mail-attachment/);
