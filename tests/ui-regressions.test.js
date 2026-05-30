@@ -159,11 +159,61 @@ test('mobile calendar and contacts layouts are allowed to scroll', () => {
 });
 
 test('login form labels cannot overlap input fields under Bootstrap 5', () => {
+  const login = read('web/templates/login.html');
   const less = read('assets/less/caldaver.less');
 
+  assert.match(login, /<input id="user" name="user"[\s\S]*autocomplete="username"[\s\S]*enterkeyhint="next"/);
+  assert.match(login, /<input id="password" name="password"[\s\S]*autocomplete="current-password"[\s\S]*enterkeyhint="go"/);
   assert.match(less, /\.loginform\s*\{[\s\S]*grid-template-columns:\s*96px minmax\(0, 1fr\)/);
   assert.match(less, /\.loginform\s*\{[\s\S]*white-space:\s*nowrap/);
   assert.match(less, /\.form-horizontal \.col-sm-3,\n  \.form-horizontal \.col-sm-9/);
+  assert.match(less, /@media \(max-width:\s*600px\)[\s\S]*\.loginform \.form-horizontal \.form-group\s*\{[\s\S]*grid-template-columns:\s*1fr;/);
+  assert.match(less, /@media \(max-width:\s*600px\)[\s\S]*\.loginform \.form-horizontal \.control-label\s*\{[\s\S]*white-space:\s*normal;/);
+});
+
+test('preferences form is grouped for responsive scanning without changing posted field names', () => {
+  const preferences = read('web/templates/preferences.html');
+  const less = read('assets/less/caldaver.less');
+
+  assert.match(preferences, /<fieldset class="prefs-section">/);
+  assert.match(preferences, /<legend>\{% trans %\}labels\.generaloptions\{% endtrans %\}<\/legend>/);
+  assert.match(preferences, /<legend>\{% trans %\}labels\.calendars\{% endtrans %\}<\/legend>/);
+
+  for (const name of [
+    'language',
+    'date_format',
+    'time_format',
+    'weekstart',
+    'timezone',
+    'default_calendar',
+    'default_view',
+    'show_week_nb',
+    'show_now_indicator',
+    'disable_javascript',
+    'list_days'
+  ]) {
+    assert.match(preferences, new RegExp(`name="${name}"`), `${name} must remain in the submitted form`);
+  }
+
+  assert.match(preferences, /role="radiogroup" aria-labelledby="date_format_label"/);
+  assert.match(preferences, /id="disable_javascript_yes" type="radio" name="disable_javascript"/);
+  assert.match(less, /\.prefs-section\s*\{/);
+  assert.match(less, /\.prefs-radio-group \.radio-inline\s*\{[\s\S]*min-height:\s*36px;/);
+  assert.match(less, /@media \(max-width:\s*600px\)[\s\S]*#prefs_buttons\s*\{[\s\S]*flex-direction:\s*column;/);
+});
+
+test('mobile shell CSS preserves tap targets, dialogs, safe areas, and focus rings', () => {
+  const less = read('assets/less/caldaver.less');
+
+  assert.match(less, /:focus-visible[\s\S]*outline:\s*3px solid #1a73e8;/);
+  assert.match(less, /\.calendar-shell\s*\{[\s\S]*height:\s*~"calc\(100dvh - 64px\)";[\s\S]*env\(safe-area-inset-bottom\)/);
+  assert.match(less, /\.cards-shell\s*\{[\s\S]*height:\s*~"calc\(100dvh - 64px\)";/);
+  assert.match(less, /\.mail-shell\s*\{[\s\S]*height:\s*~"calc\(100dvh - 64px\)";/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.ui-dialog\s*\{[\s\S]*max-width:\s*~"calc\(100vw - 24px\)" !important;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.ui-dialog \.ui-dialog-content\s*\{[\s\S]*max-height:\s*~"calc\(100dvh - 140px\)" !important;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-accounts\s*\{[\s\S]*display:\s*flex;[\s\S]*overflow-x:\s*auto;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.contacts-view-switch\s*\{[\s\S]*min-height:\s*44px;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-reader-html\s*\{[\s\S]*width:\s*100%;/);
 });
 
 test('plain Fractal serializer keeps PHP 8 compatible method signatures', () => {
@@ -205,11 +255,18 @@ test('cards page renders list and card views without loading the calendar bundle
   assert.match(cards, /id="contacts_list"/);
   assert.match(cards, /id="contacts_cards"/);
   assert.match(cards, /data-view="cards"/);
+  assert.doesNotMatch(cards, /class="active" data-view="list"/);
   assert.match(cards, /id="contact_form"/);
   assert.match(cardsJs, /fetch\('\{\{ app\.url_generator\.generate\('cards\.list'\) \}\}'/);
   assert.match(cardsJs, /fetch\(event\.target\.action/);
   assert.match(cardsJs, /app\.url_generator\.generate\('cards\.delete'\)/);
   assert.match(cardsJs, /class="contact-delete/);
+  assert.match(cardsJs, /window\.matchMedia\('\(max-width: 900px\)'\)/);
+  assert.match(cardsJs, /function defaultContactView\(\)/);
+  assert.match(cardsJs, /setContactView\(defaultContactView\(\)\)/);
+  assert.match(cardsJs, /window\.confirm\('Delete '/);
+  assert.match(cardsJs, /button\.disabled = true/);
+  assert.match(cardsJs, /button\.disabled = false/);
   assert.doesNotMatch(cards, /parts\/bottom\.html/, 'cards page must not initialize FullCalendar app.js');
   assert.match(less, /\.contacts-card-grid/);
   assert.match(less, /\.contact-row/);
@@ -335,7 +392,9 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mail, /id="mail_account_form"/);
   assert.match(mail, /name="refresh_interval_minutes"/);
   assert.match(mail, /id="mail_account_error"/);
+  assert.match(mail, /id="mail_loading"/);
   assert.match(mail, /id="mail_no_messages"/);
+  assert.match(mail, /id="mail_no_messages"[\s\S]*labels\.nomessages/);
   assert.doesNotMatch(mail, /id="mail_message_detail"/);
   assert.match(mailMessage, /id="mail_reader"/);
   assert.match(mailMessage, /data-message-url/);
@@ -354,6 +413,11 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /setInterval/);
   assert.match(mailJs, /refresh_interval_seconds/);
   assert.match(mailJs, /setMailSyncing/);
+  assert.match(mailJs, /function setMailStatus\(status, message\)/);
+  assert.match(mailJs, /setMailStatus\(account \? 'loading' : 'ready', account \? 'Checking the IMAP server for mail\.\.\.' : ''\)/);
+  assert.match(mailJs, /setMailStatus\('syncing', 'Syncing with the IMAP server\.\.\.'\)/);
+  assert.match(mailJs, /scrollIntoView\(\{ block: 'start', behavior: 'smooth' \}\)/);
+  assert.match(mailJs, /window\.matchMedia\('\(max-width: 900px\)'\)/);
   assert.match(mailJs, /window\.location\.href/);
   assert.doesNotMatch(mailJs, /function loadMessage\(/);
   assert.match(mailMessage, /app\.url_generator\.generate\('mail\.message'\)/);
@@ -375,7 +439,7 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /data-testid="mail-attachments"/);
   assert.match(mailJs, /mail-attachment-download/);
   assert.match(mailJs, /messageRequestId/);
-  assert.match(mailJs, /mail_error'\)\.hidden = false/);
+  assert.match(mailJs, /setMailStatus\('error', error\.message\)/);
   assert.match(repository, /mail_accounts/);
   assert.match(repository, /mail_message_cache/);
   assert.match(repository, /html_body/);
