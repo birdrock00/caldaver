@@ -36,7 +36,9 @@ $controllers->get('/mail/accounts', '\AgenDAV\Controller\Mail::accountsAction')-
 $controllers->post('/mail/accounts/save', '\AgenDAV\Controller\Mail::saveAccountAction')->bind('mail.accounts.save');
 $controllers->get('/mail/read', '\AgenDAV\Controller\Mail::readAction')->bind('mail.read');
 $controllers->get('/mail/messages', '\AgenDAV\Controller\Mail::messagesAction')->bind('mail.messages');
+$controllers->get('/mail/messages/sync', '\AgenDAV\Controller\Mail::syncMessagesAction')->bind('mail.messages.sync');
 $controllers->get('/mail/message', '\AgenDAV\Controller\Mail::messageAction')->bind('mail.message');
+$controllers->post('/mail/message/unread', '\AgenDAV\Controller\Mail::markUnreadAction')->bind('mail.message.unread');
 $controllers->get('/mail/attachment', '\AgenDAV\Controller\Mail::attachmentAction')->bind('mail.attachment');
 
 $controllers->get('/preferences', '\AgenDAV\Controller\Preferences::indexAction')->bind('preferences');
