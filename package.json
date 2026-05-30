@@ -25,6 +25,7 @@
     "cap:sync": "cap sync android",
     "android:build": "npm run cap:sync && cd android && ./gradlew assembleDebug",
     "android:apk": "npm run android:build",
+    "android:adb-smoke": "scripts/android-adb-smoke.sh",
     "dist-clean": "rm -rf node_modules && rm -rf .git && rm -rf ansible",
     "dist": "npm run composer && npm run build:css && npm run build:js && npm run dist-clean"
   },
