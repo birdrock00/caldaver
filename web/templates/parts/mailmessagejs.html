@@ -13,14 +13,14 @@
     return (source.charAt(0) || '?').toUpperCase();
   }
 
-  function jsonFetch(url, fallbackMessage) {
-    return fetch(url, {
-      credentials: 'same-origin',
-      headers: {
-        Accept: 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    }).then(function(response) {
+  function jsonFetch(url, options, fallbackMessage) {
+    options = options || {};
+    options.headers = options.headers || {};
+    options.credentials = options.credentials || 'same-origin';
+    options.headers.Accept = 'application/json';
+    options.headers['X-Requested-With'] = 'XMLHttpRequest';
+
+    return fetch(url, options).then(function(response) {
       return response.text().then(function(body) {
         var payload = {};
         if (body) {
@@ -38,6 +38,18 @@
         return payload;
       });
     });
+  }
+
+  function formFetch(url, data, fallbackMessage) {
+    var form = new FormData();
+    Object.keys(data).forEach(function(key) {
+      form.append(key, data[key]);
+    });
+
+    return jsonFetch(url, {
+      method: 'POST',
+      body: form
+    }, fallbackMessage);
   }
 
   function renderAttachments(container, message, accountId, attachmentUrl) {
@@ -67,7 +79,7 @@
     $('#mail_reader_message').hidden = true;
     $('#mail_reader_loading').hidden = false;
 
-    jsonFetch(url, 'Unable to load message')
+    jsonFetch(url, {}, 'Unable to load message')
       .then(function(payload) {
         var message = payload.data || {};
         $('#mail_reader_subject').textContent = text(message.subject);
@@ -78,6 +90,7 @@
         renderAttachments($('#mail_reader_attachments'), message, accountId, reader.dataset.attachmentUrl);
         $('#mail_reader_loading').hidden = true;
         $('#mail_reader_message').hidden = false;
+        $('#mail_reader_unread').hidden = false;
       })
       .catch(function(error) {
         $('#mail_reader_loading').hidden = true;
@@ -86,8 +99,27 @@
       });
   }
 
+  function markUnread() {
+    var reader = $('#mail_reader');
+    $('#mail_reader_error').hidden = true;
+
+    return formFetch(reader.dataset.unreadUrl, {
+      _token: reader.dataset.csrfToken,
+      account_id: reader.dataset.accountId,
+      uid: reader.dataset.uid
+    }, 'Unable to mark message unread')
+      .then(function() {
+        $('#mail_reader_unread').hidden = true;
+      })
+      .catch(function(error) {
+        $('#mail_reader_error').textContent = error.message;
+        $('#mail_reader_error').hidden = false;
+      });
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     $('#mail_reader_refresh').addEventListener('click', loadMessage);
+    $('#mail_reader_unread').addEventListener('click', markUnread);
     loadMessage();
   });
 })();
