@@ -1,8 +1,4 @@
-{%if logo %}
-<div id="logo" class="block">
-  <img src="{{ asset(logo, 'img') }}" alt="Logo">
-</div>
-{% endif %}
+{% include 'parts/sidebrand.html' %}
 {% set active_section = 'calendar' %}
 {% include 'parts/appnav.html' %}
 <div id="shortcuts" class="block">
