@@ -457,7 +457,7 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
 
   await expect(menu).toBeVisible();
   await expect(brand).toBeVisible();
-  await expect(page.locator('.caldaver-brand-icon')).toBeHidden();
+  await expect(page.locator('.caldaver-brand-icon')).toHaveCount(0);
   await expect(prefs).toBeVisible();
   await expect(logout).toBeVisible();
   await expect(user).toBeVisible();
@@ -472,6 +472,38 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
 
   expect(boxes.every(Boolean)).toBe(true);
 
+  const centers = boxes.map(box => ({
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2
+  }));
+
+  expect(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y))).toBeLessThan(8);
+  expect(centers[0].x).toBeLessThan(centers[1].x);
+  expect(centers[1].x).toBeLessThan(centers[2].x);
+  expect(centers[2].x).toBeLessThan(centers[3].x);
+  expect(centers[3].x).toBeLessThan(centers[4].x);
+});
+
+test('very narrow mobile topbar keeps menu, logo, preferences, logout, and username on one row', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 740 });
+  await login(page);
+  await page.goto(`${baseURL}/preferences`);
+
+  const selectors = [
+    '.mobile-section-menu',
+    '.caldaver-brand-title',
+    '#usermenu .prefs',
+    '#usermenu .logout',
+    '#usermenu .user-pill'
+  ];
+  const boxes = [];
+
+  for (const selector of selectors) {
+    await expect(page.locator(selector)).toBeVisible();
+    boxes.push(await visibleBox(page, selector));
+  }
+
+  await expect(page.locator('.caldaver-brand-icon')).toHaveCount(0);
   const centers = boxes.map(box => ({
     x: box.x + box.width / 2,
     y: box.y + box.height / 2
@@ -508,7 +540,7 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
 
   await expect(page.locator('.caldaver-brand-title')).toHaveText('Caldaver');
   await expect(page.locator('.mobile-section-menu')).toBeVisible();
-  await expect(page.locator('.caldaver-brand-icon')).toBeHidden();
+  await expect(page.locator('.caldaver-brand-icon')).toHaveCount(0);
   await expect(page.locator('#usermenu .prefs')).toBeVisible();
   await expect(page.locator('#usermenu .user-pill')).toBeVisible();
   await expect(page.locator('#sidebar .app-nav')).toBeHidden();
@@ -709,6 +741,8 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await page.locator('#mail_rows .mail-row').first().click();
   await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=101/);
   await expect(page.locator('#mail_reader_unread')).toBeVisible();
+  await expect(page.getByRole('link', { name: /inbox/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /inbox/i })).toHaveCount(0);
   await Promise.all([
     page.waitForURL(/\/mail\?account_id=1&unread_uid=101/),
     page.locator('#mail_reader_unread').click()
@@ -859,6 +893,54 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
   await expect(htmlFrame.locator('img[alt="hero"]')).toBeVisible();
   await expect(htmlFrame.locator('script')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__messageScriptRan || false)).toBe(false);
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mark unread keeps the action visible while IMAP update is pending', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  let resolveUnread;
+
+  await mockMailApi(page, {
+    accounts: [{ id: 1, label: 'Unread Inbox', email_address: 'unread@example.test' }],
+    messagesByAccount: {
+      1: [{ uid: 601, from: 'Sender <sender@example.test>', subject: 'Read then unread', date: 'Fri, 29 May 2026 14:00:00 -0700', seen: true }]
+    },
+    messageDetails: {
+      601: {
+        uid: 601,
+        from: 'Sender <sender@example.test>',
+        subject: 'Read then unread',
+        date: 'Fri, 29 May 2026 14:00:00 -0700',
+        body: 'Mark unread pending body'
+      }
+    }
+  });
+
+  await page.route('**/mail/message/unread', async route => {
+    await new Promise(resolve => {
+      resolveUnread = resolve;
+    });
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: 'SUCCESS', data: { uid: 601, seen: false } })
+    });
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await page.locator('#mail_rows .mail-row').first().click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=601/);
+  await expect(page.locator('#mail_reader_unread')).toBeVisible();
+  await page.locator('#mail_reader_unread').click();
+  await expect(page.locator('#mail_reader_unread')).toBeVisible();
+  await expect.poll(() => Boolean(resolveUnread)).toBe(true);
+  resolveUnread();
+  await expect(page).toHaveURL(/\/mail\?account_id=1&unread_uid=601/);
+  await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/unread/);
+  await expect(page.locator('#mail_rows .mail-row').first()).toHaveClass(/highlighted-unread/);
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
