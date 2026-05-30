@@ -1,27 +1,27 @@
 <?php
 
-namespace AgenDAV;
+namespace Caldaver;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-use AgenDAV\Event\RecurrenceId;
+use Caldaver\Event\RecurrenceId;
 
 /**
  * This interface models an Event
@@ -65,7 +65,7 @@ interface Event
      *
      * @param \DateTimeInterface $start
      * @param \DateTimeInterface $end
-     * @return \AgenDAV\EventInstance[]
+     * @return \Caldaver\EventInstance[]
      */
     public function expand(\DateTimeInterface $start, \DateTimeInterface $end);
 
@@ -79,7 +79,7 @@ interface Event
     /**
      * Checks if a RECURRENCE-ID is an exception to the repeat rule or not
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      *
      * @return boolean
      */
@@ -88,7 +88,7 @@ interface Event
     /**
      * Checks if a RECURRENCE-ID is a removed instance from the recurrence
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      *
      * @return boolean
      */
@@ -107,7 +107,7 @@ interface Event
      *
      * If not, a clean event instance will be returned.
      *
-     * @return \AgenDAV\EventInstance
+     * @return \Caldaver\EventInstance
      * @throws \LogicException If current event has no UID assigned
      */
     public function createEventInstance();
@@ -120,10 +120,10 @@ interface Event
      * If the passed RECURRENCE-ID does not match any existing exceptions,
      * a new EventInstance will be created with RECURRENCE-ID set
      *
-     * @param \AgenDAV\Event\RecurrenceId|null $recurrence_id
-     * @return \AgenDAV\EventInstance|null
+     * @param \Caldaver\Event\RecurrenceId|null $recurrence_id
+     * @return \Caldaver\EventInstance|null
      * @throws \LogicException if this event is not recurrent and a $recurrence_id
-     * @throws \AgenDAV\Exception\NotFound if the instance was removed
+     * @throws \Caldaver\Exception\NotFound if the instance was removed
      * is specified
      */
 
@@ -134,7 +134,7 @@ interface Event
      * or it is but this is not an recurrence exception, it will get stored as the
      * "base" event instance
      *
-     * @param \AgenDAV\EventInstance $instance
+     * @param \Caldaver\EventInstance $instance
      * @throws \InvalidArgumentException If event instance UID does not match
      *                                   current event UID
      * @throws \LogicException If a recurrence exception is passed for a date
@@ -145,9 +145,9 @@ interface Event
     /**
      * Removes an event instance by its RECURRENCE-ID from this event
      *
-     * @param \AgenDAV\Event\RecurrenceId $recurrence_id
+     * @param \Caldaver\Event\RecurrenceId $recurrence_id
      * @throws \LogicException if this event is not recurrent
-     * @throws \AgenDAV\Exception\NotFound if the instance was already removed
+     * @throws \Caldaver\Exception\NotFound if the instance was already removed
      */
     public function removeInstance(RecurrenceId $recurrence_id);
 }

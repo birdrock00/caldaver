@@ -15,5 +15,5 @@ $app['twig.options'] = $twig_options;
 $app['monolog.level'] = 'DEBUG';
 
 $app['scripts'] = [
-    'agendav.js',
+    'caldaver.js',
 ];

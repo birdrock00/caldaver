@@ -3,11 +3,11 @@
 require __DIR__ . '/../web/vendor/autoload.php';
 
 $required = [
-    'AGENDAV_DB_HOST',
-    'AGENDAV_DB_PORT',
-    'AGENDAV_DB_NAME',
-    'AGENDAV_DB_USER',
-    'AGENDAV_DB_PASSWORD',
+    'CALDAVER_DB_HOST',
+    'CALDAVER_DB_PORT',
+    'CALDAVER_DB_NAME',
+    'CALDAVER_DB_USER',
+    'CALDAVER_DB_PASSWORD',
 ];
 
 foreach ($required as $name) {
@@ -19,12 +19,12 @@ foreach ($required as $name) {
 
 $dsn = sprintf(
     'pgsql:host=%s;port=%s;dbname=%s',
-    getenv('AGENDAV_DB_HOST'),
-    getenv('AGENDAV_DB_PORT'),
-    getenv('AGENDAV_DB_NAME')
+    getenv('CALDAVER_DB_HOST'),
+    getenv('CALDAVER_DB_PORT'),
+    getenv('CALDAVER_DB_NAME')
 );
 
-$pdo = new PDO($dsn, getenv('AGENDAV_DB_USER'), getenv('AGENDAV_DB_PASSWORD'), [
+$pdo = new PDO($dsn, getenv('CALDAVER_DB_USER'), getenv('CALDAVER_DB_PASSWORD'), [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
 ]);
 

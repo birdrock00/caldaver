@@ -3,26 +3,26 @@
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace AgenDAV\Repositories;
+namespace Caldaver\Repositories;
 
 use Doctrine\ORM\EntityManager;
-use AgenDAV\Data\Preferences;
+use Caldaver\Data\Preferences;
 
 
 class DoctrineOrmPreferencesRepository implements PreferencesRepository
@@ -72,9 +72,9 @@ class DoctrineOrmPreferencesRepository implements PreferencesRepository
      * Saves user preferences
      *
      * @param string $username User name
-     * @param \AgenDAV\Data\Preferences $preferences
+     * @param \Caldaver\Data\Preferences $preferences
      */
-    public function save($username, \AgenDAV\Data\Preferences $preferences)
+    public function save($username, \Caldaver\Data\Preferences $preferences)
     {
         $preferences->setUsername($username);
         $this->em->persist($preferences);

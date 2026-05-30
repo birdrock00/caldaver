@@ -3,25 +3,25 @@
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
  *
- *  This file is part of AgenDAV.
+ *  This file is part of Caldaver.
  *
- *  AgenDAV is free software: you can redistribute it and/or modify
+ *  Caldaver is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation, either version 3 of the License, or
  *  any later version.
  *
- *  AgenDAV is distributed in the hope that it will be useful,
+ *  Caldaver is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
  *  You should have received a copy of the GNU General Public License
- *  along with AgenDAV.  If not, see <http://www.gnu.org/licenses/>.
+ *  along with Caldaver.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace AgenDAV\Repositories;
+namespace Caldaver\Repositories;
 
-use AgenDAV\Data\Principal;
+use Caldaver\Data\Principal;
 
 
 /**
@@ -33,7 +33,7 @@ interface PrincipalsRepository
      * Returns a Principal object for a given URL
      *
      * @param string $url
-     * @return \AgenDAV\Data\Principal
+     * @return \Caldaver\Data\Principal
      */
     public function get($url);
 
@@ -41,7 +41,7 @@ interface PrincipalsRepository
      * Searchs a principal using a filter string
      *
      * @param string $filter
-     * @return \AgenDAV\Data\Principal[]
+     * @return \Caldaver\Data\Principal[]
      */
     public function search($filter);
 }
