@@ -9,6 +9,8 @@
   var mailStatus = 'loading';
   var mailStatusMessage = 'Loading cached mail...';
   var defaultRequestTimeoutMs = 20000;
+  var initialAccountId = null;
+  var highlightedUnreadUid = null;
 
   function $(selector) {
     return document.querySelector(selector);
@@ -27,6 +29,16 @@
     return messages.filter(function(message) {
       return [message.from, message.subject, message.date].join(' ').toLowerCase().indexOf(filter) !== -1;
     });
+  }
+
+  function readMailQuery() {
+    if (!window.URLSearchParams) {
+      return;
+    }
+
+    var params = new URLSearchParams(window.location.search || '');
+    initialAccountId = params.get('account_id');
+    highlightedUnreadUid = params.get('unread_uid');
   }
 
   function renderAccounts() {
@@ -56,7 +68,8 @@
 
     data.forEach(function(message) {
       var row = document.createElement('article');
-      row.className = 'mail-row' + (message.seen ? '' : ' unread');
+      row.className = 'mail-row' + (message.seen ? '' : ' unread') +
+        (highlightedUnreadUid !== null && String(message.uid) === String(highlightedUnreadUid) ? ' highlighted-unread' : '');
       row.tabIndex = 0;
       row.setAttribute('role', 'button');
       row.innerHTML = '<span class="mail-from"></span><span class="mail-subject"></span><span class="mail-date"></span><div class="mail-attachments" data-testid="mail-attachments"></div>';
@@ -81,6 +94,13 @@
       });
       rows.appendChild(row);
     });
+
+    var highlighted = rows.querySelector('.mail-row.highlighted-unread');
+    if (highlighted && narrowViewport()) {
+      window.requestAnimationFrame(function() {
+        highlighted.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    }
 
     renderMailStatus(data.length);
   }
@@ -256,7 +276,10 @@
     )
       .then(function(payload) {
         accounts = payload.data || [];
-        activeAccountId = activeAccountId || (accounts[0] && accounts[0].id);
+        var initialAccount = accounts.find(function(account) {
+          return initialAccountId !== null && String(account.id) === String(initialAccountId);
+        });
+        activeAccountId = activeAccountId || (initialAccount && initialAccount.id) || (accounts[0] && accounts[0].id);
         setMailStatus('ready');
         renderAccounts();
         if (activeAccountId) {
@@ -338,28 +361,9 @@
       });
   }
 
-  function openDialog() {
-    var actionsMenu = $('#mail_account_create').closest('details');
-    if (actionsMenu) {
-      actionsMenu.open = false;
-    }
-    $('#mail_account_form').reset();
-    $('#mail_account_form input[name="id"]').value = '';
-    $('#mail_account_error').hidden = true;
-    $('#mail_account_error').textContent = '';
-    $('#mail_account_dialog').hidden = false;
-    $('#mail_account_form input[name="label"]').focus();
-  }
-
-  function closeDialog() {
-    $('#mail_account_dialog').hidden = true;
-  }
-
   document.addEventListener('DOMContentLoaded', function() {
+    readMailQuery();
     setMailStatus('loading', 'Loading cached mail...');
-    $('#mail_account_create').addEventListener('click', openDialog);
-    $('#mail_account_cancel').addEventListener('click', closeDialog);
-    $('#mail_account_cancel_icon').addEventListener('click', closeDialog);
     $('#mail_refresh').addEventListener('click', function() {
       syncMessages(++messageRequestId);
     });
@@ -367,37 +371,6 @@
     $('#mail_nav_item').addEventListener('click', function(event) {
       event.preventDefault();
       syncMessages(++messageRequestId);
-    });
-
-    $('#mail_account_form').addEventListener('submit', function(event) {
-      event.preventDefault();
-      jsonFetch(
-        event.target.action,
-        {
-          method: 'POST',
-          body: new FormData(event.target)
-        },
-        'Unable to save mail account'
-      )
-        .then(function(payload) {
-          var index = accounts.findIndex(function(account) {
-            return account.id === payload.data.id;
-          });
-          if (index === -1) {
-            accounts.push(payload.data);
-          } else {
-            accounts[index] = payload.data;
-          }
-          activeAccountId = payload.data.id;
-          closeDialog();
-          $('#mail_account_error').hidden = true;
-          renderAccounts();
-          selectAccount(payload.data.id, true);
-        })
-        .catch(function(error) {
-          $('#mail_account_error').textContent = error.message;
-          $('#mail_account_error').hidden = false;
-        });
     });
 
     loadAccounts();
