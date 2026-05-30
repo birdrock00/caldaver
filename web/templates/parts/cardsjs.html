@@ -3,6 +3,7 @@
   var contacts = [];
   var view = 'list';
   var userSelectedView = false;
+  var contactsLoading = true;
   var colors = ['#3367d6', '#188038', '#9334e6', '#d93025', '#00897b', '#5f6368', '#c5221f', '#7b1fa2'];
 
   function $(selector) {
@@ -112,11 +113,12 @@
 
   function render() {
     var data = filteredContacts();
-    $('#contact_count').textContent = '(' + data.length + ')';
-    $('#contact_count_nav').textContent = contacts.length;
-    $('#contacts_empty').hidden = data.length > 0;
-    $('#contacts_list').hidden = view !== 'list';
-    $('#contacts_cards').hidden = view !== 'cards';
+    $('#contact_count').textContent = contactsLoading ? 'Loading...' : (data.length > 0 ? '(' + data.length + ')' : '');
+    $('#contact_count_nav').textContent = contactsLoading ? '...' : (contacts.length > 0 ? contacts.length : '');
+    $('#contacts_loading').hidden = !contactsLoading;
+    $('#contacts_empty').hidden = contactsLoading || data.length > 0;
+    $('#contacts_list').hidden = contactsLoading || view !== 'list';
+    $('#contacts_cards').hidden = contactsLoading || view !== 'cards';
 
     renderList(data);
     renderCards(data);
@@ -143,6 +145,9 @@
   }
 
   function loadContacts() {
+    contactsLoading = true;
+    render();
+
     return fetch('{{ app.url_generator.generate('cards.list') }}', {
       credentials: 'same-origin',
       headers: { 'Accept': 'application/json' }
@@ -155,9 +160,15 @@
       })
       .then(function(payload) {
         contacts = payload.data || [];
+        contactsLoading = false;
         render();
       })
       .catch(function(error) {
+        contactsLoading = false;
+        $('#contact_count').textContent = '';
+        $('#contact_count_nav').textContent = '';
+        $('#contacts_loading').hidden = true;
+        $('#contacts_empty').hidden = true;
         $('#contacts_rows').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
         $('#contacts_cards').innerHTML = '<div class="contacts-error">' + error.message + '</div>';
       });
