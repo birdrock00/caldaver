@@ -867,6 +867,33 @@ body.agendav-calendar-page {
 .loginform {
   border-radius: 16px;
   box-shadow: 0 1px 2px rgba(60, 64, 67, .3), 0 1px 3px 1px rgba(60, 64, 67, .15);
+
+  .form-horizontal .form-group {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr);
+    column-gap: 12px;
+    align-items: center;
+    margin-right: 0;
+    margin-left: 0;
+  }
+
+  .form-horizontal .control-label {
+    padding: 0;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .form-horizontal .col-sm-3,
+  .form-horizontal .col-sm-9 {
+    width: auto;
+    max-width: none;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .form-control {
+    min-width: 0;
+  }
 }
 
 /*
@@ -1695,6 +1722,15 @@ body.agendav-calendar-page {
   line-height: 1.6;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.mail-reader-html {
+  display: block;
+  width: ~"calc(100% - 56px)";
+  min-height: 340px;
+  margin: 0 0 24px 56px;
+  background: #fff;
+  border: 0;
 }
 
 .mail-reader-message .mail-attachments {

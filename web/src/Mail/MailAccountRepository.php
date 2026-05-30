@@ -122,7 +122,7 @@ class MailAccountRepository
     public function cachedMessages($owner, $accountId)
     {
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT cache.uid, cache.from_header, cache.subject, cache.date_header, cache.seen, cache.attachments, cache.body
+            'SELECT cache.uid, cache.from_header, cache.subject, cache.date_header, cache.seen, cache.attachments, cache.body, cache.html_body
              FROM mail_message_cache cache
              INNER JOIN mail_accounts account ON account.id = cache.account_id
              WHERE account.owner = ? AND cache.account_id = ?
@@ -136,7 +136,7 @@ class MailAccountRepository
     public function cachedMessage($owner, $accountId, $uid)
     {
         $row = $this->connection->fetchAssociative(
-            'SELECT cache.uid, cache.from_header, cache.subject, cache.date_header, cache.seen, cache.attachments, cache.body
+            'SELECT cache.uid, cache.from_header, cache.subject, cache.date_header, cache.seen, cache.attachments, cache.body, cache.html_body
              FROM mail_message_cache cache
              INNER JOIN mail_accounts account ON account.id = cache.account_id
              WHERE account.owner = ? AND cache.account_id = ? AND cache.uid = ?',
@@ -171,8 +171,8 @@ class MailAccountRepository
     public function cacheMessage($owner, $accountId, array $message)
     {
         $this->connection->executeStatement(
-            'INSERT INTO mail_message_cache (owner, account_id, uid, position, from_header, subject, date_header, seen, attachments, body, updated_at)
-             VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            'INSERT INTO mail_message_cache (owner, account_id, uid, position, from_header, subject, date_header, seen, attachments, body, html_body, updated_at)
+             VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
              ON CONFLICT (account_id, uid)
              DO UPDATE SET from_header = EXCLUDED.from_header,
                            subject = EXCLUDED.subject,
@@ -180,6 +180,7 @@ class MailAccountRepository
                            seen = EXCLUDED.seen,
                            attachments = EXCLUDED.attachments,
                            body = EXCLUDED.body,
+                           html_body = EXCLUDED.html_body,
                            updated_at = CURRENT_TIMESTAMP',
             [
                 $owner,
@@ -191,6 +192,7 @@ class MailAccountRepository
                 !empty($message['seen']) ? 1 : 0,
                 json_encode($message['attachments'] ?? []),
                 $message['body'] ?? null,
+                $message['html_body'] ?? null,
             ]
         );
     }
@@ -248,8 +250,8 @@ class MailAccountRepository
     protected function insertCachedMessage($owner, $accountId, array $message, $position)
     {
         $this->connection->executeStatement(
-            'INSERT INTO mail_message_cache (owner, account_id, uid, position, from_header, subject, date_header, seen, attachments, body, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            'INSERT INTO mail_message_cache (owner, account_id, uid, position, from_header, subject, date_header, seen, attachments, body, html_body, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
             [
                 $owner,
                 $accountId,
@@ -261,6 +263,7 @@ class MailAccountRepository
                 !empty($message['seen']) ? 1 : 0,
                 json_encode($message['attachments'] ?? []),
                 $message['body'] ?? null,
+                $message['html_body'] ?? null,
             ]
         );
     }
@@ -278,6 +281,10 @@ class MailAccountRepository
 
         if ($includeBody || $row['body'] !== null) {
             $message['body'] = $row['body'] ?? '';
+        }
+
+        if ($includeBody || $row['html_body'] !== null) {
+            $message['html_body'] = $row['html_body'] ?? '';
         }
 
         return $message;
