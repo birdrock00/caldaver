@@ -38,10 +38,13 @@ td.fc-event-container, div.fc-event-container,
   margin: 5% auto;
   text-align: center;
   width: 430px;
+  max-width: ~"calc(100vw - 32px)";
+  box-sizing: border-box;
 }
 
 .loginerrors {
   width: 400px;
+  max-width: ~"calc(100vw - 32px)";
   margin: 5% auto 0 auto;
 }
 
@@ -108,7 +111,7 @@ div.panel-body .buttons {
     margin-top: 6px;
     margin-bottom: 6px;
 
-    i.cfg {
+    .cfg {
       display: none;
       position: absolute;
       right: 5px;
@@ -116,7 +119,7 @@ div.panel-body .buttons {
 
     span.text {
       font-size: 0.9em;
-      letter-spacing: -0.1em;
+      letter-spacing: 0;
     }
 
     span.icons {
@@ -128,9 +131,13 @@ div.panel-body .buttons {
       background-color: #f0f0f0;
       padding-right: 20px;
 
-      > i.cfg {
-        display: inline;
+      > .cfg {
+        display: inline-flex;
       }
+    }
+
+    &:focus-within > .cfg {
+      display: inline-flex;
     }
 
     &.default_calendar {
@@ -295,9 +302,12 @@ i.calendar_color {
 }
 
 .pseudobutton {
+  border: 0;
+  background: transparent;
   color: #8C8C8C;
   display: inline-block;
   padding: 2px;
+  border-radius: 4px;
   &:hover {
     color: #000;
     cursor: pointer;
@@ -317,8 +327,10 @@ i.calendar_color {
 }
 
 #prefs_buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
   margin-bottom: 10px;
-  float: right;
 }
 
 
@@ -341,6 +353,43 @@ span.table_title {
 
 div.preferences-container {
   max-width: 760px;
+}
+
+#prefs_form {
+  max-width: 760px;
+}
+
+.prefs-section {
+  margin: 0 0 24px;
+  padding: 18px 20px 8px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+}
+
+.prefs-section legend {
+  float: none;
+  width: auto;
+  margin: 0 0 12px;
+  padding: 0;
+  color: #202124;
+  border: 0;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.prefs-control-label,
+.prefs-section > .form-group > label {
+  display: block;
+  margin-bottom: 6px;
+  color: #3c4043;
+  font-weight: 500;
+}
+
+.prefs-radio-group .radio-inline {
+  min-height: 36px;
+  padding: 6px 12px 6px 0;
 }
 
 .nav-tabs {
@@ -647,7 +696,9 @@ body.caldaver-calendar-page {
 
 .calendar-shell {
   height: ~"calc(100vh - 64px)";
+  height: ~"calc(100dvh - 64px)";
   padding: 0;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 #wrapper.calendar-layout {
@@ -1123,7 +1174,9 @@ body.caldaver-calendar-page {
 .cards-shell {
   display: flex;
   height: ~"calc(100vh - 64px)";
+  height: ~"calc(100dvh - 64px)";
   padding: 0;
+  padding-bottom: env(safe-area-inset-bottom);
   background: #f8fafd;
 }
 
@@ -1463,7 +1516,9 @@ body.caldaver-calendar-page {
 .mail-shell {
   display: flex;
   height: ~"calc(100vh - 64px)";
+  height: ~"calc(100dvh - 64px)";
   padding: 0;
+  padding-bottom: env(safe-area-inset-bottom);
   background: #f6f8fc;
 }
 
@@ -1835,6 +1890,7 @@ body.caldaver-calendar-page {
   width: 92vw;
   max-width: 520px;
   max-height: 88vh;
+  max-height: 88dvh;
   overflow: auto;
   padding: 20px 24px 18px;
   background: #fff;
@@ -1902,6 +1958,36 @@ body.caldaver-calendar-page {
   margin-top: 18px;
 }
 
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible,
+.pseudobutton:focus-visible,
+.ui-button:focus-visible,
+.ui-dialog .ui-dialog-buttonpane button:focus-visible,
+#calendar_view .fc-button:focus-visible,
+#button-refresh:focus-visible,
+.caldaver-topbar.navbar .navbar-nav > li > a:focus-visible,
+.topbar-menu:focus-visible,
+.mobile-section-menu summary:focus-visible,
+.mobile-section-menu-list a:focus-visible,
+.app-nav-item:focus-visible,
+.contacts-view-switch button:focus-visible,
+.contact-delete:focus-visible,
+.contacts-actions button:focus-visible,
+.mail-account-tab:focus-visible,
+.mail-row:focus-visible,
+.mail-toolbar button:focus-visible,
+.mail-reader-toolbar a:focus-visible,
+.mail-reader-toolbar button:focus-visible {
+  outline: 3px solid #1a73e8;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 115, 232, .18);
+}
+
 @media (max-width: 900px) {
   body {
     overflow: auto;
@@ -1916,7 +2002,7 @@ body.caldaver-calendar-page {
 
     .container-fluid {
       min-height: 56px;
-      padding: 0 8px;
+      padding: 0 ~"calc(8px + env(safe-area-inset-right))" 0 ~"calc(8px + env(safe-area-inset-left))";
     }
 
     .navbar-brand {
@@ -1930,6 +2016,8 @@ body.caldaver-calendar-page {
       gap: 0;
 
       > li > a {
+        min-width: 44px;
+        height: 44px;
         padding: 8px;
       }
     }
@@ -1952,6 +2040,15 @@ body.caldaver-calendar-page {
 
   .mobile-section-menu {
     display: block;
+
+    summary {
+      width: 44px;
+      height: 44px;
+    }
+  }
+
+  .mobile-section-menu-list a {
+    min-height: 44px;
   }
 
   #usermenu .user-pill {
@@ -1969,6 +2066,7 @@ body.caldaver-calendar-page {
   .calendar-shell {
     height: auto;
     min-height: ~"calc(100vh - 56px)";
+    min-height: ~"calc(100dvh - 56px)";
   }
 
   #wrapper.calendar-layout {
@@ -2012,6 +2110,7 @@ body.caldaver-calendar-page {
     display: block;
     height: auto;
     min-height: ~"calc(100vh - 56px)";
+    min-height: ~"calc(100dvh - 56px)";
   }
 
   .cards-sidebar {
@@ -2039,6 +2138,11 @@ body.caldaver-calendar-page {
 
   .contacts-view-switch {
     margin: 12px 0 0;
+
+    button {
+      min-width: 72px;
+      min-height: 44px;
+    }
   }
 
   .contacts-panel {
@@ -2055,16 +2159,44 @@ body.caldaver-calendar-page {
     grid-template-columns: 1fr;
     row-gap: 4px;
     padding: 12px 20px;
+
+    > div {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
   }
 
   .contact-actions-cell {
     text-align: left;
   }
 
+  .contact-delete,
+  .contacts-actions button,
+  .contact-dialog-header button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .contacts-card-grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 16px 20px;
+  }
+
+  .contact-card {
+    min-height: 0;
+
+    h2,
+    p,
+    dd {
+      overflow-wrap: anywhere;
+    }
+  }
+
   .mail-shell {
     display: block;
     height: auto;
     min-height: ~"calc(100vh - 56px)";
+    min-height: ~"calc(100dvh - 56px)";
   }
 
   .mail-sidebar {
@@ -2073,6 +2205,21 @@ body.caldaver-calendar-page {
     height: auto;
     padding: 12px;
     overflow: visible;
+  }
+
+  .mail-accounts {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mail-account-tab {
+    flex: 0 0 auto;
+    min-width: 212px;
+    min-height: 48px;
+    border-radius: 24px;
   }
 
   .mail-content {
@@ -2091,8 +2238,15 @@ body.caldaver-calendar-page {
   .mail-row {
     grid-template-columns: 1fr;
     row-gap: 3px;
-    min-height: 64px;
+    min-height: 72px;
     padding: 8px 16px;
+  }
+
+  .mail-toolbar button,
+  .mail-reader-toolbar a,
+  .mail-reader-toolbar button {
+    width: 44px;
+    height: 44px;
   }
 
   .mail-date {
@@ -2112,8 +2266,15 @@ body.caldaver-calendar-page {
   }
 
   .mail-reader-message pre,
-  .mail-reader-message .mail-attachments {
+  .mail-reader-message .mail-attachments,
+  .mail-reader-html {
     margin-left: 0;
+  }
+
+  .mail-reader-html {
+    width: 100%;
+    min-height: 280px;
+    overflow: hidden;
   }
 
   #calendar_view .fc-toolbar {
@@ -2124,6 +2285,119 @@ body.caldaver-calendar-page {
   #calendar_view .fc-center,
   #calendar_view .fc-right {
     margin-left: 0;
+  }
+
+  #calendar_view .fc-button,
+  #button-refresh {
+    min-height: 44px;
+    line-height: 42px;
+  }
+
+  #calendar_view .fc-prev-button,
+  #calendar_view .fc-next-button {
+    width: 44px;
+  }
+
+  .pseudobutton {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .ui-dialog {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: ~"calc(100vw - 24px)" !important;
+    box-sizing: border-box;
+  }
+
+  .ui-dialog .ui-dialog-content {
+    max-height: ~"calc(100vh - 140px)" !important;
+    max-height: ~"calc(100dvh - 140px)" !important;
+    overflow: auto;
+  }
+
+  .view_event_details {
+    width: auto !important;
+    max-width: 100% !important;
+  }
+
+  .nav-tabs {
+    display: flex;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav-tabs > li {
+    float: none;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .loginform {
+    width: ~"calc(100vw - 24px)";
+    margin: 24px auto;
+    padding: 16px;
+  }
+
+  .loginerrors {
+    width: ~"calc(100vw - 24px)";
+    margin-top: 16px;
+  }
+
+  .loginform .form-horizontal .form-group {
+    grid-template-columns: 1fr;
+    row-gap: 6px;
+  }
+
+  .loginform .form-horizontal .control-label {
+    text-align: left;
+    white-space: normal;
+  }
+
+  .loginform input[type="submit"] {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .preferences-container {
+    max-width: none;
+  }
+
+  .prefs-section {
+    padding: 16px 14px 6px;
+  }
+
+  .prefs-section .form-control {
+    min-height: 44px;
+  }
+
+  .prefs-radio-group .radio-inline {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    margin-right: 0;
+    padding: 8px 0;
+  }
+
+  #prefs_buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  #prefs_buttons .btn,
+  #prefs_buttons input[type="submit"] {
+    width: 100%;
+    min-height: 44px;
   }
 }
 
