@@ -170,7 +170,9 @@
       uid: reader.dataset.uid
     }, 'Unable to mark message unread')
       .then(function() {
-        $('#mail_reader_unread').hidden = true;
+        window.location.href = reader.dataset.inboxUrl +
+          '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
+          '&unread_uid=' + encodeURIComponent(reader.dataset.uid);
       })
       .catch(function(error) {
         $('#mail_reader_error').textContent = error.message;
