@@ -69,10 +69,45 @@
     });
   }
 
+  function sanitizeHtml(html) {
+    var template = document.createElement('template');
+    template.innerHTML = html;
+    var blockedTags = ['script', 'iframe', 'object', 'embed', 'applet', 'meta', 'base', 'link'];
+
+    blockedTags.forEach(function(tagName) {
+      template.content.querySelectorAll(tagName).forEach(function(node) {
+        node.remove();
+      });
+    });
+
+    template.content.querySelectorAll('*').forEach(function(node) {
+      Array.prototype.slice.call(node.attributes).forEach(function(attribute) {
+        var name = attribute.name.toLowerCase();
+        var value = attribute.value || '';
+
+        if (name.indexOf('on') === 0) {
+          node.removeAttribute(attribute.name);
+          return;
+        }
+
+        if ((name === 'href' || name === 'src' || name === 'xlink:href') && /^\s*javascript:/i.test(value)) {
+          node.removeAttribute(attribute.name);
+          return;
+        }
+
+        if (name === 'style' && /(expression\s*\(|javascript\s*:)/i.test(value)) {
+          node.removeAttribute(attribute.name);
+        }
+      });
+    });
+
+    return template.innerHTML;
+  }
+
   function renderBody(message) {
     var htmlFrame = $('#mail_reader_html');
     var plainBody = $('#mail_reader_body');
-    var html = text(message.html_body);
+    var html = sanitizeHtml(text(message.html_body));
 
     if (html) {
       plainBody.hidden = true;
