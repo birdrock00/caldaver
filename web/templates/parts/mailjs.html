@@ -339,6 +339,10 @@
   }
 
   function openDialog() {
+    var actionsMenu = $('#mail_account_create').closest('details');
+    if (actionsMenu) {
+      actionsMenu.open = false;
+    }
     $('#mail_account_form').reset();
     $('#mail_account_form input[name="id"]').value = '';
     $('#mail_account_error').hidden = true;
