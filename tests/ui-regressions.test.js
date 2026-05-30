@@ -361,6 +361,7 @@ test('pages can be rendered without loading JavaScript via nojs query option and
   const mailController = read('web/src/Controller/Mail.php');
   const mail = read('web/templates/mail.html');
   const mailMessage = read('web/templates/mail_message.html');
+  const preferencesData = read('web/src/Data/Preferences.php');
 
   assert.match(layout, /app\.request\.query\.get\('nojs'\)/);
   assert.match(layout, /nojs_query != '1'/);
@@ -373,6 +374,8 @@ test('pages can be rendered without loading JavaScript via nojs query option and
   assert.match(settings, /\$app\['defaults\.disable_javascript'\] = false/);
   assert.match(preferences, /name="disable_javascript"/);
   assert.match(controller, /'disable_javascript' => \$input->get\('disable_javascript'\) == 'true'/);
+  assert.match(preferencesData, /@Column\(type="json"\)/);
+  assert.doesNotMatch(preferencesData, /json_array/);
   assert.match(mailController, /javascriptEnabled\(Request \$request, Application \$app\)/);
   assert.match(mailController, /in_array\(\$nojs, \['1', 'true', 'yes'\], true\)/);
   assert.match(mailController, /mail_javascript_enabled/);
