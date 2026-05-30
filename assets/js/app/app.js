@@ -20,7 +20,45 @@
 // Useful names
 var dustbase = {};
 var event_details_popup;
+var mobile_viewport_query = '(max-width: 900px)';
 
+var is_mobile_viewport = function is_mobile_viewport() {
+  if (window.matchMedia !== undefined) {
+    return window.matchMedia(mobile_viewport_query).matches;
+  }
+
+  return $(window).width() <= 900;
+};
+
+var calendar_header_for_viewport = function calendar_header_for_viewport() {
+  if (is_mobile_viewport()) {
+    return {
+      right: 'customizable_list,agendaDay agendaWeek,month',
+      center: 'title',
+      left: 'today prev,next'
+    };
+  }
+
+  return {
+    right: 'month,agendaWeek,agendaDay customizable_list',
+    center: 'title',
+    left: 'today prev,next'
+  };
+};
+
+var calendar_default_view_for_viewport = function calendar_default_view_for_viewport(fullcalendar_views) {
+  var preferred_view = fullcalendar_views[CaldaverUserPrefs.default_view];
+
+  if (!is_mobile_viewport()) {
+    return preferred_view;
+  }
+
+  if (preferred_view === 'customizable_list' || preferred_view === 'agendaDay') {
+    return preferred_view;
+  }
+
+  return 'customizable_list';
+};
 
 $(document).ready(function() {
   // translations is loaded in HTML body (TODO make it more elegant)
@@ -91,6 +129,8 @@ $(document).ready(function() {
     windowResize: function(view) {
       var new_height = calendar_height();
       $(this).fullCalendar('option', 'height', new_height);
+      $(this).fullCalendar('option', 'header', calendar_header_for_viewport());
+      add_refresh_button();
     },
     views: {
       customizable_list: {
@@ -99,14 +139,10 @@ $(document).ready(function() {
         listDayAltFormat: 'dddd'
       }
     },
-    header: {
-      right:   'month,agendaWeek,agendaDay customizable_list',
-      center: 'title',
-      left:  'today prev,next'
-    },
+    header: calendar_header_for_viewport(),
     navLinks: true,
 
-    defaultView: fullcalendar_views[CaldaverUserPrefs.default_view],
+    defaultView: calendar_default_view_for_viewport(fullcalendar_views),
     theme: true, // use jQuery UI themeing
     slotLabelFormat: CaldaverDateAndTime.fullCalendarFormat[CaldaverUserPrefs.time_format],
     slotMinutes: 30,
@@ -222,14 +258,7 @@ $(document).ready(function() {
 
 
   // Refresh link
-  $('<button id="button-refresh" class="btn btn-default">' +
-    '<i class="fa fa-refresh"></i> ' +
-    t('labels', 'refresh') + '</button>')
-    .appendTo('#calendar_view div.fc-right')
-    .on('click', function() {
-      update_calendar_list(true);
-    })
-    .before('<span class="fc-header-space">');
+  add_refresh_button();
 
   // Date picker above calendar
   render_template('datepicker_button', {}, function(out) {
@@ -267,20 +296,33 @@ $(document).ready(function() {
    *************************************************************/
 
   // Editing a calendar
-  $('div.calendar_list').on('click', 'i.cfg', function(e) {
+  $('div.calendar_list').on('click', '.cfg', function(e) {
     e.stopPropagation();
-    var calentry = $(this).parent();
+    var calentry = $(this).closest('li.available_calendar');
     calendar_modify_dialog($(calentry[0]).data());
   })
   .on('click', 'li.available_calendar', function(e) {
+    if ($(e.target).closest('.cfg').length > 0) {
+      return;
+    }
+
     // Make calendar hidden
     toggle_calendar($(this));
+  })
+  .on('keydown', '.calendar-toggle', function(e) {
+    if (e.keyCode !== $.ui.keyCode.ENTER && e.keyCode !== $.ui.keyCode.SPACE) {
+      return;
+    }
+
+    e.preventDefault();
+    toggle_calendar($(this).closest('li.available_calendar'));
   });
 
   // First time load: create calendar list
   update_calendar_list(true);
 
   $('#sidebar').on('click', '#toggle_all_shared_calendars', function(e) {
+    e.preventDefault();
     var shared_cals = $('#shared_calendar_list').find('ul').children();
     if ($(this).hasClass('hide_all')) {
       $.map(shared_cals, function(e, i) {
@@ -289,6 +331,7 @@ $(document).ready(function() {
       $(this)
         .removeClass('hide_all')
         .addClass('show_all')
+        .attr('aria-pressed', 'false')
         .find('i')
           .removeClass('fa-eye-slash')
           .addClass('fa-eye');
@@ -299,6 +342,7 @@ $(document).ready(function() {
       $(this)
         .removeClass('show_all')
         .addClass('hide_all')
+        .attr('aria-pressed', 'true')
         .find('i')
           .removeClass('fa-eye')
           .addClass('fa-eye-slash');
@@ -334,6 +378,8 @@ $(document).ready(function() {
 
     // Printing
     setup_print_tweaks();
+    setup_topbar_menu();
+    setup_android_back_behavior();
 
 });
 
@@ -344,6 +390,21 @@ $(document).ready(function() {
 var calendar_height = function calendar_height() {
   var offset = $('#calendar_view').offset();
   return $(window).height() - Math.ceil(offset.top) - 30;
+};
+
+var add_refresh_button = function add_refresh_button() {
+  if ($('#button-refresh').length > 0 || $('#calendar_view div.fc-right').length === 0) {
+    return;
+  }
+
+  $('<button id="button-refresh" class="btn btn-default">' +
+    '<i class="fa fa-refresh"></i> ' +
+    t('labels', 'refresh') + '</button>')
+    .appendTo('#calendar_view div.fc-right')
+    .on('click', function() {
+      update_calendar_list(true);
+    })
+    .before('<span class="fc-header-space">');
 };
 
 /**
@@ -498,6 +559,8 @@ var show_dialog = function show_dialog(params) {
   var divname = params.divname;
   var width = params.width;
   var pre_func = params.pre_func;
+  var dialog_width = mobile_safe_dialog_width(width);
+  var dialog_min_width = Math.min(dialog_width, 280);
 
   render_template(template, data, function(out) {
     $('body').append(out);
@@ -505,21 +568,49 @@ var show_dialog = function show_dialog(params) {
       autoOpen: true,
       buttons: buttons,
       title: title,
-      minWidth: width,
+      width: dialog_width,
+      minWidth: dialog_min_width,
       modal: true,
       open: function(event, ui) {
         if (pre_func !== undefined) {
           pre_func();
         }
         $('#' + divname).dialog('option', 'position', 'center');
+        $(this).dialog('widget').css({
+          maxWidth: 'calc(100vw - 24px)'
+        });
         var buttons = $(event.target).parent().find('.ui-dialog-buttonset').children();
         add_button_icons(buttons);
+        blur_mobile_dialog_input();
       },
       close: function(ev, ui) {
         $(this).remove();
       }
     });
   });
+};
+
+var mobile_safe_dialog_width = function mobile_safe_dialog_width(requested_width) {
+  var fallback_width = 400;
+  var min_usable_width = 280;
+  var viewport_width = $(window).width();
+  var max_width = Math.max(min_usable_width, viewport_width - 24);
+
+  return Math.min(requested_width || fallback_width, max_width);
+};
+
+var blur_mobile_dialog_input = function blur_mobile_dialog_input() {
+  if (!is_mobile_viewport()) {
+    return;
+  }
+
+  window.setTimeout(function() {
+    var active_element = document.activeElement;
+
+    if ($(active_element).is('input, textarea, select')) {
+      active_element.blur();
+    }
+  }, 0);
 };
 
 /**
@@ -696,7 +787,9 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     divname: 'event_edit_dialog',
     width: 550,
     pre_func: function() {
-      $('#event_edit_dialog').find('input.summary').focus();
+      if (!is_mobile_viewport()) {
+        $('#event_edit_dialog').find('input.summary').focus();
+      }
       handle_date_and_time('#event_edit_dialog', event);
       CaldaverRepeat.handleForm($('#tabs-recurrence'));
 
@@ -1704,15 +1797,21 @@ var event_delete = function event_delete(event_id) {
     return;
   }
 
-  // Non recurrent event. Just remove it
+  // Non recurrent event. Confirm before removing it.
   if (data.rrule === undefined) {
-    event_delete_proceed(data);
+    event_delete_confirm(data);
     return;
   }
 
   // This is a recurrent event. Ask user if he/she wants to remove
   // all instances or just this one
   event_delete_recurrent_dialog(data);
+};
+
+var event_delete_confirm = function event_delete_confirm(data) {
+  if (window.confirm(t('labels', 'deleteevent') + '?')) {
+    event_delete_proceed(data);
+  }
 };
 
 
@@ -1867,12 +1966,14 @@ var open_event_modify_recurrent_dialog = function open_event_modify_recurrent_di
 var show_calendar = function show_calendar(calendar_obj) {
   $('#calendar_view').fullCalendar('addEventSource', calendar_obj.data().eventsource);
   calendar_obj.removeClass('hidden_calendar');
+  calendar_obj.find('.calendar-toggle').attr('aria-pressed', 'true');
 };
 
 // Hides a calendar
 var hide_calendar = function hide_calendar(calendar_obj) {
   $('#calendar_view').fullCalendar('removeEventSource', calendar_obj.data().eventsource);
   calendar_obj.addClass('hidden_calendar');
+  calendar_obj.find('.calendar-toggle').attr('aria-pressed', 'false');
 };
 
 // Toggles calendar visibility
@@ -1931,6 +2032,114 @@ var setup_print_tweaks = function setup_print_tweaks() {
 
   window.onbeforeprint = beforePrint;
   window.onafterprint = afterPrint;
+};
+
+var setup_topbar_menu = function setup_topbar_menu() {
+  var $button = $('.topbar-menu');
+  var $sidebar = $('#sidebar');
+  var $mobile_section_menu = $('.mobile-section-menu');
+
+  if ($button.length === 0 || $sidebar.length === 0) {
+    return;
+  }
+
+  $button
+    .attr('aria-controls', 'sidebar')
+    .attr('aria-expanded', 'true')
+    .on('click', function(e) {
+      e.preventDefault();
+
+      if ($mobile_section_menu.is(':visible')) {
+        var mobile_menu_open = $mobile_section_menu.attr('open') !== undefined;
+        $mobile_section_menu.prop('open', !mobile_menu_open);
+        $button.attr('aria-expanded', String(!mobile_menu_open));
+        return;
+      }
+
+      set_sidebar_collapsed(!$('body').hasClass('caldaver-sidebar-collapsed'));
+    });
+
+  $(window).on('resize.topbarmenu', function() {
+    if (is_mobile_viewport()) {
+      set_sidebar_collapsed(false);
+    }
+  });
+};
+
+var set_sidebar_collapsed = function set_sidebar_collapsed(collapsed) {
+  $('#sidebar')
+    .toggle(!collapsed)
+    .attr('aria-hidden', String(collapsed));
+
+  $('body').toggleClass('caldaver-sidebar-collapsed', collapsed);
+  $('.topbar-menu').attr('aria-expanded', String(!collapsed));
+
+  if ($('#calendar_view').data('fullCalendar') !== undefined) {
+    $('#calendar_view').fullCalendar('render');
+  }
+};
+
+var close_open_overlay_or_menu = function close_open_overlay_or_menu() {
+  var $open_dialog = $('.ui-dialog-content:visible').last();
+
+  if ($open_dialog.length > 0) {
+    $open_dialog.dialog('close');
+    return true;
+  }
+
+  if ($('#ui-datepicker-div:visible').length > 0) {
+    $('#ui-datepicker-div').hide();
+    return true;
+  }
+
+  if (event_details_popup !== undefined &&
+      event_details_popup.rendered === true &&
+      event_details_popup.elements !== undefined &&
+      event_details_popup.elements.tooltip !== undefined &&
+      event_details_popup.elements.tooltip.is(':visible')) {
+    event_details_popup.hide();
+    return true;
+  }
+
+  if ($('.mobile-section-menu[open]').length > 0) {
+    $('.mobile-section-menu[open]').prop('open', false);
+    $('.topbar-menu').attr('aria-expanded', 'false');
+    return true;
+  }
+
+  return false;
+};
+
+var handle_android_back_button = function handle_android_back_button() {
+  if (close_open_overlay_or_menu()) {
+    return false;
+  }
+
+  if (window.history.length > 1) {
+    window.history.back();
+    return false;
+  }
+
+  if (window.Capacitor !== undefined &&
+      window.Capacitor.Plugins !== undefined &&
+      window.Capacitor.Plugins.App !== undefined &&
+      window.Capacitor.Plugins.App.exitApp !== undefined) {
+    window.Capacitor.Plugins.App.exitApp();
+  }
+
+  return false;
+};
+
+var setup_android_back_behavior = function setup_android_back_behavior() {
+  var app_plugin = window.Capacitor &&
+    window.Capacitor.Plugins &&
+    window.Capacitor.Plugins.App;
+
+  document.addEventListener('backbutton', handle_android_back_button, false);
+
+  if (app_plugin !== undefined && app_plugin.addListener !== undefined) {
+    app_plugin.addListener('backButton', handle_android_back_button);
+  }
 };
 
 // Get calendar list

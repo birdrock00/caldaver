@@ -23,13 +23,15 @@
     <input type="hidden" name="_token" value="{{ csrf_token.getValue() }}">
     <div class="form-group">
       <label class="col-sm-3 control-label" for="user">{% trans %}labels.username{% endtrans %}</label>
-      <div class="col-sm-9"><input name="user" class="form-control" type="text"
-        autofocus="autofocus" required></div>
+      <div class="col-sm-9"><input id="user" name="user" class="form-control" type="text"
+        autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text"
+        enterkeyhint="next" autofocus="autofocus" required></div>
     </div>
 
     <div class="form-group">
       <label class="col-sm-3 control-label" for="password">{% trans %}labels.password{% endtrans %}</label>
-      <div class="col-sm-9"><input name="password" class="form-control" type="password" required></div>
+      <div class="col-sm-9"><input id="password" name="password" class="form-control" type="password"
+        autocomplete="current-password" enterkeyhint="go" required></div>
     </div>
 
     <input name="login" value="{% trans %}labels.login{% endtrans %}" type="submit" class="btn btn-success">

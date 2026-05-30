@@ -60,6 +60,12 @@ async function waitForSelector(selector) {
   return element;
 }
 
+async function waitForExistingSelector(selector) {
+  const element = await $(selector);
+  await element.waitForExist();
+  return element;
+}
+
 async function clickText(selector, textPattern) {
   const clicked = await browser.execute((itemSelector, patternSource, patternFlags) => {
     const pattern = new RegExp(patternSource, patternFlags);
@@ -209,8 +215,23 @@ describe('Caldaver installed Android WebView', function () {
     await waitForSelector('#event_edit_dialog input.summary');
     await $('#event_edit_dialog input.summary').setValue(title);
 
-    const csrf = await $('#event_edit_form input[name="_token"]').getValue();
-    const calendar = await $('#event_edit_form select[name="calendar"]').getValue();
+    const formData = await browser.execute(() => {
+      const form = document.querySelector('#event_edit_form');
+      const token = form.querySelector('input[name="_token"]').value;
+      const select = form.querySelector('select[name="calendar"]');
+      const calendar = select.value ||
+        (Array.from(select.options).find(option => option.value) || {}).value ||
+        (document.querySelector('div.calendar_list li.available_calendar') || {}).dataset.calendarUrl;
+
+      if (calendar && select.value !== calendar) {
+        select.value = calendar;
+        window.jQuery(select).trigger('change');
+      }
+
+      return { token, calendar };
+    });
+
+    assert.ok(formData.calendar, 'Expected a writable calendar in the event form');
     await clickText('.ui-dialog-buttonset button', /^save$/i);
     await browser.waitUntil(async () => !(await exists('#event_edit_dialog')));
 
@@ -220,13 +241,13 @@ describe('Caldaver installed Android WebView', function () {
     end.setUTCDate(end.getUTCDate() + 7);
 
     try {
-      const events = await fetchJson(`/events?calendar=${encodeURIComponent(calendar)}&start=${isoDate(start)}&end=${isoDate(end)}&timezone=America%2FLos_Angeles`);
+      const events = await fetchJson(`/events?calendar=${encodeURIComponent(formData.calendar)}&start=${isoDate(start)}&end=${isoDate(end)}&timezone=America%2FLos_Angeles`);
       createdEvent = events.find(event => event.title === title);
       assert.ok(createdEvent, 'Created event should be returned by the event feed');
     } finally {
       if (createdEvent) {
         const body = new URLSearchParams({
-          _token: csrf,
+          _token: formData.token,
           calendar: createdEvent.calendar,
           uid: createdEvent.uid,
           href: createdEvent.href,
@@ -262,7 +283,7 @@ describe('Caldaver installed Android WebView', function () {
   it('creates and deletes a contact through the live CardDAV-backed app session', async function () {
     await login();
     await openPath('/cards');
-    await waitForSelector('#contact_form input[name="_token"]');
+    await waitForExistingSelector('#contact_form input[name="_token"]');
 
     const csrf = await $('#contact_form input[name="_token"]').getValue();
     const fullName = `Caldaver Android Contact ${Date.now()}`;
