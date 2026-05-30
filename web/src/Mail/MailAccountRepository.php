@@ -17,7 +17,7 @@ class MailAccountRepository
     public function findForOwner($owner)
     {
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT id, owner, label, email_address, imap_host, imap_port, encryption, username, created_at, updated_at
+            'SELECT id, owner, label, email_address, imap_host, imap_port, encryption, username, refresh_interval_seconds, created_at, updated_at
              FROM mail_accounts
              WHERE owner = ?
              ORDER BY label ASC, email_address ASC',
@@ -30,7 +30,7 @@ class MailAccountRepository
     public function findWithPassword($owner, $id)
     {
         $row = $this->connection->fetchAssociative(
-            'SELECT id, owner, label, email_address, imap_host, imap_port, encryption, username, password_encrypted, created_at, updated_at
+            'SELECT id, owner, label, email_address, imap_host, imap_port, encryption, username, password_encrypted, refresh_interval_seconds, created_at, updated_at
              FROM mail_accounts
              WHERE owner = ? AND id = ?',
             [$owner, $id]
@@ -53,6 +53,7 @@ class MailAccountRepository
         $encryption = in_array($input['encryption'] ?? 'ssl', ['ssl', 'tls', 'none'], true)
             ? $input['encryption']
             : 'ssl';
+        $refreshInterval = $this->refreshIntervalSeconds($input);
 
         if ($id === null) {
             $id = $this->matchingAccountId($owner, $input, $port, $encryption);
@@ -74,7 +75,7 @@ class MailAccountRepository
 
             $this->connection->executeStatement(
                 'UPDATE mail_accounts
-                 SET label = ?, email_address = ?, imap_host = ?, imap_port = ?, encryption = ?, username = ?, password_encrypted = ?, updated_at = CURRENT_TIMESTAMP
+                 SET label = ?, email_address = ?, imap_host = ?, imap_port = ?, encryption = ?, username = ?, password_encrypted = ?, refresh_interval_seconds = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE owner = ? AND id = ?',
                 [
                     $input['label'],
@@ -84,14 +85,15 @@ class MailAccountRepository
                     $encryption,
                     $input['username'],
                     $password,
+                    $refreshInterval,
                     $owner,
                     $id,
                 ]
             );
         } else {
             $id = (int)$this->connection->fetchOne(
-                'INSERT INTO mail_accounts (owner, label, email_address, imap_host, imap_port, encryption, username, password_encrypted, created_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                'INSERT INTO mail_accounts (owner, label, email_address, imap_host, imap_port, encryption, username, password_encrypted, refresh_interval_seconds, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                  RETURNING id',
                 [
                     $owner,
@@ -102,18 +104,103 @@ class MailAccountRepository
                     $encryption,
                     $input['username'],
                     $this->encrypt($input['password']),
+                    $refreshInterval,
                 ]
             );
         }
 
         $row = $this->connection->fetchAssociative(
-            'SELECT id, owner, label, email_address, imap_host, imap_port, encryption, username, created_at, updated_at
+            'SELECT id, owner, label, email_address, imap_host, imap_port, encryption, username, refresh_interval_seconds, created_at, updated_at
              FROM mail_accounts
              WHERE owner = ? AND id = ?',
             [$owner, $id]
         );
 
         return $row ? $this->publicAccount($row) : null;
+    }
+
+    public function cachedMessages($owner, $accountId)
+    {
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT cache.uid, cache.from_header, cache.subject, cache.date_header, cache.seen, cache.attachments, cache.body
+             FROM mail_message_cache cache
+             INNER JOIN mail_accounts account ON account.id = cache.account_id
+             WHERE account.owner = ? AND cache.account_id = ?
+             ORDER BY cache.position ASC, cache.uid DESC',
+            [$owner, $accountId]
+        );
+
+        return array_map([$this, 'cachedMessageRow'], $rows);
+    }
+
+    public function cachedMessage($owner, $accountId, $uid)
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT cache.uid, cache.from_header, cache.subject, cache.date_header, cache.seen, cache.attachments, cache.body
+             FROM mail_message_cache cache
+             INNER JOIN mail_accounts account ON account.id = cache.account_id
+             WHERE account.owner = ? AND cache.account_id = ? AND cache.uid = ?',
+            [$owner, $accountId, $uid]
+        );
+
+        return $row ? $this->cachedMessageRow($row, true) : null;
+    }
+
+    public function markCachedSeen($owner, $accountId, $uid, $seen)
+    {
+        $this->connection->executeStatement(
+            'UPDATE mail_message_cache
+             SET seen = ?, updated_at = CURRENT_TIMESTAMP
+             WHERE owner = ? AND account_id = ? AND uid = ?',
+            [!empty($seen) ? 1 : 0, $owner, $accountId, $uid]
+        );
+    }
+
+    public function replaceMessageCache($owner, $accountId, array $messages)
+    {
+        $this->connection->beginTransaction();
+        try {
+            $this->connection->executeStatement(
+                'DELETE FROM mail_message_cache WHERE owner = ? AND account_id = ?',
+                [$owner, $accountId]
+            );
+
+            foreach (array_values($messages) as $position => $message) {
+                $this->insertCachedMessage($owner, $accountId, $message, $position);
+            }
+
+            $this->connection->commit();
+        } catch (\Exception $exception) {
+            $this->connection->rollBack();
+            throw $exception;
+        }
+    }
+
+    public function cacheMessage($owner, $accountId, array $message)
+    {
+        $this->connection->executeStatement(
+            'INSERT INTO mail_message_cache (owner, account_id, uid, position, from_header, subject, date_header, seen, attachments, body, updated_at)
+             VALUES (?, ?, ?, 0, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+             ON CONFLICT (account_id, uid)
+             DO UPDATE SET from_header = EXCLUDED.from_header,
+                           subject = EXCLUDED.subject,
+                           date_header = EXCLUDED.date_header,
+                           seen = EXCLUDED.seen,
+                           attachments = EXCLUDED.attachments,
+                           body = EXCLUDED.body,
+                           updated_at = CURRENT_TIMESTAMP',
+            [
+                $owner,
+                $accountId,
+                (int)$message['uid'],
+                $message['from'] ?? '',
+                $message['subject'] ?? '',
+                $message['date'] ?? '',
+                !empty($message['seen']) ? 1 : 0,
+                json_encode($message['attachments'] ?? []),
+                $message['body'] ?? null,
+            ]
+        );
     }
 
     protected function matchingAccountId($owner, array $input, $port, $encryption)
@@ -150,7 +237,67 @@ class MailAccountRepository
             'imap_port' => (int)$row['imap_port'],
             'encryption' => $row['encryption'],
             'username' => $row['username'],
+            'refresh_interval_seconds' => isset($row['refresh_interval_seconds']) ? (int)$row['refresh_interval_seconds'] : 60,
         ];
+    }
+
+    protected function refreshIntervalSeconds(array $input)
+    {
+        if (isset($input['refresh_interval_seconds'])) {
+            $seconds = (int)$input['refresh_interval_seconds'];
+        } else {
+            $minutes = isset($input['refresh_interval_minutes']) ? (int)$input['refresh_interval_minutes'] : 1;
+            $seconds = $minutes * 60;
+        }
+
+        return max(60, min(86400, $seconds));
+    }
+
+    protected function insertCachedMessage($owner, $accountId, array $message, $position)
+    {
+        $this->connection->executeStatement(
+            'INSERT INTO mail_message_cache (owner, account_id, uid, position, from_header, subject, date_header, seen, attachments, body, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)',
+            [
+                $owner,
+                $accountId,
+                (int)$message['uid'],
+                (int)$position,
+                $message['from'] ?? '',
+                $message['subject'] ?? '',
+                $message['date'] ?? '',
+                !empty($message['seen']) ? 1 : 0,
+                json_encode($message['attachments'] ?? []),
+                $message['body'] ?? null,
+            ]
+        );
+    }
+
+    protected function cachedMessageRow(array $row, $includeBody = false)
+    {
+        $message = [
+            'uid' => (int)$row['uid'],
+            'from' => $row['from_header'],
+            'subject' => $row['subject'],
+            'date' => $row['date_header'],
+            'seen' => $this->booleanValue($row['seen']),
+            'attachments' => json_decode($row['attachments'] ?: '[]', true) ?: [],
+        ];
+
+        if ($includeBody || $row['body'] !== null) {
+            $message['body'] = $row['body'] ?? '';
+        }
+
+        return $message;
+    }
+
+    protected function booleanValue($value)
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return in_array(strtolower((string)$value), ['1', 't', 'true', 'yes'], true);
     }
 
     protected function encrypt($value)

@@ -62,11 +62,33 @@ CREATE TABLE IF NOT EXISTS mail_accounts (
     encryption VARCHAR(20) NOT NULL DEFAULT 'ssl',
     username VARCHAR(255) NOT NULL,
     password_encrypted TEXT NOT NULL,
+    refresh_interval_seconds INTEGER NOT NULL DEFAULT 60,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE mail_accounts
+    ADD COLUMN IF NOT EXISTS refresh_interval_seconds INTEGER NOT NULL DEFAULT 60;
+
 CREATE INDEX IF NOT EXISTS IDX_MAIL_ACCOUNTS_OWNER ON mail_accounts (owner);
+
+CREATE TABLE IF NOT EXISTS mail_message_cache (
+    id SERIAL PRIMARY KEY,
+    owner VARCHAR(255) NOT NULL,
+    account_id INTEGER NOT NULL,
+    uid INTEGER NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    from_header TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    date_header VARCHAR(255) NOT NULL,
+    seen BOOLEAN NOT NULL DEFAULT FALSE,
+    attachments TEXT NOT NULL,
+    body TEXT,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT UNIQ_MAIL_MESSAGE_CACHE_ACCOUNT_UID UNIQUE (account_id, uid)
+);
+
+CREATE INDEX IF NOT EXISTS IDX_MAIL_MESSAGE_CACHE_OWNER_ACCOUNT ON mail_message_cache (owner, account_id);
 
 CREATE TABLE IF NOT EXISTS sessions (
     sess_id VARCHAR(128) NOT NULL PRIMARY KEY,
