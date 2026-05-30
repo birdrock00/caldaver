@@ -9,9 +9,18 @@
   <aside class="mail-sidebar">
     {% include 'parts/sidebrand.html' %}
     {% include 'parts/appnav.html' %}
-    <button id="mail_account_create" class="btn btn-default compose-button">
-      <i class="fa fa-plus"></i> {% trans %}labels.addaccount{% endtrans %}
-    </button>
+    <details class="mail-actions-menu">
+      <summary aria-label="Mail actions" title="Mail actions">
+        <i class="fa fa-ellipsis-v"></i>
+        <span>{% trans %}labels.mail{% endtrans %}</span>
+      </summary>
+      <div class="mail-actions-menu-list">
+        <button id="mail_account_create" type="button">
+          <i class="fa fa-plus"></i>
+          <span>{% trans %}labels.addaccount{% endtrans %}</span>
+        </button>
+      </div>
+    </details>
     <nav id="mail_accounts" class="mail-accounts" aria-label="Mail accounts"></nav>
   </aside>
 
