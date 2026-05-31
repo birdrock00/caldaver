@@ -100,8 +100,13 @@ CREATE TABLE IF NOT EXISTS caldaver_local_contacts (
     PRIMARY KEY(owner, url)
 );
 
-ALTER TABLE mail_accounts ADD COLUMN IF NOT EXISTS password_secret TEXT NOT NULL DEFAULT '';
-ALTER TABLE mail_message_cache ADD COLUMN IF NOT EXISTS message JSONB;
+	ALTER TABLE mail_accounts ADD COLUMN IF NOT EXISTS password_secret TEXT NOT NULL DEFAULT '';
+	ALTER TABLE mail_message_cache ADD COLUMN IF NOT EXISTS message JSONB;
+	ALTER TABLE mail_accounts ALTER COLUMN id TYPE BIGINT;
+	ALTER TABLE mail_accounts ALTER COLUMN imap_port TYPE INTEGER;
+	ALTER TABLE mail_accounts ALTER COLUMN refresh_interval_seconds TYPE BIGINT;
+	ALTER TABLE mail_message_cache ALTER COLUMN account_id TYPE BIGINT;
+	ALTER TABLE mail_message_cache ALTER COLUMN uid TYPE BIGINT;
 
 DO $$
 BEGIN
@@ -345,7 +350,7 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             .get()
             .await?
             .query(
-                "SELECT id, label, email_address, imap_host, imap_port, encryption, username, password_secret, refresh_interval_seconds FROM mail_accounts WHERE owner = $1 ORDER BY id",
+	                "SELECT id::BIGINT AS id, label, email_address, imap_host, imap_port::INTEGER AS imap_port, encryption, username, password_secret, refresh_interval_seconds::BIGINT AS refresh_interval_seconds FROM mail_accounts WHERE owner = $1 ORDER BY id",
                 &[&owner],
             )
             .await?;
@@ -372,7 +377,7 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             .get()
             .await?
             .query_opt(
-                "SELECT id, label, email_address, imap_host, imap_port, encryption, username, password_secret, refresh_interval_seconds FROM mail_accounts WHERE owner = $1 AND id = $2",
+	                "SELECT id::BIGINT AS id, label, email_address, imap_host, imap_port::INTEGER AS imap_port, encryption, username, password_secret, refresh_interval_seconds::BIGINT AS refresh_interval_seconds FROM mail_accounts WHERE owner = $1 AND id = $2",
                 &[&owner, &id_i64],
             )
             .await?
@@ -397,7 +402,7 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             client
                 .query_opt(
                     r#"
-SELECT id FROM mail_accounts
+	SELECT id::BIGINT AS id FROM mail_accounts
 WHERE owner=$1 AND lower(email_address)=lower($2) AND imap_host=$3 AND imap_port=$4 AND encryption=$5
 ORDER BY id LIMIT 1
 "#,
@@ -421,7 +426,7 @@ ORDER BY id LIMIT 1
                     r#"
 INSERT INTO mail_accounts (owner, label, email_address, imap_host, imap_port, encryption, username, password_secret, refresh_interval_seconds)
 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-RETURNING id
+	RETURNING id::BIGINT AS id
 "#,
                     &[
                         &owner,
@@ -446,7 +451,7 @@ label=$3, email_address=$4, imap_host=$5, imap_port=$6, encryption=$7, username=
 password_secret = CASE WHEN $9 = '' THEN password_secret ELSE $9 END,
 refresh_interval_seconds=$10, updated_at=now()
 WHERE owner=$1 AND id=$2
-RETURNING id
+	RETURNING id::BIGINT AS id
 "#,
                     &[
                         &owner,
