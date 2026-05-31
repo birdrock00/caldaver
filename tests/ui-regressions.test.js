@@ -116,6 +116,8 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
 
   assert.match(navbar, /class="mobile-section-menu"/);
   assert.ok(navbar.indexOf('class="mobile-section-menu"') < navbar.indexOf('class="navbar-header"'));
+  assert.match(navbar, /class="mobile-calendar-menu"/);
+  assert.match(navbar, /class="mobile-calendar-menu-calendars"/);
   assert.doesNotMatch(navbar, /caldaver-brand-icon/);
   assert.doesNotMatch(navbar, /<a class="logout"/);
   assert.match(navbar, /<details class="user-menu-dropdown">[\s\S]*user-menu-logout/);
@@ -137,6 +139,7 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(mailJs, /syncMessages\(\+\+messageRequestId, \{ quiet: true \}\);/);
   assert.match(mailJs, /if \(changed\) \{\s*renderMessages\(\);/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mobile-section-menu\s*\{[\s\S]*display:\s*block;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.calendar-sidebar-section,[\s\S]*#sidebar #footer[\s\S]*display:\s*none;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.app-nav,[\s\S]*\.cards-sidebar \.app-nav,[\s\S]*\.mail-sidebar \.app-nav[\s\S]*display:\s*none;/);
   assert.match(less, /\.highlighted-unread/);
 });
