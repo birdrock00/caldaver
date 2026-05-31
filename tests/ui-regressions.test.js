@@ -103,7 +103,9 @@ test('Docker image runs the Rust backend without PHP or Apache', () => {
   assert.match(storage, /CREATE TABLE IF NOT EXISTS caldaver_sessions/);
   assert.match(storage, /CREATE TABLE IF NOT EXISTS mail_accounts/);
   assert.match(storage, /ALTER TABLE mail_accounts ALTER COLUMN id TYPE BIGINT/);
+  assert.match(storage, /ALTER TABLE mail_message_cache ALTER COLUMN message TYPE JSONB USING message::jsonb/);
   assert.match(storage, /SELECT id::BIGINT AS id/);
+  assert.match(storage, /SELECT message::JSONB AS message/);
 });
 
 test('frontend templates preserve mobile navigation and mail behavior', () => {
