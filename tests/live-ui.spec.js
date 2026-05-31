@@ -581,7 +581,7 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
   await expect(page.locator('#usermenu .prefs')).toBeVisible();
   await expect(page.locator('#usermenu .user-pill')).toBeVisible();
   await expect(page.locator('#sidebar .app-nav')).toBeHidden();
-  await expect(page.locator('#own_calendar_list')).toBeVisible();
+  await expect(page.locator('#own_calendar_list')).toBeHidden();
 
   const menuBox = await visibleBox(page, '.mobile-section-menu');
   const brand = await visibleBox(page, '.caldaver-brand-title');
@@ -598,7 +598,9 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
 
   const menu = page.locator('.mobile-section-menu');
   await menu.locator('summary').click();
-  await expect(menu.locator('a', { hasText: 'Calendar' })).toBeVisible();
+  await expect(menu.locator('.mobile-calendar-menu > summary', { hasText: 'Calendar' })).toBeVisible();
+  await menu.locator('.mobile-calendar-menu > summary').click();
+  await expect(menu.locator('.mobile-calendar-account').first()).toBeVisible();
   await expect(menu.locator('a', { hasText: 'Contacts' })).toBeVisible();
   await expect(menu.locator('a', { hasText: 'Mail' })).toBeVisible();
 

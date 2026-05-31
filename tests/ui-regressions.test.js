@@ -113,11 +113,14 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   const mailJs = read('web/templates/parts/mailjs.html');
   const mailMessageJs = read('web/templates/parts/mailmessagejs.html');
   const less = read('assets/less/caldaver.less');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
 
   assert.match(navbar, /class="mobile-section-menu"/);
   assert.ok(navbar.indexOf('class="mobile-section-menu"') < navbar.indexOf('class="navbar-header"'));
   assert.match(navbar, /class="mobile-calendar-menu"/);
   assert.match(navbar, /class="mobile-calendar-menu-calendars"/);
+  assert.match(server, /class="mobile-calendar-menu"/);
+  assert.match(server, /class="mobile-calendar-menu-calendars"/);
   assert.doesNotMatch(navbar, /caldaver-brand-icon/);
   assert.doesNotMatch(navbar, /<a class="logout"/);
   assert.match(navbar, /<details class="user-menu-dropdown">[\s\S]*user-menu-logout/);
