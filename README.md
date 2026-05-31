@@ -11,7 +11,7 @@ for calendars, contacts, preferences, and mail.
 
 ## What Changed In This Fork
 
-This fork has moved beyond the original PHP-only AgenDAV codebase:
+This fork has moved beyond the original AgenDAV codebase:
 
 - The backend has been migrated to Rust. The `caldaver-server` crate now serves
   the web app, static assets, sessions, CalDAV/CardDAV proxy behavior,
@@ -21,8 +21,8 @@ This fork has moved beyond the original PHP-only AgenDAV codebase:
   shares, and IMAP account validation.
 - PostgreSQL is now the runtime store for sessions, preferences, shares, mail
   accounts, and cached mail metadata.
-- The legacy PHP application, Composer runtime, bundled Ansible example, and
-  Apache/PHP Docker runtime have been removed from the active application path.
+- The legacy backend, dependency runtime, bundled Ansible example, and old
+  web-server Docker runtime have been removed from the active application path.
 - The Docker image now builds frontend assets, compiles the Rust server, and
   runs `caldaver-server` directly on port `8080`.
 - Capacitor Android support builds a Caldaver APK from the same web assets and
@@ -47,12 +47,11 @@ Caldaver requires:
 
 ## Documentation
 
-The original upstream documentation is available at:
-https://agendav.readthedocs.io/
+Current installation and configuration notes are in `doc/source/admin/`.
 
 ## Installation
 
-See the original upstream [installation guide](https://agendav.readthedocs.io/en/latest/admin/installation/)
+See [doc/source/admin/installation.rst](./doc/source/admin/installation.rst).
 
 ### Docker Image
 

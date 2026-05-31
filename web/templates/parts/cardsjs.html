@@ -4,6 +4,8 @@
   var view = 'list';
   var userSelectedView = false;
   var contactsLoading = true;
+  var lastContactCardTap = { card: null, at: 0 };
+  var contactCardDoubleTapMs = 550;
   var colors = ['#3367d6', '#188038', '#9334e6', '#d93025', '#00897b', '#5f6368', '#c5221f', '#7b1fa2'];
 
   function $(selector) {
@@ -12,6 +14,10 @@
 
   function text(value) {
     return value || '';
+  }
+
+  function formBody(formData) {
+    return new URLSearchParams(Array.from(formData.entries()));
   }
 
   function initials(contact) {
@@ -49,6 +55,97 @@
     return avatar;
   }
 
+  function capacitorPlugin(name) {
+    return window.Capacitor &&
+      window.Capacitor.Plugins &&
+      window.Capacitor.Plugins[name];
+  }
+
+  function capacitorPlatform() {
+    if (!window.Capacitor) {
+      return '';
+    }
+
+    if (typeof window.Capacitor.getPlatform === 'function') {
+      return window.Capacitor.getPlatform();
+    }
+
+    return window.Capacitor.platform || '';
+  }
+
+  function isInstalledAndroidApp() {
+    if (!window.Capacitor) {
+      return false;
+    }
+
+    if (typeof window.Capacitor.isNativePlatform === 'function' && !window.Capacitor.isNativePlatform()) {
+      return false;
+    }
+
+    return capacitorPlatform() === 'android';
+  }
+
+  function contactHasDialablePhone(contact) {
+    return text(contact.phone).trim().length > 0;
+  }
+
+  function telHref(phone) {
+    return 'tel:' + text(phone).trim().replace(/\s+/g, '');
+  }
+
+  function initiateContactCall(contact) {
+    window.open(telHref(contact.phone), '_self');
+  }
+
+  function confirmAndDialContact(contact) {
+    var dialog = capacitorPlugin('Dialog');
+
+    if (!isInstalledAndroidApp() || !contactHasDialablePhone(contact) || !dialog || typeof dialog.confirm !== 'function') {
+      return;
+    }
+
+    Promise.resolve(dialog.confirm({
+      title: 'Dial contact',
+      message: 'Dial ' + (contact.full_name || 'this contact') + ' at ' + text(contact.phone).trim() + '?',
+      okButtonTitle: 'Dial',
+      cancelButtonTitle: 'Cancel'
+    })).then(function(result) {
+      if (result && result.value === true) {
+        initiateContactCall(contact);
+      }
+    });
+  }
+
+  function isInteractiveContactCardTarget(target, card) {
+    return !!(target && target.closest && target.closest('button, a, input, select, textarea, label') && card.contains(target.closest('button, a, input, select, textarea, label')));
+  }
+
+  function handleContactCardTap(contact, card, event) {
+    if (view !== 'cards' || !isInstalledAndroidApp() || !contactHasDialablePhone(contact) || isInteractiveContactCardTarget(event.target, card)) {
+      return;
+    }
+
+    var now = event.timeStamp || Date.now();
+    if (lastContactCardTap.card === card && now - lastContactCardTap.at > 0 && now - lastContactCardTap.at <= contactCardDoubleTapMs) {
+      lastContactCardTap = { card: null, at: 0 };
+      event.preventDefault();
+      confirmAndDialContact(contact);
+      return;
+    }
+
+    lastContactCardTap = { card: card, at: now };
+  }
+
+  function handleContactCardDoubleClick(contact, card, event) {
+    if (view !== 'cards' || !isInstalledAndroidApp() || !contactHasDialablePhone(contact) || isInteractiveContactCardTarget(event.target, card)) {
+      return;
+    }
+
+    lastContactCardTap = { card: null, at: 0 };
+    event.preventDefault();
+    confirmAndDialContact(contact);
+  }
+
   function renderList(data) {
     var rows = $('#contacts_rows');
     rows.innerHTML = '';
@@ -58,13 +155,16 @@
       row.innerHTML =
         '<div class="contact-name-cell"><span class="contact-name"></span></div>' +
         '<div></div><div></div><div></div><div class="contact-labels"></div>' +
-        '<div class="contact-actions-cell"><button type="button" class="contact-delete" title="{{ 'labels.delete'|trans }}"><i class="fa fa-trash"></i></button></div>';
+        '<div class="contact-actions-cell"><button type="button" class="contact-edit" title="Edit"><i class="fa fa-pencil"></i></button><button type="button" class="contact-delete" title="{{ 'labels.delete'|trans }}"><i class="fa fa-trash"></i></button></div>';
       row.children[0].insertBefore(contactAvatar(contact), row.children[0].firstChild);
       row.querySelector('.contact-name').textContent = contact.full_name;
       row.children[1].textContent = text(contact.email);
       row.children[2].textContent = text(contact.phone);
       row.children[3].textContent = text(contact.company_line);
       row.children[4].textContent = (contact.labels || []).join(', ');
+      row.querySelector('.contact-edit').addEventListener('click', function() {
+        openDialog(contact);
+      });
       row.querySelector('.contact-delete').addEventListener('click', function(event) {
         deleteContact(contact, event.currentTarget);
       });
@@ -78,6 +178,12 @@
     data.forEach(function(contact) {
       var card = document.createElement('article');
       card.className = 'contact-card';
+      card.addEventListener('touchend', function(event) {
+        handleContactCardTap(contact, card, event);
+      });
+      card.addEventListener('dblclick', function(event) {
+        handleContactCardDoubleClick(contact, card, event);
+      });
       card.appendChild(contactAvatar(contact));
 
       var name = document.createElement('h2');
@@ -97,6 +203,16 @@
       detail.children[3].textContent = text(contact.phone);
       detail.children[5].textContent = text(contact.company_line);
       card.appendChild(detail);
+
+      var editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.className = 'contact-edit card-edit';
+      editButton.title = 'Edit';
+      editButton.innerHTML = '<i class="fa fa-pencil"></i>';
+      editButton.addEventListener('click', function() {
+        openDialog(contact);
+      });
+      card.appendChild(editButton);
 
       var deleteButton = document.createElement('button');
       deleteButton.type = 'button';
@@ -195,8 +311,11 @@
     fetch('{{ app.url_generator.generate('cards.delete') }}', {
       method: 'POST',
       credentials: 'same-origin',
-      headers: { 'Accept': 'application/json' },
-      body: formData
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+      },
+      body: formBody(formData)
     })
       .then(function(response) {
         if (!response.ok) {
@@ -219,10 +338,21 @@
       });
   }
 
-  function openDialog() {
-    $('#contact_form').reset();
+  function openDialog(contact) {
+    var form = $('#contact_form');
+    form.reset();
+    form.action = contact && contact.url ? '{{ app.url_generator.generate('cards.update') }}' : '{{ app.url_generator.generate('cards.save') }}';
+    form.elements.url.value = contact && contact.url ? contact.url : '';
+    form.elements.etag.value = contact && contact.etag ? contact.etag : '';
+    form.elements.uid.value = contact && contact.uid ? contact.uid : '';
+    form.elements.full_name.value = contact && contact.full_name ? contact.full_name : '';
+    form.elements.email.value = contact && contact.email ? contact.email : '';
+    form.elements.phone.value = contact && contact.phone ? contact.phone : '';
+    form.elements.organization.value = contact && contact.organization ? contact.organization : '';
+    form.elements.job_title.value = contact && contact.job_title ? contact.job_title : '';
+    $('#contact_dialog_title').textContent = contact && contact.url ? 'Edit contact' : 'Create contact';
     $('#contact_dialog').hidden = false;
-    $('#contact_form input[name="full_name"]').focus();
+    form.elements.full_name.focus();
   }
 
   function closeDialog() {
@@ -262,8 +392,11 @@
       fetch(event.target.action, {
         method: 'POST',
         credentials: 'same-origin',
-        headers: { 'Accept': 'application/json' },
-        body: new FormData(event.target)
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body: formBody(new FormData(event.target))
       })
         .then(function(response) {
           if (!response.ok) {
@@ -272,7 +405,17 @@
           return response.json();
         })
         .then(function(payload) {
-          contacts.push(payload.data);
+          var updated = false;
+          contacts = contacts.map(function(contact) {
+            if (payload.data && contact.url === payload.data.url) {
+              updated = true;
+              return payload.data;
+            }
+            return contact;
+          });
+          if (!updated && payload.data) {
+            contacts.push(payload.data);
+          }
           contacts.sort(function(a, b) {
             return text(a.full_name).localeCompare(text(b.full_name));
           });
