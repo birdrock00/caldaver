@@ -1,14 +1,10 @@
 Translating Caldaver
 ===================
 
-Caldaver translation system is based on labels which get translated into
-full sentences/paragraphs. They can contain placeholders which get replaced
-by the system depending on the context.
+Caldaver translation strings live with the web assets. Labels can contain
+placeholders which get replaced by the system depending on the context.
 
 How to add a translation
 ------------------------
-Access `Caldaver project in Transifex
-<https://www.transifex.com/caldaver-app/caldaver/>`_ and use the
-*Create language_* to add the missing language. You'll have to wait 
-until I approve the request. Once you have it created, you'll be able 
-to use Transifex interface to translate Caldaver strings.
+Update the relevant template or JavaScript asset, then rebuild the frontend
+with ``npm run build``.
