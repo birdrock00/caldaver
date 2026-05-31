@@ -19,10 +19,10 @@ $app['scripts'] = [
 // Session parameters
 $app['session.storage.options'] = [
     'name' => 'caldaver_sess',
-    // You should not change cookie_lifetime. Change 'gc_divisor', 'gc_maxlifetime' and other
-    // session related settings (http://php.net/session.configuration)
-    'cookie_lifetime' => 0,
+    'cookie_lifetime' => 30 * 24 * 60 * 60,
+    'gc_maxlifetime' => 30 * 24 * 60 * 60,
     'cookie_httponly' => true,
+    'cookie_samesite' => 'Lax',
 ];
 
 // Languages

@@ -1,8 +1,11 @@
 const assert = require('assert/strict');
+const fs = require('fs');
+const path = require('path');
 
 const baseURL = process.env.CALDAVER_BASE_URL || 'https://caldaver.example.test';
 const username = process.env.CALDAVER_USERNAME;
 const password = process.env.CALDAVER_PASSWORD;
+const repoRoot = path.resolve(__dirname, '../../..');
 
 function absoluteURL(path) {
   return new URL(path, baseURL).toString();
@@ -169,6 +172,12 @@ async function visibleLinkTextIn(selector, linkText) {
         link.getClientRects().length > 0;
     });
   }, selector, linkText);
+}
+
+function mailMessageScriptSource() {
+  return fs.readFileSync(path.join(repoRoot, 'web/templates/parts/mailmessagejs.html'), 'utf8')
+    .replace(/^\s*<script>\s*/, '')
+    .replace(/\s*<\/script>\s*$/, '');
 }
 
 describe('Caldaver installed Android WebView', function () {
@@ -363,20 +372,24 @@ describe('Caldaver installed Android WebView', function () {
     const menu = await getBox('.mobile-section-menu');
     const brand = await getBox('.caldaver-brand-title');
     const prefs = await getBox('#usermenu .prefs');
-    const logout = await getBox('#usermenu .logout');
     const user = await getBox('#usermenu .user-pill');
-    const centers = [menu, brand, prefs, logout, user].map(box => ({
+    const centers = [menu, brand, prefs, user].map(box => ({
       x: box.x + box.width / 2,
       y: box.y + box.height / 2
     }));
     const dateIconRemoved = await browser.execute(() => document.querySelector('.caldaver-brand-icon') === null);
+    const standaloneLogoutRemoved = await browser.execute(() => document.querySelector('#usermenu > li > a.logout') === null);
 
     assert.ok(Math.max(...centers.map(center => center.y)) - Math.min(...centers.map(center => center.y)) < 10);
     assert.ok(centers[0].x < centers[1].x);
     assert.ok(centers[1].x < centers[2].x);
     assert.ok(centers[2].x < centers[3].x);
-    assert.ok(centers[3].x < centers[4].x);
     assert.equal(dateIconRemoved, true, 'Mobile topbar should not render the date icon');
+    assert.equal(standaloneLogoutRemoved, true, 'Mobile topbar should not render a standalone logout icon');
+
+    await $('#usermenu .user-pill').click();
+    await waitForSelector('#usermenu .user-menu-logout');
+    await $('#usermenu .user-pill').click();
     await waitForSelector('#mail_account_create');
     await $('#mail_account_create').click();
     await waitForSelector('#mail_account_dialog');
@@ -485,5 +498,125 @@ describe('Caldaver installed Android WebView', function () {
 
     assert.ok(state.eventSources > 0, 'Calendar should have at least one event source');
     assert.equal(/error loading events/i.test(state.errors.join(' ')), false, state.errors.join(' '));
+  });
+});
+
+describe('Caldaver Android WebView mail reader gestures', function () {
+  beforeEach(async function () {
+    await switchToWebView();
+    await waitForDocument();
+  });
+
+  it('navigates newer and older messages with horizontal swipes', async function () {
+    const scriptSource = mailMessageScriptSource();
+
+    await browser.execute(source => {
+      document.open();
+      document.write(`<!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              #mail_reader_message { display: block; min-height: 420px; padding: 24px; }
+              [hidden] { display: none !important; }
+            </style>
+          </head>
+          <body>
+            <section
+              id="mail_reader"
+              data-account-id="1"
+              data-uid="802"
+              data-message-url="/mail/message"
+              data-messages-url="/mail/messages"
+              data-read-url="#mail-read"
+              data-unread-url="/mail/message/unread"
+              data-inbox-url="/mail"
+              data-attachment-url="/mail/attachment"
+              data-csrf-token="token">
+              <button type="button" id="mail_reader_refresh"></button>
+              <button type="button" id="mail_reader_unread" hidden></button>
+              <div id="mail_reader_error" hidden></div>
+              <article id="mail_reader_message" hidden>
+                <h1 id="mail_reader_subject"></h1>
+                <strong id="mail_reader_from"></strong>
+                <span id="mail_reader_date"></span>
+                <div class="mail-reader-avatar"></div>
+                <pre id="mail_reader_body"></pre>
+                <iframe id="mail_reader_html" hidden></iframe>
+                <div id="mail_reader_attachments"></div>
+              </article>
+              <div id="mail_reader_loading"></div>
+            </section>
+          </body>
+        </html>`);
+      document.close();
+
+      const inbox = [
+        { uid: 801, from: 'Newest', subject: 'Newer message', date: 'now' },
+        { uid: 802, from: 'Current', subject: 'Current message', date: 'earlier' },
+        { uid: 803, from: 'Older', subject: 'Older message', date: 'oldest' }
+      ];
+      const details = {
+        801: { uid: 801, from: 'Newest', subject: 'Newer message', date: 'now', body: 'Newer body' },
+        802: { uid: 802, from: 'Current', subject: 'Current message', date: 'earlier', body: 'Current body' },
+        803: { uid: 803, from: 'Older', subject: 'Older message', date: 'oldest', body: 'Older body' }
+      };
+      window.fetch = url => {
+        const requestUrl = String(url);
+        const payload = requestUrl.indexOf('/mail/messages') !== -1
+          ? { data: inbox }
+          : { data: details[new URL(requestUrl, window.location.href).searchParams.get('uid')] };
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve(JSON.stringify(payload))
+        });
+      };
+      window.matchMedia = () => ({ matches: true });
+      window.CALDAVER_MAIL_NAVIGATE = url => {
+        window.__mailNavigationTarget = url;
+      };
+
+      const script = document.createElement('script');
+      script.textContent = source;
+      document.body.appendChild(script);
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+    }, scriptSource);
+
+    await waitForSelector('#mail_reader_message');
+
+    async function swipe(fromX, toX) {
+      await browser.execute((startX, endX) => {
+        const element = document.querySelector('#mail_reader_message');
+        const mouseOptions = clientX => ({
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          buttons: 1,
+          clientX,
+          clientY: 220
+        });
+        element.dispatchEvent(new MouseEvent('mousedown', mouseOptions(startX)));
+        element.dispatchEvent(new MouseEvent('mouseup', mouseOptions(endX)));
+      }, fromX, toX);
+    }
+
+    await swipe(60, 320);
+    await browser.waitUntil(async () => {
+      return browser.execute(() => (window.__mailNavigationTarget || '').indexOf('uid=801') !== -1);
+    }, { timeoutMsg: 'Right swipe did not navigate to the newer message' });
+
+    await browser.execute(source => {
+      document.querySelector('#mail_reader').dataset.uid = '802';
+      window.__mailNavigationTarget = '';
+      const script = document.createElement('script');
+      script.textContent = source;
+      document.body.appendChild(script);
+      document.dispatchEvent(new Event('DOMContentLoaded'));
+    }, scriptSource);
+    await waitForSelector('#mail_reader_message');
+    await swipe(320, 60);
+    await browser.waitUntil(async () => {
+      return browser.execute(() => (window.__mailNavigationTarget || '').indexOf('uid=803') !== -1);
+    }, { timeoutMsg: 'Left swipe did not navigate to the older message' });
   });
 });
