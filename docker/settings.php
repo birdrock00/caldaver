@@ -20,6 +20,11 @@ $app['csrf.secret'] = 'CALDAVER_CSRF_SECRET';
 $app['log.path'] = 'CALDAVER_LOG_DIR';
 $app['log.level'] = 'INFO';
 
+$app['session.storage.options'] = array_replace($app['session.storage.options'], [
+    'cookie_lifetime' => CALDAVER_SESSION_LIFETIME,
+    'gc_maxlifetime' => CALDAVER_SESSION_LIFETIME,
+]);
+
 $app['auth.local.username'] = 'CALDAVER_AUTH_USERNAME';
 $app['auth.local.password'] = 'CALDAVER_AUTH_PASSWORD';
 $app['caldav.baseurl'] = 'CALDAVER_CALDAV_SERVER';

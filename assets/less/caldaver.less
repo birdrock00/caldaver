@@ -620,23 +620,93 @@ body.caldaver-calendar-page {
   }
 }
 
+.user-menu {
+  position: relative;
+}
+
+.user-menu-dropdown {
+  position: relative;
+}
+
 #usermenu .user-pill {
+  display: inline-flex;
   min-width: 40px;
   height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   margin-left: 8px;
   padding: 0 12px;
   color: #fff;
   background: #8e24aa;
   border-radius: 999px;
+  cursor: pointer;
   font-weight: 500;
   line-height: 40px;
+  list-style: none;
   text-decoration: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
 
   &:hover,
   &:focus {
     color: #fff;
     background: #7b1fa2;
     text-decoration: none;
+  }
+}
+
+.user-pill-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu-list {
+  position: absolute;
+  top: 46px;
+  right: 0;
+  z-index: 1200;
+  min-width: 160px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(60, 64, 67, .2);
+}
+
+.user-menu-item {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  padding: 0 12px;
+  color: #3c4043;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+
+  i {
+    width: 20px;
+    margin-right: 12px;
+    color: #5f6368;
+    text-align: center;
+  }
+
+  &:hover,
+  &:focus {
+    color: #001d35;
+    background: #c2e7ff;
+    outline: 0;
+    text-decoration: none;
+
+    i {
+      color: #001d35;
+    }
   }
 }
 
@@ -2073,6 +2143,7 @@ summary:focus-visible,
 .topbar-menu:focus-visible,
 .mobile-section-menu summary:focus-visible,
 .mobile-section-menu-list a:focus-visible,
+.user-menu-list a:focus-visible,
 .app-nav-item:focus-visible,
 .contacts-view-switch button:focus-visible,
 .contact-delete:focus-visible,
@@ -2157,7 +2228,7 @@ summary:focus-visible,
 
     #usermenu .user-pill {
       max-width: 58px;
-      min-width: 36px;
+      min-width: 44px;
       padding: 0 7px;
     }
   }
@@ -2178,10 +2249,16 @@ summary:focus-visible,
 
   #usermenu .user-pill {
     max-width: 76px;
+    min-width: 44px;
+    height: 44px;
     overflow: hidden;
     padding: 0 9px;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .user-menu-list {
+    top: 50px;
   }
 
   #loading {
