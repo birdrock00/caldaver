@@ -2,10 +2,14 @@ const assert = require('assert/strict');
 const fs = require('fs');
 const path = require('path');
 
-const baseURL = process.env.CALDAVER_BASE_URL || 'https://caldaver.example.test';
+const baseURL = process.env.CALDAVER_BASE_URL;
 const username = process.env.CALDAVER_USERNAME;
 const password = process.env.CALDAVER_PASSWORD;
 const repoRoot = path.resolve(__dirname, '../../..');
+
+if (!baseURL) {
+  throw new Error('CALDAVER_BASE_URL is required for Android Appium tests.');
+}
 
 function absoluteURL(path) {
   return new URL(path, baseURL).toString();
