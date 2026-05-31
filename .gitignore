@@ -27,6 +27,7 @@ web/public/dist/js/*.js
 /bower_components/
 /dist/
 /build/
+/rust/target/
 .phpunit.cache/
 .phpunit.result.cache
 .idea

@@ -49,7 +49,7 @@ to Ruslan Nagimov for making that work available as a basis for this image.
 Required runtime configuration:
 
 - `CALDAVER_CALDAV_SERVER`, for example `https://baikal.example.com/cal.php`
-- `CALDAVER_CSRF_SECRET`, set to a unique secret value
+- `CALDAVER_CSRF_SECRET`, set to a unique secret value and keep the same value across redeployments
 - `CALDAVER_DB_HOST`
 - `CALDAVER_DB_NAME`
 - `CALDAVER_DB_USER`
@@ -68,6 +68,7 @@ Common optional runtime configuration:
 - `CALDAVER_LANG`, defaults to `en`
 - `CALDAVER_WEEKSTART`, defaults to `0`
 - `CALDAVER_CALENDAR_SHARING`, defaults to `false`
+- `CALDAVER_SESSION_LIFETIME`, session cookie and server-side session lifetime in seconds, defaults to `2592000` (30 days)
 
 Example:
 
@@ -75,7 +76,7 @@ Example:
 docker run -d --name caldaver \
   -p 8080:8080 \
   -e CALDAVER_CALDAV_SERVER=https://baikal.example.com/cal.php \
-  -e CALDAVER_CSRF_SECRET="$(openssl rand -hex 32)" \
+  -e CALDAVER_CSRF_SECRET=change-this-persistent-secret \
   -e CALDAVER_DB_HOST=postgres.example.com \
   -e CALDAVER_DB_NAME=caldaver \
   -e CALDAVER_DB_USER=caldaver \

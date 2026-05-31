@@ -36,14 +36,19 @@
          <i title="{% trans %}labels.preferences{% endtrans %}" class="fa fa-lg fa-wrench"></i>
        </a>
        </li>
-       <li>
-       <a class="logout" href="{{ app.url_generator.generate('logout') }}">
-         <i title="{% trans %}labels.logout{% endtrans %}" class="fa fa-lg fa-power-off"></i>
-       </a>
-       </li>
-       <li><a class="user-pill" href="javascript:void(0)">
-       {{ app.session.get('displayname') }}
-       </a>
+       <li class="user-menu">
+         <details class="user-menu-dropdown">
+           <summary class="user-pill" aria-label="User menu">
+             <span class="user-pill-label">{{ app.session.get('displayname') }}</span>
+             <i class="fa fa-caret-down" aria-hidden="true"></i>
+           </summary>
+           <nav class="user-menu-list" aria-label="User menu">
+             <a class="user-menu-item user-menu-logout" href="{{ app.url_generator.generate('logout') }}">
+               <i class="fa fa-power-off" aria-hidden="true"></i>
+               <span>{% trans %}labels.logout{% endtrans %}</span>
+             </a>
+           </nav>
+         </details>
        </li>
    </ul>
   </div>

@@ -262,6 +262,32 @@ function overlaps(a, b) {
     a.y + a.height > b.y;
 }
 
+async function dispatchTouchSwipe(page, selector, startX, endX, y = 220) {
+  await page.locator(selector).waitFor({ state: 'visible' });
+  await page.evaluate(({ itemSelector, fromX, toX, clientY }) => {
+    const element = document.querySelector(itemSelector);
+    const touch = clientX => ({
+      identifier: 1,
+      target: element,
+      clientX,
+      clientY,
+      pageX: clientX,
+      pageY: clientY,
+      screenX: clientX,
+      screenY: clientY
+    });
+    const start = new Event('touchstart', { bubbles: true, cancelable: true });
+    Object.defineProperty(start, 'touches', { value: [touch(fromX)] });
+    Object.defineProperty(start, 'changedTouches', { value: [touch(fromX)] });
+    element.dispatchEvent(start);
+
+    const end = new Event('touchend', { bubbles: true, cancelable: true });
+    Object.defineProperty(end, 'touches', { value: [] });
+    Object.defineProperty(end, 'changedTouches', { value: [touch(toX)] });
+    element.dispatchEvent(end);
+  }, { itemSelector: selector, fromX: startX, toX: endX, clientY: y });
+}
+
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
   const pageErrors = await login(page);
 
@@ -444,7 +470,7 @@ test('preferences page remains vertically scrollable', async ({ page }) => {
   expect(afterScrollY).toBeGreaterThan(before.scrollY);
 });
 
-test('preferences topbar actions stay in one horizontal row', async ({ page }) => {
+test('preferences topbar actions stay in one horizontal row with user logout menu', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await login(page);
   await page.goto(`${baseURL}/preferences`);
@@ -452,21 +478,21 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
   const menu = page.locator('.mobile-section-menu');
   const brand = page.locator('.caldaver-brand-title');
   const prefs = page.locator('#usermenu .prefs');
-  const logout = page.locator('#usermenu .logout');
   const user = page.locator('#usermenu .user-pill');
+  const logout = page.locator('#usermenu .user-menu-logout');
 
   await expect(menu).toBeVisible();
   await expect(brand).toBeVisible();
   await expect(page.locator('.caldaver-brand-icon')).toHaveCount(0);
   await expect(prefs).toBeVisible();
-  await expect(logout).toBeVisible();
   await expect(user).toBeVisible();
+  await expect(page.locator('#usermenu > li > a.logout')).toHaveCount(0);
+  await expect(logout).toBeHidden();
 
   const boxes = await Promise.all([
     menu.boundingBox(),
     brand.boundingBox(),
     prefs.boundingBox(),
-    logout.boundingBox(),
     user.boundingBox()
   ]);
 
@@ -481,10 +507,13 @@ test('preferences topbar actions stay in one horizontal row', async ({ page }) =
   expect(centers[0].x).toBeLessThan(centers[1].x);
   expect(centers[1].x).toBeLessThan(centers[2].x);
   expect(centers[2].x).toBeLessThan(centers[3].x);
-  expect(centers[3].x).toBeLessThan(centers[4].x);
+
+  await user.click();
+  await expect(logout).toBeVisible();
+  await expect(logout).toHaveText(/Log out|Logout/i);
 });
 
-test('very narrow mobile topbar keeps menu, logo, preferences, logout, and username on one row', async ({ page }) => {
+test('very narrow mobile topbar keeps menu, logo, preferences, and username on one row', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await login(page);
   await page.goto(`${baseURL}/preferences`);
@@ -493,7 +522,6 @@ test('very narrow mobile topbar keeps menu, logo, preferences, logout, and usern
     '.mobile-section-menu',
     '.caldaver-brand-title',
     '#usermenu .prefs',
-    '#usermenu .logout',
     '#usermenu .user-pill'
   ];
   const boxes = [];
@@ -513,7 +541,9 @@ test('very narrow mobile topbar keeps menu, logo, preferences, logout, and usern
   expect(centers[0].x).toBeLessThan(centers[1].x);
   expect(centers[1].x).toBeLessThan(centers[2].x);
   expect(centers[2].x).toBeLessThan(centers[3].x);
-  expect(centers[3].x).toBeLessThan(centers[4].x);
+  await expect(page.locator('#usermenu > li > a.logout')).toHaveCount(0);
+  await page.locator('#usermenu .user-pill').click();
+  await expect(page.locator('#usermenu .user-menu-logout')).toBeVisible();
 });
 
 test('login form labels do not overlap input fields', async ({ page }) => {
@@ -860,6 +890,81 @@ test('mail cache renders immediately while IMAP sync runs from nav click and con
   expect(consoleErrors).toEqual([]);
 });
 
+test('mail auto refresh keeps unchanged message rows stable', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  const syncRequests = [];
+  const stableMessage = {
+    uid: 451,
+    from: 'Stable Sender',
+    subject: 'Stable cached message',
+    date: 'Fri, 29 May 2026 12:30:00 -0700',
+    seen: true
+  };
+
+  await page.addInitScript(() => {
+    window.__mailRefreshCallbacks = [];
+    window.__mailRefreshIntervals = [];
+    window.setInterval = function(callback, timeout) {
+      window.__mailRefreshCallbacks.push(callback);
+      window.__mailRefreshIntervals.push(timeout);
+      return window.__mailRefreshCallbacks.length;
+    };
+    window.clearInterval = function() {};
+  });
+
+  await mockMailApi(page, {
+    accounts: [
+      {
+        id: 1,
+        label: 'Stable Inbox',
+        email_address: 'stable@example.test',
+        refresh_interval_seconds: 60
+      }
+    ],
+    cachedMessagesByAccount: { 1: [stableMessage] },
+    syncMessagesByAccount: { 1: [stableMessage] },
+    syncRequests
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('#mail_rows .mail-row')).toHaveCount(1);
+  await expect(page.locator('#mail_rows .mail-row .mail-subject')).toContainText('Stable cached message');
+  await expect.poll(() => syncRequests.length).toBe(1);
+  await expect(page.locator('#mail_nav_item')).not.toHaveClass(/syncing/);
+
+  await page.evaluate(() => {
+    const rows = document.querySelector('#mail_rows');
+    window.__firstMailRow = rows.firstElementChild;
+    window.__mailRowsMutationCount = 0;
+    new MutationObserver(mutations => {
+      window.__mailRowsMutationCount += mutations.length;
+    }).observe(rows, { attributes: true, childList: true, characterData: true, subtree: true });
+  });
+
+  await page.evaluate(() => {
+    window.__mailRefreshCallbacks[window.__mailRefreshCallbacks.length - 1]();
+  });
+  await expect.poll(() => syncRequests.length).toBe(2);
+  await page.waitForTimeout(100);
+
+  const refreshState = await page.evaluate(() => ({
+    loadingHidden: document.querySelector('#mail_loading').hidden,
+    rowMutations: window.__mailRowsMutationCount,
+    sameRow: window.__firstMailRow === document.querySelector('#mail_rows .mail-row'),
+    syncing: document.querySelector('#mail_nav_item').classList.contains('syncing')
+  }));
+
+  expect(refreshState).toEqual({
+    loadingHidden: true,
+    rowMutations: 0,
+    sameRow: true,
+    syncing: false
+  });
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
 test('mail reader renders HTML email bodies and blocks message scripts', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
@@ -893,6 +998,44 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
   await expect(htmlFrame.locator('img[alt="hero"]')).toBeVisible();
   await expect(htmlFrame.locator('script')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__messageScriptRan || false)).toBe(false);
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mobile mail reader swipe navigates newer and older inbox messages', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+
+  const inboxMessages = [
+    { uid: 701, from: 'Newest Sender', subject: 'Newer message', date: 'Fri, 29 May 2026 15:00:00 -0700', seen: true },
+    { uid: 702, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', seen: true },
+    { uid: 703, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', seen: true }
+  ];
+
+  await mockMailApi(page, {
+    accounts: [{ id: 1, label: 'Swipe Inbox', email_address: 'swipe@example.test' }],
+    cachedMessagesByAccount: { 1: inboxMessages },
+    messagesByAccount: { 1: inboxMessages },
+    messageDetails: {
+      701: { uid: 701, from: 'Newest Sender', subject: 'Newer message', date: 'Fri, 29 May 2026 15:00:00 -0700', body: 'Newer body' },
+      702: { uid: 702, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', body: 'Current body' },
+      703: { uid: 703, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', body: 'Older body' }
+    }
+  });
+
+  await page.goto(`${baseURL}/mail/read?account_id=1&uid=702`);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Current message');
+  await dispatchTouchSwipe(page, '#mail_reader_message', 60, 320);
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=701/);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Newer message');
+
+  await page.goto(`${baseURL}/mail/read?account_id=1&uid=702`);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Current message');
+  await dispatchTouchSwipe(page, '#mail_reader_message', 320, 60);
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=703/);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Older message');
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
