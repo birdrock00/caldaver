@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/caldaver-core",
+    "crates/caldaver-server",
 ]
 
 [workspace.package]
