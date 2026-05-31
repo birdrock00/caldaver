@@ -102,6 +102,8 @@ test('Docker image runs the Rust backend without PHP or Apache', () => {
   assert.match(storage, /Caldaver Rust backend requires a Postgres database URL/);
   assert.match(storage, /CREATE TABLE IF NOT EXISTS caldaver_sessions/);
   assert.match(storage, /CREATE TABLE IF NOT EXISTS mail_accounts/);
+  assert.match(storage, /ALTER TABLE mail_accounts ALTER COLUMN id TYPE BIGINT/);
+  assert.match(storage, /SELECT id::BIGINT AS id/);
 });
 
 test('frontend templates preserve mobile navigation and mail behavior', () => {
