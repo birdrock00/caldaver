@@ -1260,7 +1260,60 @@ var update_calendar_list = function update_calendar_list(maskbody) {
     }
 
     $('#shortcut_add_event').removeAttr('disabled');
+    sync_mobile_calendar_menu();
 
+  });
+};
+
+var sync_mobile_calendar_menu = function sync_mobile_calendar_menu() {
+  var $menu = $('.mobile-calendar-menu-calendars');
+
+  if ($menu.length === 0) {
+    return;
+  }
+
+  $menu.empty();
+
+  var $calendars = $('#own_calendar_list li.available_calendar, #shared_calendar_list li.available_calendar');
+
+  if ($calendars.length === 0) {
+    $menu.append($('<span/>', {
+      'class': 'mobile-calendar-menu-empty',
+      text: 'Loading calendars...'
+    }));
+    return;
+  }
+
+  $calendars.each(function() {
+    var $calendar = $(this);
+    var data = $calendar.data();
+    var pressed = !$calendar.hasClass('hidden_calendar');
+    var $button = $('<button/>', {
+      type: 'button',
+      'class': 'mobile-calendar-account',
+      'data-calendar-url': data.calendar,
+      'aria-pressed': String(pressed)
+    });
+
+    $('<span/>', {
+      'class': 'mobile-calendar-account-color'
+    })
+      .css('background-color', data.color || CaldaverConf.default_calendar_color)
+      .appendTo($button);
+
+    $('<span/>', {
+      'class': 'mobile-calendar-account-name',
+      text: data.displayname || data.calendar
+    }).appendTo($button);
+
+    if (data.is_shared === true) {
+      $('<i/>', {
+        'class': 'fa fa-share mobile-calendar-account-shared',
+        'aria-hidden': 'true'
+      }).appendTo($button);
+    }
+
+    $menu.append($button);
   });
 };
 
@@ -1981,6 +2034,7 @@ var show_calendar = function show_calendar(calendar_obj) {
   $('#calendar_view').fullCalendar('addEventSource', calendar_obj.data().eventsource);
   calendar_obj.removeClass('hidden_calendar');
   calendar_obj.find('.calendar-toggle').attr('aria-pressed', 'true');
+  sync_mobile_calendar_menu();
 };
 
 // Hides a calendar
@@ -1988,6 +2042,7 @@ var hide_calendar = function hide_calendar(calendar_obj) {
   $('#calendar_view').fullCalendar('removeEventSource', calendar_obj.data().eventsource);
   calendar_obj.addClass('hidden_calendar');
   calendar_obj.find('.calendar-toggle').attr('aria-pressed', 'false');
+  sync_mobile_calendar_menu();
 };
 
 // Toggles calendar visibility
@@ -2072,6 +2127,24 @@ var setup_topbar_menu = function setup_topbar_menu() {
 
       set_sidebar_collapsed(!$('body').hasClass('caldaver-sidebar-collapsed'));
     });
+
+  $mobile_section_menu.on('click', '.mobile-calendar-account', function(e) {
+    e.preventDefault();
+
+    var calendar_url = $(this).attr('data-calendar-url');
+    var $calendar = $('#own_calendar_list li.available_calendar, #shared_calendar_list li.available_calendar')
+      .filter(function() {
+        return $(this).data('calendar') === calendar_url;
+      })
+      .first();
+
+    if ($calendar.length === 0) {
+      return;
+    }
+
+    toggle_calendar($calendar);
+    sync_mobile_calendar_menu();
+  });
 
   $(window).on('resize.topbarmenu', function() {
     if (is_mobile_viewport()) {
