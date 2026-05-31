@@ -1,5 +1,10 @@
 <script>
 (function() {
+  var swipeStart = null;
+  var swipeNavigating = false;
+  var inboxMessagesPromise = null;
+  var mobileViewportQuery = '(max-width: 900px)';
+
   function $(selector) {
     return document.querySelector(selector);
   }
@@ -50,6 +55,14 @@
       method: 'POST',
       body: form
     }, fallbackMessage);
+  }
+
+  function narrowViewport() {
+    if (window.matchMedia) {
+      return window.matchMedia(mobileViewportQuery).matches;
+    }
+
+    return window.innerWidth <= 900;
   }
 
   function renderAttachments(container, message, accountId, attachmentUrl) {
@@ -160,6 +173,172 @@
       });
   }
 
+  function loadInboxMessages(reader) {
+    if (inboxMessagesPromise !== null) {
+      return inboxMessagesPromise;
+    }
+
+    inboxMessagesPromise = jsonFetch(
+      reader.dataset.messagesUrl + '?account_id=' + encodeURIComponent(reader.dataset.accountId),
+      {},
+      'Unable to load inbox messages'
+    ).then(function(payload) {
+      return payload.data || [];
+    }).catch(function(error) {
+      inboxMessagesPromise = null;
+      throw error;
+    });
+
+    return inboxMessagesPromise;
+  }
+
+  function messageReadUrl(reader, uid) {
+    return reader.dataset.readUrl +
+      '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
+      '&uid=' + encodeURIComponent(uid);
+  }
+
+  function navigateTo(url) {
+    if (typeof window.CALDAVER_MAIL_NAVIGATE === 'function') {
+      window.CALDAVER_MAIL_NAVIGATE(url);
+      return;
+    }
+
+    window.location.href = url;
+  }
+
+  function navigateBySwipe(direction) {
+    if (swipeNavigating) {
+      return Promise.resolve();
+    }
+
+    var reader = $('#mail_reader');
+    $('#mail_reader_error').hidden = true;
+
+    return loadInboxMessages(reader)
+      .then(function(messages) {
+        var currentIndex = -1;
+        messages.forEach(function(message, index) {
+          if (String(message.uid) === String(reader.dataset.uid)) {
+            currentIndex = index;
+          }
+        });
+
+        if (currentIndex === -1) {
+          return;
+        }
+
+        var targetIndex = direction === 'newer' ? currentIndex - 1 : currentIndex + 1;
+        if (targetIndex < 0 || targetIndex >= messages.length) {
+          return;
+        }
+
+        swipeNavigating = true;
+        navigateTo(messageReadUrl(reader, messages[targetIndex].uid));
+      })
+      .catch(function(error) {
+        $('#mail_reader_error').textContent = error.message;
+        $('#mail_reader_error').hidden = false;
+      });
+  }
+
+  function beginSwipe(clientX, clientY) {
+    swipeStart = { x: clientX, y: clientY };
+  }
+
+  function finishSwipe(clientX, clientY) {
+    if (!swipeStart || !narrowViewport()) {
+      swipeStart = null;
+      return;
+    }
+
+    var deltaX = clientX - swipeStart.x;
+    var deltaY = clientY - swipeStart.y;
+    swipeStart = null;
+
+    if (Math.abs(deltaX) < 80 || Math.abs(deltaY) > 70 || Math.abs(deltaX) < Math.abs(deltaY) * 1.6) {
+      return;
+    }
+
+    navigateBySwipe(deltaX > 0 ? 'newer' : 'older');
+  }
+
+  function touchPoint(event) {
+    var touches = event.changedTouches && event.changedTouches.length > 0 ? event.changedTouches : event.touches;
+    if (!touches || touches.length === 0) {
+      return null;
+    }
+
+    return touches[0];
+  }
+
+  function setupSwipeNavigation() {
+    var message = $('#mail_reader_message');
+
+    message.addEventListener('touchstart', function(event) {
+      if (!narrowViewport() || event.touches.length !== 1) {
+        swipeStart = null;
+        return;
+      }
+
+      var point = touchPoint(event);
+      if (point) {
+        beginSwipe(point.clientX, point.clientY);
+      } else {
+        swipeStart = null;
+      }
+    }, { passive: true });
+
+    message.addEventListener('touchend', function(event) {
+      var point = touchPoint(event);
+      if (!point) {
+        swipeStart = null;
+        return;
+      }
+
+      finishSwipe(point.clientX, point.clientY);
+    }, { passive: true });
+
+    message.addEventListener('pointerdown', function(event) {
+      if (!narrowViewport() || (event.pointerType !== 'touch' && event.pointerType !== 'pen')) {
+        return;
+      }
+
+      beginSwipe(event.clientX, event.clientY);
+      if (message.setPointerCapture) {
+        message.setPointerCapture(event.pointerId);
+      }
+    });
+
+    message.addEventListener('pointerup', function(event) {
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
+        return;
+      }
+
+      finishSwipe(event.clientX, event.clientY);
+    });
+
+    message.addEventListener('pointercancel', function() {
+      swipeStart = null;
+    });
+
+    message.addEventListener('mousedown', function(event) {
+      if (!narrowViewport() || event.button !== 0) {
+        return;
+      }
+
+      beginSwipe(event.clientX, event.clientY);
+    });
+
+    message.addEventListener('mouseup', function(event) {
+      if (event.button !== 0) {
+        return;
+      }
+
+      finishSwipe(event.clientX, event.clientY);
+    });
+  }
+
   function markUnread() {
     var reader = $('#mail_reader');
     $('#mail_reader_error').hidden = true;
@@ -170,9 +349,9 @@
       uid: reader.dataset.uid
     }, 'Unable to mark message unread')
       .then(function() {
-        window.location.href = reader.dataset.inboxUrl +
+        navigateTo(reader.dataset.inboxUrl +
           '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
-          '&unread_uid=' + encodeURIComponent(reader.dataset.uid);
+          '&unread_uid=' + encodeURIComponent(reader.dataset.uid));
       })
       .catch(function(error) {
         $('#mail_reader_error').textContent = error.message;
@@ -183,6 +362,7 @@
   document.addEventListener('DOMContentLoaded', function() {
     $('#mail_reader_refresh').addEventListener('click', loadMessage);
     $('#mail_reader_unread').addEventListener('click', markUnread);
+    setupSwipeNavigation();
     loadMessage();
   });
 })();

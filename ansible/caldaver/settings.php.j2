@@ -75,11 +75,11 @@ $app['twig.options'] = array('cache' => '/var/cache/twig');
 // Some session specific settings
 $app['session.storage.options'] = [
     'name' => 'caldaver_sess',
-    'cookie_lifetime' => 0,
+    'cookie_lifetime' => 30 * 24 * 60 * 60,
     // Every request has 10% chance of triggering session GC
     'gc_probability' => 1,
     'gc_divisor' => 10,
-    'gc_maxlifetime' => 1200,
-    'lifetime' => 1200,
+    'gc_maxlifetime' => 30 * 24 * 60 * 60,
     'cookie_httponly' => true,
+    'cookie_samesite' => 'Lax',
 ];
