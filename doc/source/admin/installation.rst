@@ -102,18 +102,6 @@ Then you have to edit the file ``pg_hba.conf``, which is usually located at
  # TYPE  DATABASE    USER        CIDR-ADDRESS          METHOD
  local   caldaver     caldaver                           md5
 
-**Setting up a SQLite database**
-
-SQLite is not recommended for production environments, but will be more than enough for testing and
-single user environments.
-
-You will need a dedicated directory for the database::
-
-  # mkdir database
-  # touch database/caldaver.sqlite
-  # chown -R www-data:www-data database/
-
-
 .. _webserver:
 
 Web server configuration
