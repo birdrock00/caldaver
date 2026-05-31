@@ -581,15 +581,18 @@ body.caldaver-calendar-page {
   top: 46px;
   left: 0;
   z-index: 1200;
-  min-width: 178px;
+  min-width: 220px;
   padding: 8px;
   background: #fff;
   border: 1px solid #dadce0;
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(60, 64, 67, .2);
 
-  a {
+  a,
+  .mobile-calendar-menu > summary {
     display: flex;
+    width: auto;
+    height: auto;
     min-height: 40px;
     align-items: center;
     padding: 0 12px;
@@ -618,6 +621,94 @@ body.caldaver-calendar-page {
       }
     }
   }
+}
+
+.mobile-calendar-menu {
+  summary {
+    cursor: pointer;
+    list-style: none;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  &[open] .mobile-calendar-menu-caret {
+    transform: rotate(90deg);
+  }
+}
+
+.mobile-calendar-menu-caret {
+  margin-right: 0 !important;
+  margin-left: auto;
+  transition: transform .16s ease;
+}
+
+.mobile-calendar-menu-calendars {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 6px 22px;
+  padding-left: 10px;
+  border-left: 1px solid #e8eaed;
+}
+
+.mobile-calendar-account {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  min-height: 38px;
+  align-items: center;
+  column-gap: 10px;
+  padding: 0 10px;
+  color: #3c4043;
+  background: transparent;
+  border: 0;
+  border-radius: 19px;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+
+  &:hover,
+  &:focus {
+    background: #f1f3f4;
+    outline: 0;
+  }
+
+  &[aria-pressed="false"] {
+    color: #70757a;
+
+    .mobile-calendar-account-color {
+      opacity: .35;
+    }
+
+    .mobile-calendar-account-name {
+      text-decoration: line-through;
+    }
+  }
+}
+
+.mobile-calendar-account-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.mobile-calendar-account-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-calendar-account-shared {
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.mobile-calendar-menu-empty {
+  display: block;
+  padding: 8px 10px;
+  color: #70757a;
+  font-size: 13px;
 }
 
 .user-menu {
@@ -2143,6 +2234,7 @@ summary:focus-visible,
 .topbar-menu:focus-visible,
 .mobile-section-menu summary:focus-visible,
 .mobile-section-menu-list a:focus-visible,
+.mobile-calendar-account:focus-visible,
 .user-menu-list a:focus-visible,
 .app-nav-item:focus-visible,
 .contacts-view-switch button:focus-visible,
@@ -2243,7 +2335,8 @@ summary:focus-visible,
     }
   }
 
-  .mobile-section-menu-list a {
+  .mobile-section-menu-list a,
+  .mobile-section-menu-list .mobile-calendar-menu > summary {
     min-height: 44px;
   }
 
@@ -2281,7 +2374,7 @@ summary:focus-visible,
     min-width: 0;
     max-width: none;
     height: auto;
-    padding: 12px;
+    padding: 12px 12px 0;
     overflow: visible;
   }
 
@@ -2291,6 +2384,15 @@ summary:focus-visible,
   .cards-sidebar .app-nav,
   .mail-sidebar #logo,
   .mail-sidebar .app-nav {
+    display: none;
+  }
+
+  #sidebar #shortcuts {
+    margin-bottom: 0;
+  }
+
+  #sidebar .calendar-sidebar-section,
+  #sidebar #footer {
     display: none;
   }
 
