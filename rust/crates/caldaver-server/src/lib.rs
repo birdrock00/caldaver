@@ -1591,8 +1591,11 @@ fn navbar(state: &AppState, session: &Session, active: &str) -> String {
 }
 
 fn mobile_links(active: &str) -> String {
-    [
-        ("calendar", "/", "fa-calendar", "Calendar"),
+    let calendar = format!(
+        r#"<details class="mobile-calendar-menu"><summary class="{active}"><i class="fa fa-calendar"></i><span>Calendar</span><i class="fa fa-caret-right mobile-calendar-menu-caret" aria-hidden="true"></i></summary><div class="mobile-calendar-menu-calendars" aria-label="Calendars"><span class="mobile-calendar-menu-empty">Loading calendars...</span></div></details>"#,
+        active = if active == "calendar" { "active" } else { "" }
+    );
+    let section_links = [
         ("cards", "/cards", "fa-book", "Contacts"),
         ("mail", "/mail", "fa-envelope", "Mail"),
     ]
@@ -1603,7 +1606,8 @@ fn mobile_links(active: &str) -> String {
             active = if active == name { "active" } else { "" }
         )
     })
-    .collect()
+    .collect::<String>();
+    format!("{calendar}{section_links}")
 }
 
 fn appnav(active: &str) -> String {
