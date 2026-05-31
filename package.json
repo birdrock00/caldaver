@@ -1,6 +1,6 @@
 {
   "name": "Caldaver",
-  "version": "2.6.0",
+  "version": "3.0.0",
   "description": "A web CalDAV client",
   "directories": {
     "doc": "doc",
@@ -49,6 +49,7 @@
     "@capacitor/android": "^8.3.4",
     "@capacitor/cli": "^8.3.4",
     "@capacitor/core": "^8.3.4",
+    "@capacitor/dialog": "^8.0.1",
     "@playwright/test": "^1.60.0",
     "@wdio/appium-service": "^8.46.0",
     "@wdio/cli": "^8.46.0",

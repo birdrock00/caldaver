@@ -164,6 +164,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/cards", get(cards_page))
         .route("/cards/list", get(cards_list))
         .route("/cards/save", post(cards_save))
+        .route("/cards/update", post(cards_update))
         .route("/cards/delete", post(cards_delete))
         .route("/mail", get(mail_page))
         .route("/mail/read", get(mail_read_page))
@@ -199,6 +200,10 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
         let (key, value) = part.trim().split_once('=')?;
         (key == name).then(|| value.to_string())
     })
+}
+
+fn secure_cookie_attr(config: &Config) -> &'static str {
+    if config.cookie_secure { "; Secure" } else { "" }
 }
 
 async fn session_from(headers: &HeaderMap, state: &AppState) -> Result<(String, Session), Response> {
@@ -310,7 +315,11 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
     let mut response = Redirect::to("/").into_response();
     response.headers_mut().insert(
         header::SET_COOKIE,
-        HeaderValue::from_str(&format!("caldaver_sess={id}; Path=/; HttpOnly; SameSite=Lax")).unwrap(),
+        HeaderValue::from_str(&format!(
+            "caldaver_sess={id}; Path=/; HttpOnly; SameSite=Lax{}",
+            secure_cookie_attr(&state.config)
+        ))
+        .unwrap(),
     );
     response
 }
@@ -325,7 +334,11 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let mut response = Redirect::to(location).into_response();
     response.headers_mut().insert(
         header::SET_COOKIE,
-        HeaderValue::from_static("caldaver_sess=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"),
+        HeaderValue::from_str(&format!(
+            "caldaver_sess=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax{}",
+            secure_cookie_attr(&state.config)
+        ))
+        .unwrap(),
     );
     response
 }
@@ -446,6 +459,9 @@ async fn calendar_save(State(state): State<AppState>, headers: HeaderMap, Form(f
         .get("calendar")
         .cloned()
         .unwrap_or_else(|| new_calendar_url(&session.calendar_home_set, displayname));
+    if !dav_href_in_scope(&calendar_url, &session.calendar_home_set) {
+        return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+    }
     let result = if form.get("calendar").is_some() {
         client.update_calendar(&calendar_url, &properties).await
     } else {
@@ -467,6 +483,9 @@ async fn calendar_delete(State(state): State<AppState>, headers: HeaderMap, Form
     let Some(calendar) = form.get("calendar").filter(|value| !value.is_empty()) else {
         return json_error(StatusCode::BAD_REQUEST, "Calendar is required");
     };
+    if !dav_href_in_scope(calendar, &session.calendar_home_set) {
+        return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+    }
     let client = match caldav_client_for_session(&state.config, &session) {
         Ok(client) => client,
         Err(error) => return caldav_response(error),
@@ -483,6 +502,9 @@ async fn events_list(State(state): State<AppState>, headers: HeaderMap, Query(qu
     };
     let calendar = query.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
     if let Ok(client) = caldav_client_for_session(&state.config, &session) {
+        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+        }
         let start = query
             .get("start")
             .map(|value| caldav_datetime(value))
@@ -536,12 +558,24 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
         description: form.get("description").cloned().unwrap_or_default(),
     };
     if let Ok(client) = caldav_client_for_session(&state.config, &session) {
+        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+        }
         let original_calendar = form.get("original_calendar").filter(|value| !value.is_empty());
+        if let Some(original_calendar) = original_calendar {
+            if !dav_href_in_scope(original_calendar, &session.calendar_home_set) {
+                return json_error(StatusCode::BAD_REQUEST, "Original calendar href is outside the CalDAV home set");
+            }
+        }
         let href = form
             .get("href")
             .cloned()
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| format!("{}{}.ics", ensure_slash(&calendar), uid));
+        let href_scope = original_calendar.unwrap_or(&calendar);
+        if !dav_href_in_scope(&href, href_scope) {
+            return json_error(StatusCode::BAD_REQUEST, "Event href is outside the selected calendar");
+        }
         let etag = form.get("etag").map(String::as_str).filter(|value| !value.is_empty());
         let existing = if etag.is_some() || original_calendar.is_some_and(|source| source != &calendar) {
             match client.list_events_by_uid(original_calendar.unwrap_or(&calendar), &uid).await {
@@ -563,6 +597,9 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
         } else {
             href.clone()
         };
+        if !dav_href_in_scope(&destination_href, &calendar) {
+            return json_error(StatusCode::BAD_REQUEST, "Destination href is outside the selected calendar");
+        }
         let result = match client.put_event(&destination_href, icalendar, etag).await {
             Ok(result) => result,
             Err(error) => return caldav_response(error),
@@ -594,6 +631,9 @@ async fn event_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
     }
     let calendar = form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
     if let Ok(client) = caldav_client_for_session(&state.config, &session) {
+        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+        }
         let Some(etag) = form.get("etag").map(String::as_str).filter(|value| !value.is_empty()) else {
             return json_error(StatusCode::BAD_REQUEST, "Event ETag is required");
         };
@@ -605,6 +645,9 @@ async fn event_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
         let Some(href) = href else {
             return json_error(StatusCode::BAD_REQUEST, "Event href or uid is required");
         };
+        if !dav_href_in_scope(&href, &calendar) {
+            return json_error(StatusCode::BAD_REQUEST, "Event href is outside the selected calendar");
+        }
         if let Some(recurrence_id) = form.get("recurrence_id").filter(|value| !value.is_empty()) {
             let uid = form.get("uid").cloned().unwrap_or_default();
             let objects = match client.list_events_by_uid(&calendar, &uid).await {
@@ -654,6 +697,9 @@ async fn event_alter(state: AppState, headers: HeaderMap, form: HashMap<String, 
     }
     if let Ok(client) = caldav_client_for_session(&state.config, &session) {
         let calendar = form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
+        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+        }
         let uid = form.get("uid").cloned().unwrap_or_default();
         if !uid.is_empty() {
             match client.list_events_by_uid(&calendar, &uid).await {
@@ -691,6 +737,9 @@ async fn event_base(State(state): State<AppState>, headers: HeaderMap, Query(que
     let calendar = query.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
     let uid = query.get("uid").cloned().unwrap_or_default();
     if let Ok(client) = caldav_client_for_session(&state.config, &session) {
+        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+        }
         match client.list_events_by_uid(&calendar, &uid).await {
             Ok(objects) => {
                 if let Some(event) = objects.iter().find_map(|object| event_payload_from_object(object, &calendar)) {
@@ -770,48 +819,56 @@ async fn cards_save(State(state): State<AppState>, headers: HeaderMap, Form(form
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let full_name = form
-        .get("full_name")
-        .map(|value| value.trim().to_string())
-        .unwrap_or_default();
-    if full_name.trim().is_empty() {
+    let input = contact_input_from_form(&form, None);
+    if input.full_name.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "Full name is required");
     }
     if let Ok(carddav) = carddav_client_for_session(&state.config, &session) {
-        let input = ContactInput {
-            uid: None,
-            full_name,
-            email: form.get("email").cloned().unwrap_or_default(),
-            phone: form.get("phone").cloned().unwrap_or_default(),
-            organization: form.get("organization").cloned().unwrap_or_default(),
-            job_title: form.get("job_title").cloned().unwrap_or_default(),
-        };
         return match carddav.create_contact(&input).await {
             Ok(contact) => Json(json!({"result": "SUCCESS", "data": contact_payload(&contact)})).into_response(),
             Err(error) => json_error(StatusCode::BAD_GATEWAY, &error.to_string()),
         };
     }
 
-    let organization = form.get("organization").cloned().unwrap_or_default();
-    let job_title = form.get("job_title").cloned().unwrap_or_default();
-    let contact = Contact {
-        full_name: full_name.clone(),
-        email: form.get("email").cloned().unwrap_or_default(),
-        phone: form.get("phone").cloned().unwrap_or_default(),
-        organization: organization.clone(),
-        job_title: job_title.clone(),
-        company_line: [job_title, organization]
-            .into_iter()
-            .filter(|value| !value.is_empty())
-            .collect::<Vec<_>>()
-            .join(", "),
-        labels: Vec::new(),
-        url: format!("/addressbooks/default/{}.vcf", Uuid::new_v4()),
-        etag: format!("\"{}\"", Uuid::new_v4()),
-    };
+    let contact = local_contact_from_input(input, format!("/addressbooks/default/{}.vcf", Uuid::new_v4()));
     if let Err(error) = state.storage.upsert_contact(&session.username, &contact).await {
         tracing::error!(%error, "failed to save contact to Postgres");
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save contact");
+    }
+    Json(json!({"result": "SUCCESS", "data": contact})).into_response()
+}
+
+async fn cards_update(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+    let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
+    };
+    if !valid_csrf(&session, &form) {
+        return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
+    }
+    let Some(url) = form.get("url").map(|value| value.trim()).filter(|value| !value.is_empty()) else {
+        return json_error(StatusCode::BAD_REQUEST, "Contact URL is required");
+    };
+    let input = contact_input_from_form(&form, Some(url));
+    if input.full_name.is_empty() {
+        return json_error(StatusCode::BAD_REQUEST, "Full name is required");
+    }
+    if let Ok(carddav) = carddav_client_for_session(&state.config, &session) {
+        if !dav_href_in_scope(url, &session.addressbook_home_set) {
+            return json_error(StatusCode::BAD_REQUEST, "Contact href is outside the CardDAV home set");
+        }
+        return match carddav
+            .update_contact(url, form.get("etag").map(String::as_str), &input)
+            .await
+        {
+            Ok(contact) => Json(json!({"result": "SUCCESS", "data": contact_payload(&contact)})).into_response(),
+            Err(error) => json_error(StatusCode::BAD_GATEWAY, &error.to_string()),
+        };
+    }
+
+    let contact = local_contact_from_input(input, url.to_string());
+    if let Err(error) = state.storage.upsert_contact(&session.username, &contact).await {
+        tracing::error!(%error, "failed to update contact in Postgres");
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to update contact");
     }
     Json(json!({"result": "SUCCESS", "data": contact})).into_response()
 }
@@ -827,6 +884,9 @@ async fn cards_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
         let Some(url) = form.get("url").filter(|value| !value.is_empty()) else {
             return json_error(StatusCode::BAD_REQUEST, "Contact URL is required");
         };
+        if !dav_href_in_scope(url, &session.addressbook_home_set) {
+            return json_error(StatusCode::BAD_REQUEST, "Contact href is outside the CardDAV home set");
+        }
         return match carddav
             .delete_contact(url, form.get("etag").map(String::as_str))
             .await
@@ -861,6 +921,65 @@ fn contact_payload(contact: &CardDavContact) -> Value {
         "initial": view.initial,
         "avatar_color": view.avatar_color
     })
+}
+
+fn contact_input_from_form(form: &HashMap<String, String>, url: Option<&str>) -> ContactInput {
+    ContactInput {
+        uid: form
+            .get("uid")
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .or_else(|| url.and_then(uid_from_contact_url)),
+        full_name: form
+            .get("full_name")
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default(),
+        email: form
+            .get("email")
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default(),
+        phone: form
+            .get("phone")
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default(),
+        organization: form
+            .get("organization")
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default(),
+        job_title: form
+            .get("job_title")
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default(),
+    }
+}
+
+fn local_contact_from_input(input: ContactInput, url: String) -> Contact {
+    Contact {
+        full_name: input.full_name,
+        email: input.email,
+        phone: input.phone,
+        organization: input.organization.clone(),
+        job_title: input.job_title.clone(),
+        company_line: [input.job_title, input.organization]
+            .into_iter()
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>()
+            .join(", "),
+        labels: Vec::new(),
+        url,
+        etag: format!("\"{}\"", Uuid::new_v4()),
+    }
+}
+
+fn uid_from_contact_url(url: &str) -> Option<String> {
+    let file_name = url.rsplit('/').next().unwrap_or(url);
+    file_name
+        .strip_suffix(".vcf")
+        .or(Some(file_name))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 async fn mail_accounts(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -1462,6 +1581,22 @@ fn ensure_slash(value: &str) -> String {
     }
 }
 
+fn dav_href_in_scope(href: &str, scope: &str) -> bool {
+    let href = href.trim();
+    if href.is_empty()
+        || !href.starts_with('/')
+        || href.starts_with("//")
+        || href.contains("://")
+        || href.contains('\\')
+    {
+        return false;
+    }
+    if scope.trim().is_empty() {
+        return true;
+    }
+    href.starts_with(&ensure_slash(scope.trim()))
+}
+
 fn mail_backend_response(error: MailBackendError) -> Response {
     let status = match error {
         MailBackendError::InvalidAccount(_) => StatusCode::BAD_REQUEST,
@@ -1710,7 +1845,7 @@ fn translations_json() -> String {
 
 fn contact_dialog(csrf: &str) -> String {
     format!(
-        r#"<div id="contact_dialog" class="contact-dialog" hidden><form id="contact_form" action="/cards/save" method="post"><input type="hidden" name="_token" value="{csrf}"><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2>Create contact</h2><button type="button" id="contact_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><label><span>Name</span><input required name="full_name" type="text" autocomplete="name"></label><label><span>Email</span><input name="email" type="email" autocomplete="email"></label><label><span>Phone number</span><input name="phone" type="tel" autocomplete="tel"></label><label><span>Company</span><input name="organization" type="text" autocomplete="organization"></label><label><span>Job title</span><input name="job_title" type="text" autocomplete="organization-title"></label><div class="contact-dialog-footer"><button type="button" id="contact_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
+        r#"<div id="contact_dialog" class="contact-dialog" hidden><form id="contact_form" action="/cards/save" method="post"><input type="hidden" name="_token" value="{csrf}"><input type="hidden" name="url" value=""><input type="hidden" name="etag" value=""><input type="hidden" name="uid" value=""><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2 id="contact_dialog_title">Create contact</h2><button type="button" id="contact_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><label><span>Name</span><input required name="full_name" type="text" autocomplete="name"></label><label><span>Email</span><input name="email" type="email" autocomplete="email"></label><label><span>Phone number</span><input name="phone" type="tel" autocomplete="tel"></label><label><span>Company</span><input name="organization" type="text" autocomplete="organization"></label><label><span>Job title</span><input name="job_title" type="text" autocomplete="organization-title"></label><div class="contact-dialog-footer"><button type="button" id="contact_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
     )
 }
 
@@ -1744,6 +1879,8 @@ fn part_js(name: &str) -> String {
     };
     raw.replace("{{ app.url_generator.generate('cards.list') }}", "/cards/list")
         .replace("{{ app.url_generator.generate('cards.delete') }}", "/cards/delete")
+        .replace("{{ app.url_generator.generate('cards.save') }}", "/cards/save")
+        .replace("{{ app.url_generator.generate('cards.update') }}", "/cards/update")
         .replace("{{ app.url_generator.generate('mail.read') }}", "/mail/read")
         .replace("{{ app.url_generator.generate('mail.attachment') }}", "/mail/attachment")
         .replace("{{ app.url_generator.generate('mail.accounts') }}", "/mail/accounts")
@@ -1896,7 +2033,7 @@ mod tests {
                     .method(Method::POST)
                     .uri("/login")
                     .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-                    .body(Body::from("user=bruce&password=secret"))
+                    .body(Body::from("user=demo&password=secret"))
                     .unwrap(),
             )
             .await
@@ -2101,11 +2238,11 @@ mod tests {
 
     fn test_session_without_storage() -> Session {
         Session {
-            username: "bruce".to_string(),
-            displayname: "bruce".to_string(),
+            username: "demo".to_string(),
+            displayname: "demo".to_string(),
             csrf: "token".to_string(),
             preferences: Preferences::default(),
-            dav_username: "bruce".to_string(),
+            dav_username: "demo".to_string(),
             dav_password: "secret".to_string(),
             principal_url: String::new(),
             calendar_home_set: String::new(),

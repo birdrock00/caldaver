@@ -478,13 +478,19 @@ impl CalDavClient {
     }
 
     fn href_to_url(&self, href: &str) -> Result<Url, CalDavError> {
-        if let Ok(url) = Url::parse(href) {
-            return Ok(url);
+        let url = match Url::parse(href) {
+            Ok(url) => url,
+            Err(_) => self
+                .base_url
+                .join(href)
+                .map_err(|error| CalDavError::InvalidDavHref(error.to_string()))?,
+        };
+        if !same_origin(&self.base_url, &url) {
+            return Err(CalDavError::InvalidDavHref(
+                "DAV href resolves outside the configured CalDAV origin".to_string(),
+            ));
         }
-
-        self.base_url
-            .join(href)
-            .map_err(|error| CalDavError::InvalidDavHref(error.to_string()))
+        Ok(url)
     }
 }
 
@@ -502,6 +508,12 @@ impl From<XmlError> for CalDavError {
 
 fn method(value: &'static str) -> Method {
     Method::from_bytes(value.as_bytes()).expect("valid DAV method")
+}
+
+fn same_origin(left: &Url, right: &Url) -> bool {
+    left.scheme() == right.scheme()
+        && left.host_str() == right.host_str()
+        && left.port_or_known_default() == right.port_or_known_default()
 }
 
 fn is_calendar_resource(properties: &Properties) -> bool {
@@ -673,7 +685,7 @@ mod tests {
         CalDavClient::new(CalDavConfig {
             base_url: server.base_url.clone(),
             auth: CalDavAuth::Basic {
-                username: "bruce".to_string(),
+                username: "demo".to_string(),
                 password: "secret".to_string(),
             },
             connect_timeout: Duration::from_secs(5),
@@ -773,13 +785,13 @@ mod tests {
             response(multistatus(
                 r#"<d:response>
   <d:href>/dav/</d:href>
-  <d:propstat><d:prop><d:current-user-principal><d:href>/dav/principals/bruce/</d:href></d:current-user-principal></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  <d:propstat><d:prop><d:current-user-principal><d:href>/dav/principals/demo/</d:href></d:current-user-principal></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response>"#,
             )),
             response(multistatus(
                 r#"<d:response>
-  <d:href>/dav/principals/bruce/</d:href>
-  <d:propstat><d:prop><cal:calendar-home-set><d:href>/dav/calendars/bruce/</d:href></cal:calendar-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  <d:href>/dav/principals/demo/</d:href>
+  <d:propstat><d:prop><cal:calendar-home-set><d:href>/dav/calendars/demo/</d:href></cal:calendar-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response>"#,
             )),
         ])
@@ -788,15 +800,15 @@ mod tests {
 
         let session = client.login().await.unwrap();
 
-        assert_eq!(session.principal_url, "/dav/principals/bruce/");
-        assert_eq!(session.calendar_home_set, "/dav/calendars/bruce/");
+        assert_eq!(session.principal_url, "/dav/principals/demo/");
+        assert_eq!(session.calendar_home_set, "/dav/calendars/demo/");
         let requests = server.requests();
         assert_eq!(requests[0].method, "OPTIONS");
         assert_eq!(requests[0].path, "/dav/");
         assert_eq!(requests[1].method, "PROPFIND");
         assert_eq!(header(&requests[1], "depth").as_deref(), Some("0"));
         assert!(requests[1].body.contains("current-user-principal"));
-        assert_eq!(requests[2].path, "/dav/principals/bruce/");
+        assert_eq!(requests[2].path, "/dav/principals/demo/");
         assert!(requests[2].body.contains("calendar-home-set"));
         assert!(header(&requests[0], "authorization").is_some());
     }
@@ -805,31 +817,31 @@ mod tests {
     async fn lists_calendar_collections_from_calendar_home_set() {
         let server = MockDavServer::start(vec![response(multistatus(
             r##"<d:response>
-  <d:href>/dav/calendars/bruce/</d:href>
+  <d:href>/dav/calendars/demo/</d:href>
   <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response>
 <d:response>
-  <d:href>/dav/calendars/bruce/work</d:href>
+  <d:href>/dav/calendars/demo/work</d:href>
   <d:propstat><d:prop>
     <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>
     <d:displayname>Work</d:displayname>
     <a:calendar-color>#123456</a:calendar-color>
-    <d:owner><d:href>/dav/principals/bruce/</d:href></d:owner>
+    <d:owner><d:href>/dav/principals/demo/</d:href></d:owner>
   </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response>"##,
         ))])
         .await;
         let client = client(&server);
 
-        let calendars = client.list_calendars("/dav/calendars/bruce/").await.unwrap();
+        let calendars = client.list_calendars("/dav/calendars/demo/").await.unwrap();
 
         assert_eq!(calendars.len(), 1);
-        assert_eq!(calendars[0].url(), "/dav/calendars/bruce/work/");
+        assert_eq!(calendars[0].url(), "/dav/calendars/demo/work/");
         assert_eq!(calendars[0].property(Calendar::DISPLAYNAME), Some("Work"));
         assert_eq!(calendars[0].property(Calendar::COLOR), Some("#123456ff"));
         assert_eq!(
             calendars[0].owner().map(PrincipalRef::display_name),
-            Some("/dav/principals/bruce/")
+            Some("/dav/principals/demo/")
         );
         let requests = server.requests();
         assert_eq!(requests[0].method, "PROPFIND");
@@ -849,24 +861,24 @@ mod tests {
 
         let by_range = client
             .list_events_by_time_range(
-                "/dav/calendars/bruce/work/",
+                "/dav/calendars/demo/work/",
                 "20260501T000000Z",
                 "20260601T000000Z",
             )
             .await
             .unwrap();
         let by_uid = client
-            .list_events_by_uid("/dav/calendars/bruce/work/", "item-1")
+            .list_events_by_uid("/dav/calendars/demo/work/", "item-1")
             .await
             .unwrap();
 
-        assert_eq!(by_range[0].url(), "/dav/calendars/bruce/work/item-1.ics");
+        assert_eq!(by_range[0].url(), "/dav/calendars/demo/work/item-1.ics");
         assert_eq!(by_range[0].etag(), Some("\"abc\""));
         assert_eq!(by_range[0].rendered_event(), Some(calendar_data));
         assert_eq!(by_uid[0].etag(), Some("\"abc\""));
         let requests = server.requests();
         assert_eq!(requests[0].method, "REPORT");
-        assert_eq!(requests[0].path, "/dav/calendars/bruce/work/");
+        assert_eq!(requests[0].path, "/dav/calendars/demo/work/");
         assert!(requests[0].body.contains("time-range"));
         assert_eq!(header(&requests[0], "depth").as_deref(), Some("1"));
         assert_eq!(requests[1].method, "REPORT");
@@ -908,32 +920,32 @@ mod tests {
 
         let created = client
             .create_calendar(
-                "/dav/calendars/bruce/personal/",
+                "/dav/calendars/demo/personal/",
                 &[XmlProperty::text(Calendar::DISPLAYNAME, "Personal")],
             )
             .await
             .unwrap();
         let updated = client
             .update_calendar(
-                "/dav/calendars/bruce/personal/",
+                "/dav/calendars/demo/personal/",
                 &[XmlProperty::text(Calendar::COLOR, "#abcdef")],
             )
             .await
             .unwrap();
         let event = client
             .put_event(
-                "/dav/calendars/bruce/personal/item-1.ics",
+                "/dav/calendars/demo/personal/item-1.ics",
                 "BEGIN:VCALENDAR\nEND:VCALENDAR",
                 None,
             )
             .await
             .unwrap();
         client
-            .delete_event("/dav/calendars/bruce/personal/item-1.ics", Some("\"event-new\""))
+            .delete_event("/dav/calendars/demo/personal/item-1.ics", Some("\"event-new\""))
             .await
             .unwrap();
         client
-            .delete_calendar("/dav/calendars/bruce/personal/", Some("\"cal-new\""))
+            .delete_calendar("/dav/calendars/demo/personal/", Some("\"cal-new\""))
             .await
             .unwrap();
 
@@ -960,7 +972,7 @@ mod tests {
     fn event_multistatus(calendar_data: &str) -> String {
         multistatus(&format!(
             r#"<d:response>
-  <d:href>/dav/calendars/bruce/work/item-1.ics</d:href>
+  <d:href>/dav/calendars/demo/work/item-1.ics</d:href>
   <d:propstat><d:prop><d:getetag>"abc"</d:getetag><cal:calendar-data>{}</cal:calendar-data></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response>"#,
             calendar_data

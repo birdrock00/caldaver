@@ -183,6 +183,46 @@ impl CardDavClient {
         Ok(())
     }
 
+    pub async fn update_contact(
+        &self,
+        href: &str,
+        etag: Option<&str>,
+        input: &ContactInput,
+    ) -> Result<Contact, CardDavError> {
+        let url = self.href_to_url(href)?;
+        let (_, vcard) = carddav::build_vcard(input);
+        let mut request = self
+            .request(method("PUT"), url.clone())
+            .header(CONTENT_TYPE, "text/vcard; charset=utf-8");
+        if let Some(etag) = etag.filter(|value| !value.is_empty()) {
+            request = request.header(IF_MATCH, etag);
+        }
+        let response = request
+            .body(vcard.clone())
+            .send()
+            .await
+            .map_err(CardDavError::Http)?;
+        let status = response.status();
+        let etag = response
+            .headers()
+            .get(ETAG)
+            .and_then(|value| value.to_str().ok())
+            .map(str::to_string);
+
+        if !matches!(
+            status,
+            StatusCode::CREATED | StatusCode::NO_CONTENT | StatusCode::OK
+        ) {
+            return Err(CardDavError::UnexpectedStatus {
+                method: "PUT",
+                url: url.to_string(),
+                status,
+            });
+        }
+
+        Ok(Contact::from_vcard(href, etag, &vcard))
+    }
+
     async fn discover_addressbook_home_set_from_base(&self) -> Result<String, CardDavError> {
         let properties = empty_properties([CURRENT_USER_PRINCIPAL, ADDRESSBOOK_HOME_SET]);
         let body = self
@@ -384,9 +424,16 @@ impl CardDavClient {
     }
 
     fn href_to_url(&self, href: &str) -> Result<Url, CardDavError> {
-        self.base_url
+        let url = self
+            .base_url
             .join(href)
-            .map_err(|error| CardDavError::InvalidDavHref(error.to_string()))
+            .map_err(|error| CardDavError::InvalidDavHref(error.to_string()))?;
+        if !same_origin(&self.base_url, &url) {
+            return Err(CardDavError::InvalidDavHref(
+                "DAV href resolves outside the configured CardDAV origin".to_string(),
+            ));
+        }
+        Ok(url)
     }
 }
 
@@ -409,6 +456,12 @@ impl std::error::Error for CardDavError {}
 
 fn method(value: &'static str) -> Method {
     Method::from_bytes(value.as_bytes()).expect("valid DAV method")
+}
+
+fn same_origin(left: &Url, right: &Url) -> bool {
+    left.scheme() == right.scheme()
+        && left.host_str() == right.host_str()
+        && left.port_or_known_default() == right.port_or_known_default()
 }
 
 fn href_property(
@@ -522,7 +575,7 @@ mod tests {
         CardDavClient::new(CardDavConfig {
             base_url: server.base_url.clone(),
             auth: CalDavAuth::Basic {
-                username: "bruce".to_string(),
+                username: "demo".to_string(),
                 password: "secret".to_string(),
             },
         })
@@ -622,18 +675,18 @@ mod tests {
             response(multistatus(
                 r#"<d:response>
   <d:href>/dav/</d:href>
-  <d:propstat><d:prop><card:addressbook-home-set><d:href>/dav/addressbooks/users/bruce/</d:href></card:addressbook-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
+  <d:propstat><d:prop><card:addressbook-home-set><d:href>/dav/addressbooks/users/demo/</d:href></card:addressbook-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response>"#,
             )),
             response(multistatus(
                 r#"<d:response>
-  <d:href>/dav/addressbooks/users/bruce/contacts/</d:href>
+  <d:href>/dav/addressbooks/users/demo/contacts/</d:href>
   <d:propstat><d:prop><d:resourcetype><d:collection/><card:addressbook/></d:resourcetype><d:displayname>Contacts</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>
 </d:response>"#,
             )),
             response(multistatus(
                 r#"<d:response>
-  <d:href>/dav/addressbooks/users/bruce/contacts/ada.vcf</d:href>
+  <d:href>/dav/addressbooks/users/demo/contacts/ada.vcf</d:href>
   <d:propstat><d:prop><d:getetag>"ada"</d:getetag><card:address-data>BEGIN:VCARD
 VERSION:4.0
 UID:ada
@@ -647,10 +700,10 @@ END:VCARD
         .await;
         let client = client(&server);
 
-        let addressbooks = client.ensure_addressbooks(None, "Bruce").await.unwrap();
+        let addressbooks = client.ensure_addressbooks(None, "Demo").await.unwrap();
         let contacts = client.list_contacts(&addressbooks).await.unwrap();
 
-        assert_eq!(addressbooks[0].url, "/dav/addressbooks/users/bruce/contacts/");
+        assert_eq!(addressbooks[0].url, "/dav/addressbooks/users/demo/contacts/");
         assert_eq!(addressbooks[0].property(AddressBook::DISPLAYNAME), Some("Contacts"));
         assert_eq!(contacts.len(), 1);
         assert_eq!(contacts[0].full_name, "Ada Lovelace");
@@ -662,10 +715,10 @@ END:VCARD
         assert_eq!(header(&requests[0], "depth").as_deref(), Some("0"));
         assert!(header(&requests[0], "authorization").is_some());
         assert_eq!(requests[1].method, "PROPFIND");
-        assert_eq!(requests[1].path, "/dav/addressbooks/users/bruce/");
+        assert_eq!(requests[1].path, "/dav/addressbooks/users/demo/");
         assert_eq!(header(&requests[1], "depth").as_deref(), Some("1"));
         assert_eq!(requests[2].method, "REPORT");
-        assert_eq!(requests[2].path, "/dav/addressbooks/users/bruce/contacts/");
+        assert_eq!(requests[2].path, "/dav/addressbooks/users/demo/contacts/");
         assert!(requests[2].body.contains("addressbook-query"));
     }
 
@@ -673,10 +726,10 @@ END:VCARD
     async fn creates_default_addressbook_when_home_set_has_none() {
         let server = MockDavServer::start(vec![
             response(multistatus(
-                r#"<d:response><d:href>/dav/</d:href><d:propstat><d:prop><card:addressbook-home-set><d:href>/dav/addressbooks/users/bruce/</d:href></card:addressbook-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
+                r#"<d:response><d:href>/dav/</d:href><d:propstat><d:prop><card:addressbook-home-set><d:href>/dav/addressbooks/users/demo/</d:href></card:addressbook-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
             )),
             response(multistatus(
-                r#"<d:response><d:href>/dav/addressbooks/users/bruce/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
+                r#"<d:response><d:href>/dav/addressbooks/users/demo/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
             )),
             MockResponse {
                 status: "201 Created",
@@ -684,36 +737,41 @@ END:VCARD
                 body: String::new(),
             },
             response(multistatus(
-                r#"<d:response><d:href>/dav/addressbooks/users/bruce/generated/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><card:addressbook/></d:resourcetype><d:displayname>Bruce addressbook</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
+                r#"<d:response><d:href>/dav/addressbooks/users/demo/generated/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><card:addressbook/></d:resourcetype><d:displayname>Demo addressbook</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
             )),
         ])
         .await;
         let client = client(&server);
 
-        let addressbooks = client.ensure_addressbooks(None, "Bruce").await.unwrap();
+        let addressbooks = client.ensure_addressbooks(None, "Demo").await.unwrap();
 
         assert_eq!(addressbooks.len(), 1);
-        assert_eq!(addressbooks[0].url, "/dav/addressbooks/users/bruce/generated/");
+        assert_eq!(addressbooks[0].url, "/dav/addressbooks/users/demo/generated/");
         let requests = server.requests();
         assert_eq!(requests[2].method, "MKCOL");
-        assert!(requests[2].path.starts_with("/dav/addressbooks/users/bruce/"));
-        assert_ne!(requests[2].path, "/dav/addressbooks/users/bruce/default/");
+        assert!(requests[2].path.starts_with("/dav/addressbooks/users/demo/"));
+        assert_ne!(requests[2].path, "/dav/addressbooks/users/demo/default/");
         assert!(requests[2].body.contains("addressbook"));
-        assert!(requests[2].body.contains("Bruce addressbook"));
+        assert!(requests[2].body.contains("Demo addressbook"));
     }
 
     #[tokio::test]
-    async fn puts_and_deletes_contacts_with_precondition_headers() {
+    async fn puts_updates_and_deletes_contacts_with_precondition_headers() {
         let server = MockDavServer::start(vec![
             response(multistatus(
-                r#"<d:response><d:href>/dav/</d:href><d:propstat><d:prop><card:addressbook-home-set><d:href>/dav/addressbooks/users/bruce/</d:href></card:addressbook-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
+                r#"<d:response><d:href>/dav/</d:href><d:propstat><d:prop><card:addressbook-home-set><d:href>/dav/addressbooks/users/demo/</d:href></card:addressbook-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
             )),
             response(multistatus(
-                r#"<d:response><d:href>/dav/addressbooks/users/bruce/contacts/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><card:addressbook/></d:resourcetype><d:displayname>Contacts</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
+                r#"<d:response><d:href>/dav/addressbooks/users/demo/contacts/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><card:addressbook/></d:resourcetype><d:displayname>Contacts</d:displayname></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,
             )),
             MockResponse {
                 status: "201 Created",
                 headers: vec![("ETag", r#""new-etag""#)],
+                body: String::new(),
+            },
+            MockResponse {
+                status: "200 OK",
+                headers: vec![("ETag", r#""updated-etag""#)],
                 body: String::new(),
             },
             MockResponse {
@@ -734,6 +792,19 @@ END:VCARD
             })
             .await
             .unwrap();
+        let contact = client
+            .update_contact(
+                &contact.url,
+                contact.etag.as_deref(),
+                &ContactInput {
+                    uid: Some("ada".to_string()),
+                    full_name: "Ada Byron".to_string(),
+                    email: "ada@example.test".to_string(),
+                    ..ContactInput::default()
+                },
+            )
+            .await
+            .unwrap();
         client
             .delete_contact(&contact.url, contact.etag.as_deref())
             .await
@@ -741,17 +812,21 @@ END:VCARD
 
         let requests = server.requests();
         assert_eq!(requests[2].method, "PUT");
-        assert_eq!(requests[2].path, "/dav/addressbooks/users/bruce/contacts/ada.vcf");
+        assert_eq!(requests[2].path, "/dav/addressbooks/users/demo/contacts/ada.vcf");
         assert_eq!(header(&requests[2], "if-none-match").as_deref(), Some("*"));
         assert!(requests[2].body.contains("BEGIN:VCARD"));
         assert!(requests[2].body.contains("FN:Ada Lovelace"));
-        assert_eq!(requests[3].method, "DELETE");
-        assert_eq!(requests[3].path, "/dav/addressbooks/users/bruce/contacts/ada.vcf");
+        assert_eq!(requests[3].method, "PUT");
+        assert_eq!(requests[3].path, "/dav/addressbooks/users/demo/contacts/ada.vcf");
         assert_eq!(header(&requests[3], "if-match").as_deref(), Some(r#""new-etag""#));
+        assert!(requests[3].body.contains("FN:Ada Byron"));
+        assert_eq!(requests[4].method, "DELETE");
+        assert_eq!(requests[4].path, "/dav/addressbooks/users/demo/contacts/ada.vcf");
+        assert_eq!(header(&requests[4], "if-match").as_deref(), Some(r#""updated-etag""#));
     }
 
     #[tokio::test]
-    async fn auth_modes_and_delete_without_etag_match_php_preconditions() {
+    async fn auth_modes_and_delete_without_etag_match_expected_preconditions() {
         let server = MockDavServer::start(vec![
             response(multistatus(
                 r#"<d:response><d:href>/dav/</d:href><d:propstat><d:prop><card:addressbook-home-set><d:href>/dav/addressbooks/users/ada/</d:href></card:addressbook-home-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"#,

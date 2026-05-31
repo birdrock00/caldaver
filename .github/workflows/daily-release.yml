@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "17 10 * * *"
   workflow_dispatch:
+    inputs:
+      release_title:
+        description: "Optional GitHub release title"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -26,6 +31,7 @@ jobs:
     outputs:
       date_tag: ${{ steps.release.outputs.date_tag }}
       release_tag: ${{ steps.release.outputs.release_tag }}
+      release_title: ${{ steps.release.outputs.release_title }}
       image_repo: ${{ steps.release.outputs.image_repo }}
       previous_tag: ${{ steps.release.outputs.previous_tag }}
 
@@ -42,12 +48,17 @@ jobs:
           set -euo pipefail
           date_tag="$(date -u +'%Y-%m-%d')"
           release_tag="$(date -u +'%Y-%m-%d-%H%M%S')"
+          release_title="${{ github.event.inputs.release_title || '' }}"
+          if [ -z "$release_title" ]; then
+            release_title="CalDaver $release_tag"
+          fi
           image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
           git fetch --tags --force
           previous_tag="$(git tag --list '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]*' --sort=-creatordate | awk -v current="$release_tag" '$0 != current && $0 != "latest" { print; exit }')"
           {
             echo "date_tag=$date_tag"
             echo "release_tag=$release_tag"
+            echo "release_title=$release_title"
             echo "image_repo=$image_repo"
             echo "previous_tag=$previous_tag"
           } >> "$GITHUB_OUTPUT"
@@ -219,11 +230,11 @@ jobs:
           set -euo pipefail
           if gh release view "${{ needs.prepare.outputs.release_tag }}" >/dev/null 2>&1; then
             gh release edit "${{ needs.prepare.outputs.release_tag }}" \
-              --title "CalDaver ${{ needs.prepare.outputs.release_tag }}" \
+              --title "${{ needs.prepare.outputs.release_title }}" \
               --notes-file "${{ steps.notes.outputs.notes_file }}"
           else
             gh release create "${{ needs.prepare.outputs.release_tag }}" \
-              --title "CalDaver ${{ needs.prepare.outputs.release_tag }}" \
+              --title "${{ needs.prepare.outputs.release_title }}" \
               --notes-file "${{ steps.notes.outputs.notes_file }}" \
               --latest=false
           fi

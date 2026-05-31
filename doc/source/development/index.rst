@@ -7,8 +7,8 @@ information to confirm a bug.
 Virtual Machine
 ---------------
 
-Configuring a working environment for Caldaver can be difficult. There are so
-many requirements (web server, PHP, PHP libraries, Composer, a CalDAV server...).
+Configuring a working environment for Caldaver can be difficult. You need a
+Rust toolchain, Node.js, PostgreSQL, and a CalDAV server.
 
 To make the task of setting up an environment easier, Caldaver ships with a
 `Vagrant <https://www.vagrantup.com/>`_ file and an `Ansible
@@ -94,4 +94,3 @@ JavaScript
 Run the following command to rebuild them::
 
    $ npm run build:js
-

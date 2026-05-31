@@ -8,7 +8,7 @@ You can write to `Caldaver general list
 <http://groups.google.com/group/caldaver-general>`_ asking for help. Make
 sure you include the following information:
 
-* Software details (OS, PHP version, web server you're using, CalDAV server)
+* Software details (OS, Caldaver version, deployment method, CalDAV server)
 * Clear description of your problem
 * Important log lines
 
@@ -22,19 +22,9 @@ Development environment
 You can switch to ``development`` environment easily by setting the environment
 variable ``CALDAVER_ENVIRONMENT`` to ``dev``.
 
-Environment variables have to be set on your webserver configuration file.
-Apache lets you do it using ``SetEnv``, or even better, using ``SetEnvIf`` to
-enable the development environment just for some IPs. Example::
-
-   <Location />
-      SetEnvIf Remote_Addr ^1\.2\.3\.4$ CALDAVER_ENVIRONMENT=dev
-   </Location>
-
-Then point your browser to ``http://your.caldaver.host/``. A debugging
-toolbar will appear, logs will be more verbose and a new HTTP debug log will be
-generated.
-
-Note that your application will be more slow and logs will grow really fast.
+Environment variables are provided by your process manager, shell, container
+runtime, or orchestration platform. For local debugging, run the Rust server
+directly and set ``RUST_LOG=caldaver_server=debug,tower_http=debug``.
 
 Debug your browser status
 -------------------------
