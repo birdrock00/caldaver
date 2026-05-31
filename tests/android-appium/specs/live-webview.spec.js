@@ -85,6 +85,21 @@ async function clickText(selector, textPattern) {
   assert.equal(clicked, true, `Expected to click ${selector} matching ${textPattern}`);
 }
 
+async function clickSelector(selector) {
+  const clicked = await browser.execute(itemSelector => {
+    const element = document.querySelector(itemSelector);
+    if (!element) {
+      return false;
+    }
+
+    element.scrollIntoView({ block: 'center', inline: 'center' });
+    element.click();
+    return true;
+  }, selector);
+
+  assert.equal(clicked, true, `Expected to click ${selector}`);
+}
+
 async function fetchInApp(path, options = {}) {
   return browser.executeAsync((url, requestOptions, done) => {
     fetch(url, {
@@ -283,10 +298,31 @@ describe('Caldaver installed Android WebView', function () {
 
     await waitForSelector('.contacts-panel');
     await waitForSelector('#contact_create');
-    await waitForSelector('#contacts_list');
+    await browser.waitUntil(async () => {
+      return browser.execute(() => {
+        const list = document.querySelector('#contacts_list');
+        const cards = document.querySelector('#contacts_cards');
+        const empty = document.querySelector('#contacts_empty');
+        return !!(list && !list.hidden) || !!(cards && !cards.hidden) || !!(empty && !empty.hidden);
+      });
+    }, {
+      timeoutMsg: 'Contacts page did not render a list, card grid, or empty state'
+    });
 
-    await $('.contacts-view-switch button[data-view="cards"]').click();
-    await waitForSelector('#contacts_cards');
+    await browser.execute(() => {
+      const cardsButton = document.querySelector('.contacts-view-switch button[data-view="cards"]');
+      if (cardsButton) {
+        cardsButton.click();
+      }
+    });
+    await browser.waitUntil(async () => {
+      return browser.execute(() => {
+        const cards = document.querySelector('#contacts_cards');
+        return !!(cards && !cards.hidden && cards.getClientRects().length > 0);
+      });
+    }, {
+      timeoutMsg: 'Contacts card view did not become visible'
+    });
   });
 
   it('creates and deletes a contact through the live CardDAV-backed app session', async function () {
@@ -404,15 +440,24 @@ describe('Caldaver installed Android WebView', function () {
     assert.equal(await exists('#mail_account_create'), false, 'Add account should live in preferences, not the mail screen');
     await browser.waitUntil(async () => {
       return browser.execute(() => {
-        return !!document.querySelector('#mail_empty') ||
-          !!document.querySelector('#mail_error') ||
+        const visible = selector => {
+          const element = document.querySelector(selector);
+          return !!(element && !element.hidden && element.getClientRects().length > 0);
+        };
+
+        return visible('#mail_empty') ||
+          visible('#mail_error') ||
           !!document.querySelector('.mail-account-tab');
       });
     }, {
       timeoutMsg: 'Mail page did not render accounts, empty state, or error state'
     });
 
-    if (await exists('#mail_error')) {
+    const mailErrorVisible = await browser.execute(() => {
+      const element = document.querySelector('#mail_error');
+      return !!(element && !element.hidden && element.getClientRects().length > 0);
+    });
+    if (mailErrorVisible) {
       const errorText = await $('#mail_error').getText();
       assert.equal(errorText.trim(), '', `Mail page rendered an error: ${errorText}`);
     }
@@ -432,7 +477,7 @@ describe('Caldaver installed Android WebView', function () {
       });
 
       if (await exists('#mail_rows .mail-row')) {
-        await $('#mail_rows .mail-row').click();
+        await clickSelector('#mail_rows .mail-row');
         await waitForSelector('#mail_reader_message');
         await waitForSelector('#mail_reader_subject');
         assert.equal(await exists('.mail-read-shell .compose-button'), false, 'Mail reader should rely on the toolbar back button');
@@ -450,11 +495,11 @@ describe('Caldaver installed Android WebView', function () {
 
         if (await exists('#mail_reader_unread')) {
           await waitForSelector('#mail_reader_unread');
-          await $('#mail_reader_unread').click();
+          await clickSelector('#mail_reader_unread');
           await waitForSelector('#mail_rows');
           await waitForSelector('.mail-row.highlighted-unread');
         } else {
-          await $('#mail_reader_back').click();
+          await clickSelector('#mail_reader_back');
         }
         await waitForSelector('#mail_rows');
       }
