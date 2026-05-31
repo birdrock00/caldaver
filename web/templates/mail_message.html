@@ -18,6 +18,8 @@
       data-account-id="{{ account_id }}"
       data-uid="{{ uid }}"
       data-message-url="{{ app.url_generator.generate('mail.message') }}"
+      data-messages-url="{{ app.url_generator.generate('mail.messages') }}"
+      data-read-url="{{ app.url_generator.generate('mail.read') }}"
       data-unread-url="{{ app.url_generator.generate('mail.message.unread') }}"
       data-inbox-url="{{ app.url_generator.generate('mail') }}"
       data-attachment-url="{{ app.url_generator.generate('mail.attachment') }}"
