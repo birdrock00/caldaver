@@ -21,11 +21,12 @@ env:
 
 jobs:
   prepare:
-    name: Prepare release tags
+    name: Prepare release metadata
     runs-on: ubuntu-latest
     outputs:
       date_tag: ${{ steps.release.outputs.date_tag }}
       image_repo: ${{ steps.release.outputs.image_repo }}
+      previous_tag: ${{ steps.release.outputs.previous_tag }}
 
     steps:
       - name: Checkout repository
@@ -40,22 +41,13 @@ jobs:
           set -euo pipefail
           date_tag="$(date -u +'%Y-%m-%d')"
           image_repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          git fetch --tags --force
+          previous_tag="$(git tag --list '20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' --sort=-creatordate | awk -v current="$date_tag" '$0 != current { print; exit }')"
           {
             echo "date_tag=$date_tag"
             echo "image_repo=$image_repo"
+            echo "previous_tag=$previous_tag"
           } >> "$GITHUB_OUTPUT"
-
-      - name: Publish date and latest git tags
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch --tags --force
-          git tag -fa "${{ steps.release.outputs.date_tag }}" "$GITHUB_SHA" -m "Caldaver daily release ${{ steps.release.outputs.date_tag }}"
-          git tag -fa latest "$GITHUB_SHA" -m "Caldaver latest release"
-          git push --force origin "refs/tags/${{ steps.release.outputs.date_tag }}"
-          git push --force origin "refs/tags/latest"
 
   docker:
     name: Publish Docker image
@@ -136,20 +128,117 @@ jobs:
           test -n "$apk"
           mv "$apk" "build/android-apk/caldaver-android-${{ needs.prepare.outputs.date_tag }}.apk"
 
-      - name: Publish dated GitHub release
-        uses: softprops/action-gh-release@v2
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ needs.prepare.outputs.date_tag }}
-          name: CalDaver ${{ needs.prepare.outputs.date_tag }}
-          files: build/android-apk/*.apk
-          overwrite_files: true
-          make_latest: false
+          name: caldaver-android-apk
+          path: build/android-apk/*.apk
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub releases
+    runs-on: ubuntu-latest
+    needs:
+      - prepare
+      - docker
+      - android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Android APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: caldaver-android-apk
+          path: build/android-apk
+
+      - name: Publish date and latest git tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch --tags --force
+          git tag -fa "${{ needs.prepare.outputs.date_tag }}" "$GITHUB_SHA" -m "Caldaver daily release ${{ needs.prepare.outputs.date_tag }}"
+          git tag -fa latest "$GITHUB_SHA" -m "Caldaver latest release"
+          git push --force origin "refs/tags/${{ needs.prepare.outputs.date_tag }}"
+          git push --force origin "refs/tags/latest"
+
+      - name: Generate release notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          notes_file="$RUNNER_TEMP/release-notes.md"
+          {
+            echo "## Artifacts"
+            echo
+            echo "- Docker image: \`${{ needs.prepare.outputs.image_repo }}:${{ needs.prepare.outputs.date_tag }}\`"
+            echo "- Docker image: \`${{ needs.prepare.outputs.image_repo }}:latest\`"
+            echo "- Android APK: attached to this release"
+            echo "- Source code: GitHub-generated source archives for this tag"
+            echo
+            echo "## Changes"
+            echo
+          } > "$notes_file"
+
+          previous_tag="${{ needs.prepare.outputs.previous_tag }}"
+          if [ -n "$previous_tag" ] && git rev-parse --verify --quiet "refs/tags/$previous_tag" >/dev/null; then
+            range="$previous_tag..HEAD"
+            echo "Changes since \`$previous_tag\`:" >> "$notes_file"
+            echo >> "$notes_file"
+          else
+            range="HEAD"
+            echo "All reachable changes in this release:" >> "$notes_file"
+            echo >> "$notes_file"
+          fi
+
+          if git log --format='- %s (%h)' "$range" >> "$notes_file"; then
+            if ! grep -q '^- ' "$notes_file"; then
+              echo "- No code changes since the previous release." >> "$notes_file"
+            fi
+          else
+            echo "- Unable to calculate git change list." >> "$notes_file"
+          fi
+
+          echo "notes_file=$notes_file" >> "$GITHUB_OUTPUT"
+
+      - name: Publish dated GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "${{ needs.prepare.outputs.date_tag }}" >/dev/null 2>&1; then
+            gh release edit "${{ needs.prepare.outputs.date_tag }}" \
+              --title "CalDaver ${{ needs.prepare.outputs.date_tag }}" \
+              --notes-file "${{ steps.notes.outputs.notes_file }}"
+          else
+            gh release create "${{ needs.prepare.outputs.date_tag }}" \
+              --title "CalDaver ${{ needs.prepare.outputs.date_tag }}" \
+              --notes-file "${{ steps.notes.outputs.notes_file }}" \
+              --latest=false
+          fi
+          gh release upload "${{ needs.prepare.outputs.date_tag }}" build/android-apk/*.apk --clobber
 
       - name: Publish latest GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: latest
-          name: CalDaver latest
-          files: build/android-apk/*.apk
-          overwrite_files: true
-          make_latest: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view latest >/dev/null 2>&1; then
+            gh release edit latest \
+              --title "CalDaver latest" \
+              --notes-file "${{ steps.notes.outputs.notes_file }}" \
+              --latest
+          else
+            gh release create latest \
+              --title "CalDaver latest" \
+              --notes-file "${{ steps.notes.outputs.notes_file }}" \
+              --latest
+          fi
+          gh release upload latest build/android-apk/*.apk --clobber
