@@ -23,6 +23,7 @@ Useful environment variables:
 - `APPIUM_HOST` and `APPIUM_PORT`, default to `127.0.0.1:4723`
 - `CALDAVER_ANDROID_CHROMEDRIVER_AUTODOWNLOAD=1`, allow Appium to fetch a matching Chromedriver
 - `CALDAVER_ANDROID_CHROMEDRIVER_EXECUTABLE`, use a specific Chromedriver binary
+- `CALDAVER_ANDROID_ADB_EXEC_TIMEOUT_MS`, Appium adb command timeout, defaults to `120000`
 - `CALDAVER_ANDROID_APK`, APK path for `npm run android:adb-smoke`, defaults to `android/app/build/outputs/apk/debug/app-debug.apk`
 - `CALDAVER_ANDROID_SMOKE_DIR`, evidence directory for adb install, launch, logcat, and screenshot output
 - `CALDAVER_ANDROID_LAUNCH_WAIT_SECONDS`, defaults to `8`
