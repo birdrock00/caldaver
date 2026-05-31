@@ -222,6 +222,11 @@ jobs:
               --notes-file "${{ steps.notes.outputs.notes_file }}" \
               --latest=false
           fi
+          assets="$(gh release view "${{ needs.prepare.outputs.date_tag }}" --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$' || true)"
+          while IFS= read -r asset; do
+            [ -n "$asset" ] || continue
+            gh release delete-asset "${{ needs.prepare.outputs.date_tag }}" "$asset" --yes
+          done <<< "$assets"
           gh release upload "${{ needs.prepare.outputs.date_tag }}" build/android-apk/*.apk --clobber
 
       - name: Publish latest GitHub release
@@ -241,4 +246,9 @@ jobs:
               --notes-file "${{ steps.notes.outputs.notes_file }}" \
               --latest
           fi
+          assets="$(gh release view latest --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$' || true)"
+          while IFS= read -r asset; do
+            [ -n "$asset" ] || continue
+            gh release delete-asset latest "$asset" --yes
+          done <<< "$assets"
           gh release upload latest build/android-apk/*.apk --clobber
