@@ -9,6 +9,30 @@ for calendars, contacts, preferences, and mail.
 
 ![Screenshot](./docs/screenshot.png)
 
+## What Changed In This Fork
+
+This fork has moved beyond the original PHP-only AgenDAV codebase:
+
+- The backend has been migrated to Rust. The `caldaver-server` crate now serves
+  the web app, static assets, sessions, CalDAV/CardDAV proxy behavior,
+  preferences, calendar sharing, contact lookup, and mail account/message APIs.
+- Shared domain logic lives in `caldaver-core`, including CalDAV filtering and
+  resources, CardDAV parsing, XML generation/parsing, preferences, reminders,
+  shares, and IMAP account validation.
+- PostgreSQL is now the runtime store for sessions, preferences, shares, mail
+  accounts, and cached mail metadata.
+- The legacy PHP application, Composer runtime, bundled Ansible example, and
+  Apache/PHP Docker runtime have been removed from the active application path.
+- The Docker image now builds frontend assets, compiles the Rust server, and
+  runs `caldaver-server` directly on port `8080`.
+- Capacitor Android support builds a Caldaver APK from the same web assets and
+  can point at a configured remote Caldaver server at build time.
+- Android Appium and ADB smoke tests validate the installed APK and WebView
+  behavior against a live backend.
+- GitHub releases are produced when release artifacts are published. Each dated
+  release includes source archives, the built Android APK, Docker image tags,
+  and release notes listing the commits since the previous dated release.
+
 ## Requirements
 
 Caldaver requires:
@@ -19,6 +43,7 @@ Caldaver requires:
 - PostgreSQL for sessions, preferences, mail accounts, and cached mail metadata
 - Rust stable for source builds
 - Optional: nodejs & npm to build assets (releases include a build)
+- Optional: Android SDK, Java 21, and Node.js when building the Android APK
 
 ## Documentation
 
@@ -37,6 +62,10 @@ This fork includes a Docker image published to GitHub Container Registry as
 
 The Docker image builds the frontend assets, compiles `caldaver-server`, and
 runs the Rust backend directly on port `8080`.
+
+When the release workflow publishes a Docker image, it also builds the Android
+APK and updates GitHub Releases. The dated release is the durable release record;
+`latest` is updated to point at the newest artifact set.
 
 Required runtime configuration:
 
@@ -70,6 +99,38 @@ docker run -d --name caldaver \
   -e CALDAVER_AUTH_PASSWORD=change-this \
   ghcr.io/caldaver-app/caldaver:latest
 ```
+
+### Android APK
+
+The Android app is a Capacitor wrapper around the Caldaver web UI. Build-time
+configuration controls the remote server URL; do not commit deployment-specific
+URLs or credentials to this repository.
+
+Useful commands:
+
+```sh
+npm install
+CALDAVER_BASE_URL=https://caldaver.example.test npm run android:apk
+ANDROID_UDID=emulator-5554 npm run android:adb-smoke
+```
+
+`CALDAVER_ANDROID_SERVER_URL` overrides `CALDAVER_BASE_URL` for the generated
+Capacitor Android config. `CALDAVER_ANDROID_ALLOW_NAVIGATION` can be set to a
+comma-separated list of additional hosts that should remain inside the WebView.
+
+### Releases
+
+The release workflow publishes a complete artifact set from the same commit:
+
+- Git tags: `YYYY-MM-DD` and `latest`
+- Docker images: `ghcr.io/caldaver-app/caldaver:YYYY-MM-DD` and
+  `ghcr.io/caldaver-app/caldaver:latest`
+- Android APK: attached to the dated GitHub release and the `latest` release
+- Source code: GitHub-generated source archives for the release tag
+- Release notes: generated from commits since the previous dated release
+
+This means every new container release also produces a matching APK release and
+a GitHub release entry describing what changed.
 
 ## Upstream Source
 
