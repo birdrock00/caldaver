@@ -524,7 +524,12 @@ describe('Caldaver installed Android WebView', function () {
     await waitForSelector('#own_calendar_list');
 
     await $('.mobile-section-menu summary').click();
-    assert.equal(await visibleLinkTextIn('.mobile-section-menu', 'Calendar'), true);
+    assert.equal(await browser.execute(() => {
+      const summary = document.querySelector('.mobile-calendar-menu > summary');
+      return summary && summary.textContent.includes('Calendar');
+    }), true);
+    await $('.mobile-calendar-menu > summary').click();
+    await waitForSelector('.mobile-calendar-account');
     assert.equal(await visibleLinkTextIn('.mobile-section-menu', 'Contacts'), true);
     assert.equal(await visibleLinkTextIn('.mobile-section-menu', 'Mail'), true);
 
