@@ -108,6 +108,23 @@ CREATE TABLE IF NOT EXISTS caldaver_local_contacts (
 	ALTER TABLE mail_message_cache ALTER COLUMN account_id TYPE BIGINT;
 	ALTER TABLE mail_message_cache ALTER COLUMN uid TYPE BIGINT;
 
+	DO $$
+	BEGIN
+	    IF EXISTS (
+	        SELECT 1 FROM information_schema.columns
+	        WHERE table_name = 'mail_message_cache'
+	          AND column_name = 'message'
+	          AND data_type <> 'jsonb'
+	    ) THEN
+	        BEGIN
+	            EXECUTE 'ALTER TABLE mail_message_cache ALTER COLUMN message TYPE JSONB USING message::jsonb';
+	        EXCEPTION WHEN others THEN
+	            EXECUTE 'DELETE FROM mail_message_cache';
+	            EXECUTE 'ALTER TABLE mail_message_cache ALTER COLUMN message TYPE JSONB USING message::jsonb';
+	        END;
+	    END IF;
+	END $$;
+
 DO $$
 BEGIN
     IF EXISTS (
@@ -481,12 +498,15 @@ WHERE owner=$1 AND id=$2
             .get()
             .await?
             .query(
-                "SELECT message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 ORDER BY (message->>'date') DESC, uid DESC",
+	                "SELECT message::JSONB AS message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 ORDER BY (message->>'date') DESC, uid DESC",
                 &[&owner, &account_id],
             )
             .await?;
         rows.into_iter()
-            .map(|row| serde_json::from_value(row.get("message")).map_err(Into::into))
+            .map(|row| {
+                let message: Value = row.try_get("message")?;
+                serde_json::from_value(message).map_err(Into::into)
+            })
             .collect()
     }
 
