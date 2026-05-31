@@ -61,7 +61,7 @@ exports.config = {
         args: {
           address: appiumHost,
           port: appiumPort,
-          ...(chromedriverAutodownload ? { 'allow-insecure': 'chromedriver_autodownload' } : {})
+          ...(chromedriverAutodownload ? { 'allow-insecure': 'uiautomator2:chromedriver_autodownload' } : {})
         }
       }
     ]],
