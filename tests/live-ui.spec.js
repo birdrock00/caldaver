@@ -290,6 +290,33 @@ async function dispatchTouchSwipe(page, selector, startX, endX, y = 220) {
   }, { itemSelector: selector, fromX: startX, toX: endX, clientY: y });
 }
 
+async function dispatchDoubleTouchTap(page, selector) {
+  await page.locator(selector).waitFor({ state: 'visible' });
+  await page.evaluate(itemSelector => {
+    const element = document.querySelector(itemSelector);
+    const touch = {
+      identifier: 1,
+      target: element,
+      clientX: 24,
+      clientY: 24,
+      pageX: 24,
+      pageY: 24,
+      screenX: 24,
+      screenY: 24
+    };
+
+    function touchEnd() {
+      const event = new Event('touchend', { bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'touches', { value: [] });
+      Object.defineProperty(event, 'changedTouches', { value: [touch] });
+      element.dispatchEvent(event);
+    }
+
+    touchEnd();
+    touchEnd();
+  }, selector);
+}
+
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
   const pageErrors = await login(page);
 
@@ -401,6 +428,48 @@ test('contacts section opens from the left tab and supports card view', async ({
 
   await page.locator('.contacts-view-switch button[data-view="cards"]').click();
   await expect(page.locator('#contacts_cards')).toBeVisible();
+});
+
+test('contact card double tap dialing is disabled in browser contexts', async ({ page }) => {
+  await mockCardsApi(page, 1);
+  await page.addInitScript(() => {
+    window.__contactDialProbe = { confirms: [], opens: [] };
+    window.open = (url, target) => {
+      window.__contactDialProbe.opens.push({ url, target });
+      return null;
+    };
+  });
+
+  await login(page);
+  await page.goto(`${baseURL}/cards`);
+  await page.locator('.contacts-view-switch button[data-view="cards"]').click();
+  await expect(page.locator('#contacts_cards .contact-card')).toHaveCount(1);
+  await dispatchDoubleTouchTap(page, '#contacts_cards .contact-card');
+  await page.waitForTimeout(100);
+  await expect.poll(() => page.evaluate(() => window.__contactDialProbe)).toEqual({ confirms: [], opens: [] });
+
+  await page.addInitScript(() => {
+    window.Capacitor = {
+      getPlatform: () => 'web',
+      isNativePlatform: () => false,
+      Plugins: {
+        Dialog: {
+          confirm: options => {
+            window.__contactDialProbe.confirms.push(options);
+            return Promise.resolve({ value: true });
+          }
+        }
+      }
+    };
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseURL}/cards`);
+  await page.locator('.contacts-view-switch button[data-view="cards"]').click();
+  await expect(page.locator('#contacts_cards .contact-card')).toHaveCount(1);
+  await dispatchDoubleTouchTap(page, '#contacts_cards .contact-card');
+  await page.waitForTimeout(100);
+  await expect.poll(() => page.evaluate(() => window.__contactDialProbe)).toEqual({ confirms: [], opens: [] });
 });
 
 test('created contacts are persisted through the configured local CardDAV server', async ({ page }) => {

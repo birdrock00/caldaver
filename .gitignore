@@ -6,21 +6,15 @@
 
 /var/logs/
 /doc/build
-/web/vendor
-
 # Vagrant
 /.vagrant
 /vagrant_ansible_inventory_default
 
-*.phar
 *.sqlite
 
 caldaver-built*
 web/public/dist/css/*.css
 web/public/dist/js/*.js
-
-# Configuration file
-/web/config/settings*
 
 # Development
 /node_modules/
@@ -28,6 +22,4 @@ web/public/dist/js/*.js
 /dist/
 /build/
 /rust/target/
-.phpunit.cache/
-.phpunit.result.cache
 .idea

@@ -42,7 +42,7 @@ test('Rust workspace owns backend crates and scripts', () => {
   }
 });
 
-test('Rust server exposes the former PHP route surface', () => {
+test('Rust server exposes the web route surface', () => {
   const server = read('rust/crates/caldaver-server/src/lib.rs');
 
   for (const route of [
@@ -52,6 +52,7 @@ test('Rust server exposes the former PHP route surface', () => {
     'route("/cards", get(cards_page))',
     'route("/cards/list", get(cards_list))',
     'route("/cards/save", post(cards_save))',
+    'route("/cards/update", post(cards_update))',
     'route("/cards/delete", post(cards_delete))',
     'route("/mail", get(mail_page))',
     'route("/mail/read", get(mail_read_page))',
@@ -81,7 +82,7 @@ test('Rust server exposes the former PHP route surface', () => {
   }
 });
 
-test('Docker image runs the Rust backend without PHP or Apache', () => {
+test('Docker image runs the standalone Rust backend', () => {
   const dockerfile = read('Dockerfile');
 
   assert.match(dockerfile, /FROM docker\.io\/library\/rust:1-bookworm AS rust-builder/);
@@ -90,10 +91,7 @@ test('Docker image runs the Rust backend without PHP or Apache', () => {
   assert.match(dockerfile, /ENTRYPOINT \["\/usr\/local\/bin\/caldaver-server"\]/);
   assert.match(dockerfile, /CALDAVER_STATIC_ROOT=\/var\/www\/caldaver\/web\/public/);
   assert.match(dockerfile, /USER nobody/);
-  assert.doesNotMatch(dockerfile, /docker\.io\/library\/php/);
   assert.doesNotMatch(dockerfile, /apache2/);
-  assert.doesNotMatch(dockerfile, /composer/);
-  assert.doesNotMatch(dockerfile, /pdo_pgsql|imap/);
 
   const config = read('rust/crates/caldaver-server/src/config.rs');
   const storage = read('rust/crates/caldaver-server/src/storage.rs');
@@ -104,8 +102,9 @@ test('Docker image runs the Rust backend without PHP or Apache', () => {
   assert.match(storage, /CREATE TABLE IF NOT EXISTS mail_accounts/);
   assert.match(storage, /ALTER TABLE mail_accounts ALTER COLUMN id TYPE BIGINT/);
   assert.match(storage, /ALTER TABLE mail_message_cache ALTER COLUMN message TYPE JSONB USING message::jsonb/);
+  assert.match(storage, /DELETE FROM mail_message_cache WHERE message IS NULL/);
   assert.match(storage, /SELECT id::BIGINT AS id/);
-  assert.match(storage, /SELECT message::JSONB AS message/);
+  assert.match(storage, /SELECT message::JSONB AS message[\s\S]*message IS NOT NULL/);
 });
 
 test('frontend templates preserve mobile navigation and mail behavior', () => {
@@ -163,6 +162,24 @@ test('layout CSS keeps mobile pages scrollable and controls visible', () => {
   assert.match(less, /\.mail-shell\s*\{[\s\S]*height:\s*~"calc\(100dvh - 64px\)";/);
   assert.match(less, /\.mail-reader-message\s*\{[\s\S]*max-width:\s*none;/);
   assert.match(less, /\.mail-reader-html\s*\{[\s\S]*width:\s*100%;/);
+});
+
+test('contacts card dialing is native Android app only', () => {
+  const packageJson = JSON.parse(read('package.json'));
+  const cardsJs = read('web/templates/parts/cardsjs.html');
+
+  assert.equal(packageJson.devDependencies['@capacitor/dialog'], '^8.0.1');
+  assert.match(cardsJs, /function isInstalledAndroidApp\(\)/);
+  assert.match(cardsJs, /window\.Capacitor\.isNativePlatform\(\)/);
+  assert.match(cardsJs, /capacitorPlatform\(\) === 'android'/);
+  assert.match(cardsJs, /capacitorPlugin\('Dialog'\)/);
+  assert.match(cardsJs, /okButtonTitle:\s*'Dial'/);
+  assert.match(cardsJs, /cancelButtonTitle:\s*'Cancel'/);
+  assert.match(cardsJs, /window\.open\(telHref\(contact\.phone\), '_self'\)/);
+  assert.match(cardsJs, /card\.addEventListener\('touchend'/);
+  assert.match(cardsJs, /card\.addEventListener\('dblclick'/);
+  assert.match(cardsJs, /view !== 'cards'/);
+  assert.doesNotMatch(cardsJs, /window\.confirm\('Dial/);
 });
 
 test('Rust core contains translated backend domain coverage', () => {

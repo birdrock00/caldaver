@@ -125,6 +125,8 @@ CREATE TABLE IF NOT EXISTS caldaver_local_contacts (
 	    END IF;
 	END $$;
 
+	DELETE FROM mail_message_cache WHERE message IS NULL;
+
 DO $$
 BEGIN
     IF EXISTS (
@@ -498,7 +500,7 @@ WHERE owner=$1 AND id=$2
             .get()
             .await?
             .query(
-	                "SELECT message::JSONB AS message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 ORDER BY (message->>'date') DESC, uid DESC",
+                "SELECT message::JSONB AS message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 AND message IS NOT NULL ORDER BY (message->>'date') DESC, uid DESC",
                 &[&owner, &account_id],
             )
             .await?;
