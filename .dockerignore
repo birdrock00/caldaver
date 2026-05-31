@@ -5,11 +5,8 @@ node_modules
 bower_components
 dist
 doc/build
-web/vendor
-web/config/settings.php
 web/public/dist/css/*.css
 web/public/dist/js/*.js
 *.sqlite
-*.phar
 Dockerfile
 docker-compose*.yml

@@ -3,137 +3,40 @@
 Upgrading
 =========
 
-Before starting this process, **make sure you have a backup** of your current
-Caldaver directory, specially the ``web/config/`` directory, and a dump of your
-database schema and contents.
+Before upgrading, back up your PostgreSQL database and any deployment-specific
+environment configuration.
 
-Please, do not continue unless you have both backups.
+Container deployments
+---------------------
 
-Read all the :ref:`releasenotes` starting at the version you are currently using, because some
-important changes may have happened. Apply those changes after updating the files from Caldaver.
+Pull the desired image tag and restart the container with the same environment
+variables. The server applies database schema updates at startup.
 
-Make sure your system meets the requirements before upgrading. Read the :ref:`requirements` section.
+Example::
 
-Upgrading from 1.x.x
---------------------
+  $ docker pull ghcr.io/caldaver-app/caldaver:latest
+  $ docker stop caldaver
+  $ docker rm caldaver
 
-If you are upgrading Caldaver from 1.x.x, make sure you have the latest 1.x release
-installed.
+Then start the replacement container using the same configuration described in
+the :doc:`installation` section.
 
-The just follow the steps below. You will also have to update your web server configuration (see :ref:`webserver`).
+Source deployments
+------------------
 
-.. _filesupgrade:
-
-Upgrade Caldaver code
---------------------
-
-a) Updating from a tar.gz file
-******************************
-
-After downloading the new tar.gz file and uncompressing it, copy your
-configuration files from the old directory::
-
-  $ cp -a /path/to/old_caldaver/web/config/settings.php \
-    /path/to/new/caldaver/web/config/
-
-This will only work if you are upgrading from Caldaver 2.x, as older releases
-used different configuration files.
-
-b) Updating from git
-********************
-
-If you downloaded Caldaver from the git repository at GitHub then you can
-checkout latest stable release from the ``master`` branch, or an specific
-version using its tag.
-
-Just pull latest changes and checkout the release you want. For example,
-checking out Caldaver 2.0.0 can be achieved with::
+Fetch the desired revision, rebuild assets, and rebuild the Rust server::
 
   $ git pull
-  [...]
-  $ git checkout 2.0.0
+  $ npm install
+  $ npm run build
+  $ cargo build --release --manifest-path rust/Cargo.toml --bin caldaver-server
 
-Next step is downloading latest Caldaver dependencies using Composer. If you
-already have Composer installed, just run::
+Restart the service with the same environment variables. Database schema
+updates run automatically on startup.
 
- $ cd web/
- $ composer install
+Android application
+-------------------
 
-If you are upgrading from Caldaver 1.2.x, you will need to install Composer.
-Follow the instructions you'll find in the installation section.
-
-.. _dbupgrade:
-
-Database upgrade
-----------------
-
-The database upgrade process included in Caldaver lets you
-apply the latest schema changes without having to deal with ``.sql`` files
-and with no need to check which files you should apply to your current
-version.
-
-Follow the guide at :ref:`configuration` to create a new ``settings.php`` file inside
-``web/config`` which contains at least the database connection details.
-
-Once you have your database configuration prepared, run the provided ``caldavercli`` script this
-way::
-
-  $ php caldavercli migrations:migrate
-
-
-
-Clear sessions and caches
--------------------------
-
-It is recommended to remove all active sessions. Do it by running the
-following command::
-
-  $ php caldavercli sessions:clear
-
-If you are running Caldaver on a production environment, you should clear several
-caches:
-
-- Remove the contents of the _twig_ cache directory. The cache path is configured
-  using the option ``twig.options`` on your ``settings.php`` file. If you did not override the
-  default value, it should be found at `web/var/cache/twig/` subdirectory::
-
-    $ rm -rf web/var/cache/twig/*
-
-- Remove the Doctrine ORM metadata cache. Even if you didn't configure it, the ORM tries to
-  find any available caches (APC, memcached, etc). Clear it with::
-
-   $ php caldavercli orm:clear-cache:metadata
-
-Finishing the upgrade from Caldaver 1.2.x (shares)
--------------------------------------------------
-
-If you were using calendar sharing, there is an additional step required to complete the upgrade.
-The schema upgrading process from Caldaver 1.2.x can't handle the upgrade for the ``shares`` table.
-The old table schema makes hard to apply a clean migration, so you have to run a query to adapt the
-shares data to the new expected format.
-
-The following queries will change the ``shares`` table for a DAViCal server, but can be adapted for
-other CalDAV servers.
-
-
-MySQL
-*****
-
-Run the following SQL queries::
-
-    UPDATE `shares` SET owner = CONCAT('/caldav.php/', owner, '/'),
-    calendar = CONCAT(owner, calendar, '/'),
-    `with` = CONCAT('/caldav.php/', `with`, '/');
-
-    UPDATE `shares` SET options = 'a:0:{}' WHERE options = '';
-
-PostgreSQL
-**********
-
-Run the following SQL queries::
-
-    UPDATE shares SET owner = '/caldav.php/' || owner || '/',
-    calendar = '/caldav.php/' || owner || '/' || calendar || '/',
-    "with" = '/caldav.php/' || "with" || '/';
-
-    UPDATE `shares` SET options = 'a:0:{}' WHERE options = '';
+Each published release includes a matching Android APK. Install the APK that
+matches your server release when you want the packaged WebView assets to track
+the same commit.

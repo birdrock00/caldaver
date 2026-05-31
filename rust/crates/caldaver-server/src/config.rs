@@ -19,6 +19,7 @@ pub struct Config {
     pub database_url: String,
     pub csrf_secret: String,
     pub session_lifetime: Duration,
+    pub cookie_secure: bool,
     pub logout_redirection: Option<String>,
     pub static_root: String,
     pub timezone: String,
@@ -50,6 +51,7 @@ impl Config {
             database_url,
             csrf_secret,
             session_lifetime: Duration::from_secs(env_u64("CALDAVER_SESSION_LIFETIME", 2_592_000)),
+            cookie_secure: env_bool("CALDAVER_COOKIE_SECURE", true),
             logout_redirection: env::var("CALDAVER_LOGOUT_REDIRECTION")
                 .ok()
                 .filter(|value| !value.trim().is_empty()),
@@ -83,6 +85,7 @@ impl Config {
             database_url,
             csrf_secret: "test-secret".to_string(),
             session_lifetime: Duration::from_secs(3600),
+            cookie_secure: false,
             logout_redirection: None,
             static_root: "web/public".to_string(),
             timezone: "UTC".to_string(),
