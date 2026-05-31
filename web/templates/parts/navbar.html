@@ -5,10 +5,16 @@
        <i class="fa fa-bars"></i>
      </summary>
      <nav class="mobile-section-menu-list" aria-label="Application sections">
-       <a class="{% if active_section|default('calendar') == 'calendar' %}active{% endif %}" href="{{ app.url_generator.generate('calendar') }}">
-         <i class="fa fa-calendar"></i>
-         <span>{% trans %}labels.calendar{% endtrans %}</span>
-       </a>
+       <details class="mobile-calendar-menu">
+         <summary class="{% if active_section|default('calendar') == 'calendar' %}active{% endif %}">
+           <i class="fa fa-calendar"></i>
+           <span>{% trans %}labels.calendar{% endtrans %}</span>
+           <i class="fa fa-caret-right mobile-calendar-menu-caret" aria-hidden="true"></i>
+         </summary>
+         <div class="mobile-calendar-menu-calendars" aria-label="{% trans %}labels.calendars{% endtrans %}">
+           <span class="mobile-calendar-menu-empty">Loading calendars...</span>
+         </div>
+       </details>
        <a class="{% if active_section|default('calendar') == 'cards' %}active{% endif %}" href="{{ app.url_generator.generate('cards') }}">
          <i class="fa fa-book"></i>
          <span>{% trans %}labels.contacts{% endtrans %}</span>
