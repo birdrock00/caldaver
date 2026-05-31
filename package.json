@@ -12,6 +12,7 @@
     "composer-dev": "cd web && composer install --dev --prefer-source",
     "test": "npm run test:ui",
     "test:ui": "node --test tests/ui-regressions.test.js",
+    "test:rust": "cargo test --manifest-path rust/Cargo.toml",
     "test:live-ui": "playwright test tests/live-ui.spec.js",
     "test:android-appium": "npm run test:android-appium:doctor && wdio tests/android-appium/wdio.conf.js --autoCompileOpts.autoCompile=false",
     "test:android-appium:doctor": "node tests/android-appium/doctor.js",
