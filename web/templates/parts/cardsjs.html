@@ -5,6 +5,7 @@
   var userSelectedView = false;
   var contactsLoading = true;
   var lastContactCardTap = { card: null, at: 0 };
+  var lastContactCardPrompt = { card: null, at: 0 };
   var contactCardDoubleTapMs = 550;
   var colors = ['#3367d6', '#188038', '#9334e6', '#d93025', '#00897b', '#5f6368', '#c5221f', '#7b1fa2'];
 
@@ -128,6 +129,7 @@
     var now = event.timeStamp || Date.now();
     if (lastContactCardTap.card === card && now - lastContactCardTap.at > 0 && now - lastContactCardTap.at <= contactCardDoubleTapMs) {
       lastContactCardTap = { card: null, at: 0 };
+      lastContactCardPrompt = { card: card, at: now };
       event.preventDefault();
       confirmAndDialContact(contact);
       return;
@@ -141,7 +143,14 @@
       return;
     }
 
+    var now = event.timeStamp || Date.now();
+    if (lastContactCardPrompt.card === card && now - lastContactCardPrompt.at >= 0 && now - lastContactCardPrompt.at <= contactCardDoubleTapMs) {
+      event.preventDefault();
+      return;
+    }
+
     lastContactCardTap = { card: null, at: 0 };
+    lastContactCardPrompt = { card: card, at: now };
     event.preventDefault();
     confirmAndDialContact(contact);
   }
