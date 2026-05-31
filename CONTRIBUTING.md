@@ -1,8 +1,6 @@
 # Contributing guidelines for Caldaver
 
-Great to have you here. Here are a few ways you can help make this project better!
-
-**Please note that this project was put into [maintenance mode](./README.md#maintenance-mode)**
+Great to have you here. Here are a few ways you can help make this project better.
 
 ## Issues
 
@@ -17,7 +15,7 @@ When reporting a bug make sure you specify the following data:
 * *What you were expecting to happen and what actualy happened*
 * Any logs that could help to identify the cause
 
-**You are encouraged to send fixes for bug reports as Pull Request**
+**You are encouraged to send fixes for bug reports as pull requests.**
 
 ### Features
 
@@ -26,10 +24,8 @@ implement it.
 
 ## Translation
 
-Caldaver uses [Transifex](https://www.transifex.com/caldaver-app/caldaver/) for translations.
-
-Have a look at [Transifex documentation](http://docs.transifex.com/) for more information about
-adding a new language or upadting an existing translation.
+Caldaver keeps user-facing strings in the web assets. When adding or changing
+labels, update the relevant templates and JavaScript together.
 
 ## Documentation
 
@@ -42,10 +38,11 @@ Have a look at the `doc/` directory.
 
 There are some facts that will help you when contributing code to Caldaver:
 
-* Caldaver ships with a [Vagrant environment](https://caldaver.readthedocs.io/en/latest/development/#virtual-machine)
-  that is absolutely recommended when developing
-* Caldaver includes unit tests as well, run via `./web/vendor/bin/phpunit tests`
-* Caldaver repository uses [nvie's git flow](http://nvie.com/posts/a-successful-git-branching-model/)
+* The backend lives under `rust/` and is tested with `npm run test:rust`.
+* UI regression coverage is run with `npm run test:ui`.
+* Frontend assets are built with `npm run build`.
+* Android packaging and smoke tests are available through the `android:*`
+  npm scripts.
 
 ### Pull requests
 
@@ -59,8 +56,9 @@ There are some facts that will help you when contributing code to Caldaver:
 
 ## Coding Guidelines
 
-This project has adopted the
-[PSR-2 Coding Style Guide](https://www.php-fig.org/psr/psr-2/) for PHP Code.
+Follow the style already present in the file you are editing. Keep Rust changes
+formatted with `cargo fmt`, JavaScript changes compatible with the existing
+asset pipeline, and documentation concise.
 
 ## Release cycle
 
@@ -79,10 +77,7 @@ All notable changes made between each release are documented in the
 Manual release steps done by project maintainers.
 
 - Checkout latest »development« branch and rebase against »main«
-- Use the projects base PHP version, stored in the
-  [.php-version](https://packagist.org/packages/webit-de/php-version-pickup)
-  file (or run `php-version-pickup use`)
-- Create test build runing `npm install && npm run-script build`
+- Create a test build running `npm install && npm run build`
 - Run code quality tools
 - Compare the »development« branch to »main«
   - Add a list of noteworthy features and bugfixes to CHANGELOG.md
@@ -91,8 +86,7 @@ Manual release steps done by project maintainers.
 - Change the version, using semantic versioning, in these files:
   - `doc/source/conf.py`
   - `package.json`
-  - `web/src/Version.php`
-- Run some manual test in the Vagrant box
+- Run focused manual tests against the Rust server
 - Create a release commit
   ([example commit](https://github.com/caldaver-app/caldaver/commit/7d2f1bba00deb090943f14bf9c47c4a6ac4d1387))
 - Merge »development« branch to »main«
@@ -103,8 +97,7 @@ Manual release steps done by project maintainers.
   - Clone the git repository using
     `git clone -b <version> https://github.com/caldaver-app/caldaver.git caldaver-<version>`
   - Run `npm install && npm run-script dist`
-    - Creates build files in `web/public/dist/css/`, `web/public/dist/js/`
-      and `web/vendor/`
-    - Removes `.git`, `ansible`, `node_modules`
+    - Creates build files in `web/public/dist/css/` and `web/public/dist/js/`
+    - Removes `.git`, `ansible`, and `node_modules`
   - Zip directory `tar -czf ../caldaver-<version>.tar.gz ../caldaver-<version>`
 - Sip a tea

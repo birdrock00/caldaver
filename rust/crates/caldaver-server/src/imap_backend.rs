@@ -110,7 +110,7 @@ impl SealedPassword {
         }
 
         let nonce_bytes: [u8; 12] = rand::random();
-        let cipher = Aes256Gcm::new_from_slice(&password_key())
+        let cipher = Aes256Gcm::new_from_slice(&password_key()?)
             .map_err(|_| MailBackendError::Crypto("Unable to initialize password seal".to_string()))?;
         let ciphertext = cipher
             .encrypt(Nonce::from_slice(&nonce_bytes), plaintext.as_bytes())
@@ -138,7 +138,7 @@ impl SealedPassword {
         let ciphertext = BASE64
             .decode(&self.ciphertext)
             .map_err(|_| MailBackendError::Crypto("Invalid sealed password ciphertext".to_string()))?;
-        let cipher = Aes256Gcm::new_from_slice(&password_key())
+        let cipher = Aes256Gcm::new_from_slice(&password_key()?)
             .map_err(|_| MailBackendError::Crypto("Unable to initialize password seal".to_string()))?;
         let plaintext = cipher
             .decrypt(Nonce::from_slice(&nonce), ciphertext.as_ref())
@@ -149,7 +149,7 @@ impl SealedPassword {
     }
 }
 
-fn password_key() -> [u8; 32] {
+fn password_key() -> Result<[u8; 32], MailBackendError> {
     let secret = env::var("CALDAVER_MAIL_PASSWORD_KEY")
         .ok()
         .filter(|value| !value.is_empty())
@@ -158,9 +158,16 @@ fn password_key() -> [u8; 32] {
                 .ok()
                 .filter(|value| !value.is_empty())
                 .map(|value| format!("auth:{value}"))
-        })
-        .unwrap_or_else(|| "caldaver-local-mail-password-key".to_string());
-    Sha256::digest(secret.as_bytes()).into()
+        });
+    #[cfg(test)]
+    let secret = secret.or_else(|| Some("caldaver-test-mail-password-key".to_string()));
+    let secret = secret.ok_or_else(|| {
+        MailBackendError::Crypto(
+            "CALDAVER_MAIL_PASSWORD_KEY or CALDAVER_AUTH_PASSWORD must be set to store mail passwords"
+                .to_string(),
+        )
+    })?;
+    Ok(Sha256::digest(secret.as_bytes()).into())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -603,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_message_matches_php_subject_body_and_inline_attachment_fallbacks() {
+    fn parse_message_handles_subject_body_and_inline_attachment_fallbacks() {
         let raw = concat!(
             "From: Ada <ada@example.test>\r\n",
             "Date: Mon, 01 Jan 2024 00:00:00 +0000\r\n",

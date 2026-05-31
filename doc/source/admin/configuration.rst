@@ -3,264 +3,126 @@
 Configuration
 =============
 
-Configuring Caldaver requires creating a ``settings.php`` file in the
-``web/config/`` directory.
+Caldaver is configured with environment variables.
 
-You will find all available settings inside the file ``default.settings.php``. Please, do not
-modify ``default.settings.php``, as any changes will be lost if you upgrade Caldaver.
+Required settings
+-----------------
 
-Save a copy of the ``default.settings.php`` file as ``settings.php``, or just copy the settings you want to
-modify,  and start configuring your instance.
+.. confval:: CALDAVER_CALDAV_SERVER
 
-.. confval:: site.title
+   Base CalDAV URL used for calendar discovery and requests.
 
-   Title of every page
+.. confval:: CALDAVER_CSRF_SECRET
 
-.. confval:: site.logo
+   Persistent secret used for CSRF/session protection. Keep this stable across
+   redeployments.
 
-   Image filename which will be used as a logo. Has to be a valid filename
-   placed inside ``web/public/img/`` directory.
+.. confval:: CALDAVER_DATABASE_URL
 
-.. confval:: site.favicon
+   PostgreSQL connection URL. Instead of this single URL, you may provide
+   ``CALDAVER_DB_HOST``, ``CALDAVER_DB_NAME``, ``CALDAVER_DB_USER``,
+   ``CALDAVER_DB_PASSWORD``, and optionally ``CALDAVER_DB_PORT``.
 
-   Icon filename which will be used as favicon. Has to be placed inside
-   ``web/public/img/``.
+Authentication and DAV settings
+-------------------------------
 
-.. confval:: site.footer
+.. confval:: CALDAVER_AUTH_USERNAME
 
-   Text to be placed in the footer.
+   Optional local username. When set, login is restricted to this account.
 
-.. confval:: proxies
+.. confval:: CALDAVER_AUTH_PASSWORD
 
-   Array of IPs of trusted proxies, on which the HTTP_X_FORWARDED_FOR header will be honored.
+   Optional local password for ``CALDAVER_AUTH_USERNAME``.
 
-.. confval:: db.options
+.. confval:: CALDAVER_CALDAV_USERNAME
 
-   Database connection parameters. Uses Doctrine DBAL syntax, so follow the guide at
-   http://docs.doctrine-project.org/projects/doctrine-dbal/en/latest/reference/configuration.html
-   for a better reference. Example::
+   Optional service DAV username used when local login is enabled.
 
-        $app['db.options'] = [
-            'dbname' => 'caldaver',
-            'user' => 'user',
-            'password' => 'password',
-            'host' => 'localhost',
-            'driver' => 'pdo_mysql',
-         ];
+.. confval:: CALDAVER_CALDAV_PASSWORD
 
-   .. warning::
+   Optional service DAV password used when local login is enabled.
 
-      When using an SQLite database, note that there is a `bug when using URL
-      based configurations <http://www.doctrine-project.org/jira/browse/DBAL-1164>`_. Use
-      the alternative syntax (`path` and `driver`) instead.
+.. confval:: CALDAVER_CARDDAV_SERVER
 
-.. confval:: csrf.secret
+   CardDAV base URL. Defaults to ``CALDAVER_CALDAV_SERVER``.
 
-   Internal CSRF token id.
+.. confval:: CALDAVER_CALDAV_PUBLIC_URL
 
-.. confval:: log.level
+   Public CalDAV URL shown to users. Defaults to ``CALDAVER_CALDAV_SERVER``.
 
-   Level of logging. Can be one from DEBUG, INFO, WARNING, ERROR.
+.. confval:: CALDAVER_CALDAV_AUTHMETHOD
 
-   Default setting::
+   DAV authentication method. Defaults to ``basic``.
 
-    $app['log.level'] = 'INFO';
+.. confval:: CALDAVER_CALDAV_CONNECT_TIMEOUT
 
-.. confval:: log.path
+   Connection timeout in seconds. Defaults to ``10``.
 
-   Full path where logs will be created. Add a trailing slash. Example::
+.. confval:: CALDAVER_CALDAV_RESPONSE_TIMEOUT
 
-    $app['log.path'] = '/var/log/caldaver/';
+   Response timeout in seconds. Defaults to ``30``.
 
-   Make sure the user that runs your web server has write permission on that
-   directory.
+.. confval:: CALDAVER_CALDAV_CERTIFICATE_VERIFY
 
-.. confval:: caldav.baseurl
+   Whether to verify HTTPS certificates. Defaults to ``true``.
 
-   Base CalDAV URL used to build all CalDAV URLs.
+Application settings
+--------------------
 
-   If you want to pass the username you enter on login into Caldaver,
-   then add a '%u' placeholder to your baseurl. It will be replaced dynamically.
+.. confval:: CALDAVER_TITLE
 
-   Examples::
+   Page title. Defaults to ``Caldaver``.
 
-    // SabreDAV
-    $app['caldav.baseurl'] = 'http://caldav.server/cal.php';
+.. confval:: CALDAVER_FOOTER
 
-    // DAViCal
-    $app['caldav.baseurl'] = 'http://caldav.server/caldav.php';
+   Footer text. Defaults to ``Caldaver``.
 
-    // Radicale
-    $app['caldav.baseurl'] = 'http://caldav.server/%u';
+.. confval:: CALDAVER_BIND
 
+   Socket address for the server. Defaults to ``0.0.0.0:8080`` in the
+   container and ``127.0.0.1:3000`` when omitted by local runs.
 
-   .. note::
-      If you are configuring Caldaver to connect to a CalDAV server using HTTPS,
-      certificate validation will be performed. Both CA and hostname will be verified. If you are
-      having trouble with your certificate, make sure you have your CA recognized by your system.
-      See `OpenSSL changes in PHP 5.6.x <http://php.net/manual/en/migration56.openssl.php>`_ for
-      more details.
+.. confval:: CALDAVER_STATIC_ROOT
 
+   Directory containing static frontend assets. Defaults to ``web/public`` for
+   source runs and is set by the container image.
 
-.. confval:: caldav.authmethod
+.. confval:: CALDAVER_SESSION_LIFETIME
 
-   You have to specify which HTTP authentication method does your CalDAV server
-   require. Both basic and digest authentication methods are supported.
+   Session lifetime in seconds. Defaults to ``2592000``.
 
-   Example::
+.. confval:: CALDAVER_LOGOUT_REDIRECTION
 
-    // SabreDAV
-    $app['caldav.authmethod'] = 'digest';
+   Optional URL to redirect users to after logout.
 
-    // DAViCal
-    $app['caldav.authmethod'] = 'basic';
+.. confval:: CALDAVER_TIMEZONE
 
-.. confval:: caldav.publicurls
+   Default time zone. Defaults to ``UTC``.
 
-   Whether to show CalDAV URL links or not in the edit dialog
+.. confval:: CALDAVER_LANG
 
-   .. seealso:: :confval:`caldav.baseurl.public`
+   Default interface language. Defaults to ``en``.
 
-.. confval:: caldav.baseurl.public
+.. confval:: CALDAVER_WEEKSTART
 
-   The base URL that will be shown to users if :confval:`caldav.publicurls` is
-   enabled. It's not used for internal connections.
+   First day of week. ``0`` means Sunday and ``1`` means Monday.
 
-   Do not add a trailing slash.
+.. confval:: CALDAVER_DEFAULT_VIEW
 
-   Example::
+   Default calendar view. Defaults to ``month``.
 
-    $app['caldav.baseurl.public'] = 'https://public.caldav.tld';
+.. confval:: CALDAVER_DISABLE_JAVASCRIPT
 
-.. confval:: caldav.connect.timeout
+   Disables the JavaScript-heavy interface when set to a truthy value.
 
-   Timeout in seconds for CalDAV connections. A value of 0 means to wait indefinitely, which is the
-   default behaviour.
+.. confval:: CALDAVER_CALENDAR_SHARING
 
-   Eample::
+   Enables calendar sharing when set to a truthy value.
 
-    // Timeout after 5 seconds if connection to the CalDAV server is not ready
-    $app['caldav.connect.timeout'] = 5;
+Mail settings
+-------------
 
-.. confval:: caldav.response.timeout
+.. confval:: CALDAVER_MAIL_PASSWORD_KEY
 
-   Timeout in seconds while waiting for responses after a CalDAV request is sent. A value of 0 means
-   to wait indefinitely, which is the default behaviour.
-
-   Example::
-
-    // Timeout after 10 seconds if server hasn't answered
-    $app['caldav.response.timeout'] = 10;
-
-.. confval:: caldav.certificate.verify
-
-   Whether to verify the SSL certificate using available CA bundles. Defaults to yes, which is
-   recommended, but can be disabled if the CalDAV server is using a self-signed certificate or a
-   certificate issued by a non-trusted CA.
-
-   Example::
-
-    // Do not verify SSL certificate, it is self signed
-    $app['caldav.certificate.verify'] = false;
-
-.. confval:: calendar.sharing
-
-   Enables calendar sharing between users
-
-   Note that calendar sharing requires full WebDAV ACL support on your
-   CalDAV server. Sharing has been fully tested only with DAViCal, so it is
-   recommended to disable calendar sharing on other CalDAV servers unless
-   you know what you are doing.
-
-.. confval:: calendar.sharing.permissions
-
-   Configures ACL permissions for calendar sharing. The default values will
-   work with DAViCal.
-
-.. confval:: defaults.timezone
-
-   Timezone to be used by default.
-
-   Make sure you use a valid timezone from http://php.net/timezones
-
-.. confval:: defaults.language
-
-   Default language to be used on Caldaver interface.
-
-   Have a look at directory ``web/lang`` for a list of available languages.
-
-.. confval:: defaults.time_format
-
-   Preferred time format: 12 hours (e.g. 3pm / 2:30am) or 24 hours
-   (e.g. 15:00 / 2:30).
-
-   Set this option using a **string** (``'12'`` or ``'24'``).
-
-.. confval:: defaults.date_format
-
-   Default date format.
-
-   Available options are:
-
-   * ``ymd``: e.g. 2011/10/22
-   * ``dmy``: e.g. 22/10/2011
-   * ``mdy``: e.g. 10/22/2011
-
-.. confval:: defaults.weekstart
-
-   Which day should be considered the default first day of week.
-
-   0 means Sunday, 1 means Monday
-
-   Specify it as a number.
-
-.. confval:: defaults.show_week_nb
-
-   Whether or not to show week numbers in views by default
-
-   Specify it as a boolean ("true" or "false").
-
-.. confval:: defaults.show_now_indicator
-
-   Whether or not to show a marker indicating current time
-
-   Specify it as a boolean ("true" or "false").
-
-.. confval:: defaults.list_days
-
-   Default number of days covered by the "list" (agenda) view. Allowed values: 7, 14 or 31
-
-   Specify it as an integer.
-
-.. confval:: defaults.default_view
-
-   Default calendar view when accessing Caldaver. Allowed values: month, week, day and list
-
-   Specify it as a string.
-
-.. confval:: logout.redirection
-
-   When logging out from Caldaver, the URL the user will be redirected to.
-
-   Can be left empty to redirect user to login page again.
-
-
-Sessions
---------
-
-Caldaver uses `php.ini session settings <http://php.net/session.configuration>`_. You can override
-most of them inside `settings.php` by using the `session.storage.options`. Just copy it from
-`prod.php` and set any parameters you wish.
-
-The following example makes sessions expire after 20 minutes of closing your browser in a low
-traffic instance::
-
-    $app['session.storage.options'] = [
-       'name' => 'caldaver_sess',
-       'cookie_lifetime' => 0,
-       // Every request has 10% chance of triggering session GC
-       'gc_probability' => 1,
-       'gc_divisor' => 10,
-       'gc_maxlifetime' => 1200,
-       'lifetime' => 1200,
-    ];
+   Optional encryption key for stored mail account passwords. If unset, the
+   server falls back to the local authentication password when present.

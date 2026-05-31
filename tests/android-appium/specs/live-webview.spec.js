@@ -199,6 +199,17 @@ function mailMessageScriptSource() {
     .replace(/\s*<\/script>\s*$/, '');
 }
 
+function cardsScriptSource() {
+  return fs.readFileSync(path.join(repoRoot, 'web/templates/parts/cardsjs.html'), 'utf8')
+    .replace(/^\s*<script>\s*/, '')
+    .replace(/\s*<\/script>\s*$/, '')
+    .replace(/\{\{\s*'labels\.delete'\|trans\s*\}\}/g, 'Delete')
+    .replace(/\{\{\s*app\.url_generator\.generate\('cards\.list'\)\s*\}\}/g, '/cards/list')
+    .replace(/\{\{\s*app\.url_generator\.generate\('cards\.delete'\)\s*\}\}/g, '/cards/delete')
+    .replace(/\{\{\s*app\.url_generator\.generate\('cards\.save'\)\s*\}\}/g, '/cards/save')
+    .replace(/\{\{\s*app\.url_generator\.generate\('cards\.update'\)\s*\}\}/g, '/cards/update');
+}
+
 describe('Caldaver installed Android WebView', function () {
   before(function () {
     if (!username || !password) {
@@ -552,6 +563,175 @@ describe('Caldaver installed Android WebView', function () {
 
     assert.ok(state.eventSources > 0, 'Calendar should have at least one event source');
     assert.equal(/error loading events/i.test(state.errors.join(' ')), false, state.errors.join(' '));
+  });
+});
+
+describe('Caldaver Android WebView contact card dialing', function () {
+  beforeEach(async function () {
+    await switchToWebView();
+    await waitForDocument();
+  });
+
+  it('prompts with Dial and Cancel before opening a tel URL from card double taps only', async function () {
+    const scriptSource = cardsScriptSource();
+
+    await browser.execute(source => {
+      document.open();
+      document.write(`<!doctype html>
+        <html>
+          <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+              [hidden] { display: none !important; }
+              .contact-card, .contact-row { display: block; min-height: 80px; margin: 8px; padding: 12px; }
+            </style>
+          </head>
+          <body>
+            <button type="button" id="contact_create"></button>
+            <button type="button" id="contact_cancel"></button>
+            <button type="button" id="contact_cancel_icon"></button>
+            <button type="button" id="contacts_refresh"></button>
+            <input id="contacts_search" type="search">
+            <div class="contacts-view-switch">
+              <button type="button" data-view="list"></button>
+              <button type="button" data-view="cards"></button>
+            </div>
+            <span id="contact_count"></span>
+            <span id="contact_count_nav"></span>
+            <div id="contacts_loading"></div>
+            <div id="contacts_empty" hidden></div>
+            <div id="contacts_list"><div id="contacts_rows"></div></div>
+            <div id="contacts_cards" hidden></div>
+            <div id="contact_dialog" hidden>
+              <form id="contact_form" action="/cards/save">
+                <input type="hidden" name="_token" value="token">
+                <input type="hidden" name="url" value="">
+                <input type="hidden" name="etag" value="">
+                <input type="hidden" name="uid" value="">
+                <input name="full_name">
+                <input name="email">
+                <input name="phone">
+                <input name="organization">
+                <input name="job_title">
+              </form>
+              <h2 id="contact_dialog_title"></h2>
+            </div>
+          </body>
+        </html>`);
+      document.close();
+
+      const contact = {
+        full_name: 'Dial Test Contact',
+        email: 'dial@example.test',
+        phone: '+14155550123',
+        organization: 'Caldaver',
+        job_title: 'QA',
+        company_line: 'QA, Caldaver',
+        labels: [],
+        url: '/contacts/dial-test.vcf',
+        etag: '"dial-test"'
+      };
+
+      window.__contactDialState = { confirms: [], opens: [] };
+      window.__contactDialConfirmValue = true;
+      window.Capacitor = {
+        getPlatform: () => 'android',
+        isNativePlatform: () => true,
+        Plugins: {
+          Dialog: {
+            confirm: options => {
+              window.__contactDialState.confirms.push(options);
+              return Promise.resolve({ value: window.__contactDialConfirmValue });
+            }
+          }
+        }
+      };
+      window.open = (url, target) => {
+        window.__contactDialState.opens.push({ url, target });
+        return null;
+      };
+      window.fetch = () => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ data: [contact] })
+      });
+
+      const script = document.createElement('script');
+      script.textContent = source;
+      document.body.appendChild(script);
+      document.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }));
+    }, scriptSource);
+
+    await browser.waitUntil(async () => {
+      return browser.execute(() => document.querySelectorAll('#contacts_cards .contact-card').length === 1);
+    }, {
+      timeoutMsg: 'Synthetic contact card did not render'
+    });
+    await browser.execute(() => document.querySelector('.contacts-view-switch button[data-view="cards"]').click());
+
+    async function doubleTap(selector) {
+      await browser.executeAsync((itemSelector, done) => {
+        const element = document.querySelector(itemSelector);
+        const touch = {
+          identifier: 1,
+          target: element,
+          clientX: 24,
+          clientY: 24,
+          pageX: 24,
+          pageY: 24,
+          screenX: 24,
+          screenY: 24
+        };
+
+        function touchEnd() {
+          const event = new Event('touchend', { bubbles: true, cancelable: true });
+          Object.defineProperty(event, 'touches', { value: [] });
+          Object.defineProperty(event, 'changedTouches', { value: [touch] });
+          element.dispatchEvent(event);
+        }
+
+        touchEnd();
+        setTimeout(() => {
+          touchEnd();
+          setTimeout(done, 25);
+        }, 50);
+      }, selector);
+    }
+
+    await doubleTap('#contacts_cards .contact-card');
+    const dialState = await browser.execute(() => window.__contactDialState);
+    assert.equal(dialState.confirms.length, 1);
+    assert.equal(dialState.confirms[0].okButtonTitle, 'Dial');
+    assert.equal(dialState.confirms[0].cancelButtonTitle, 'Cancel');
+    assert.equal(dialState.opens.length, 1);
+    assert.deepEqual(dialState.opens[0], { url: 'tel:+14155550123', target: '_self' });
+
+    await browser.execute(() => {
+      window.__contactDialState = { confirms: [], opens: [] };
+      window.__contactDialConfirmValue = false;
+    });
+    await doubleTap('#contacts_cards .contact-card');
+    const cancelState = await browser.execute(() => window.__contactDialState);
+    assert.equal(cancelState.confirms.length, 1);
+    assert.equal(cancelState.opens.length, 0);
+
+    await browser.execute(() => {
+      window.__contactDialState = { confirms: [], opens: [] };
+      window.__contactDialConfirmValue = true;
+    });
+    await doubleTap('#contacts_rows .contact-row');
+    const rowState = await browser.execute(() => window.__contactDialState);
+    assert.equal(rowState.confirms.length, 0);
+    assert.equal(rowState.opens.length, 0);
+
+    await browser.execute(() => {
+      window.__contactDialState = { confirms: [], opens: [] };
+      window.Capacitor.isNativePlatform = () => false;
+      window.Capacitor.getPlatform = () => 'web';
+    });
+    await doubleTap('#contacts_cards .contact-card');
+    const webState = await browser.execute(() => window.__contactDialState);
+    assert.equal(webState.confirms.length, 0);
+    assert.equal(webState.opens.length, 0);
   });
 });
 
