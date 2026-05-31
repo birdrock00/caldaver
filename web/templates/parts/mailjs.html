@@ -8,6 +8,7 @@
   var activeSyncs = 0;
   var mailStatus = 'loading';
   var mailStatusMessage = 'Loading cached mail...';
+  var messagesFingerprint = '[]';
   var defaultRequestTimeoutMs = 20000;
   var initialAccountId = null;
   var highlightedUnreadUid = null;
@@ -103,6 +104,39 @@
     }
 
     renderMailStatus(data.length);
+  }
+
+  function messagesSignature(data) {
+    return JSON.stringify((data || []).map(function(message) {
+      return {
+        uid: message.uid,
+        from: text(message.from),
+        subject: text(message.subject),
+        date: text(message.date),
+        seen: !!message.seen,
+        attachments: (message.attachments || []).map(function(attachment) {
+          return {
+            part: text(attachment.part),
+            filename: text(attachment.filename),
+            content_type: text(attachment.content_type),
+            size: attachment.size || 0
+          };
+        })
+      };
+    }));
+  }
+
+  function replaceMessages(nextMessages) {
+    var nextFingerprint = messagesSignature(nextMessages);
+    var changed = nextFingerprint !== messagesFingerprint;
+    messages = nextMessages || [];
+    messagesFingerprint = nextFingerprint;
+    return changed;
+  }
+
+  function clearMessages() {
+    messages = [];
+    messagesFingerprint = '[]';
   }
 
   function renderAttachments(container, message, accountId) {
@@ -205,7 +239,7 @@
     }
 
     autoRefreshTimer = window.setInterval(function() {
-      syncMessages(++messageRequestId);
+      syncMessages(++messageRequestId, { quiet: true });
     }, refreshIntervalMs(account));
   }
 
@@ -295,7 +329,7 @@
   function loadMessages(syncAfterLoad) {
     var account = activeAccount();
     var requestId = ++messageRequestId;
-    messages = [];
+    clearMessages();
     $('#mail_account_title').textContent = account ? account.label : '{{ 'labels.mail'|trans }}';
     setMailStatus(account ? 'loading' : 'ready', account ? 'Checking the IMAP server for mail...' : '');
     renderMessages();
@@ -313,7 +347,7 @@
         if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
           return;
         }
-        messages = payload.data || [];
+        replaceMessages(payload.data || []);
         if (syncAfterLoad) {
           renderMessages();
           return syncMessages(requestId);
@@ -329,14 +363,17 @@
       });
   }
 
-  function syncMessages(requestId) {
+  function syncMessages(requestId, options) {
     var account = activeAccount();
+    var quiet = options && options.quiet === true;
     if (!account) {
       return Promise.resolve();
     }
 
-    setMailSyncing(true);
-    setMailStatus('syncing', 'Syncing with the IMAP server...');
+    if (!quiet) {
+      setMailSyncing(true);
+      setMailStatus('syncing', 'Syncing with the IMAP server...');
+    }
     return jsonFetch(
       '{{ app.url_generator.generate('mail.messages.sync') }}?account_id=' + encodeURIComponent(account.id),
       {},
@@ -346,18 +383,26 @@
         if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
           return;
         }
-        messages = payload.data || [];
+        var changed = replaceMessages(payload.data || []);
         setMailStatus('ready');
-        renderMessages();
+        if (changed) {
+          renderMessages();
+        } else {
+          renderMailStatus();
+        }
       })
       .catch(function(error) {
         if (requestId !== messageRequestId || !account || activeAccountId !== account.id) {
           return;
         }
-        setMailStatus('error', error.message);
+        if (!quiet || messages.length === 0) {
+          setMailStatus('error', error.message);
+        }
       })
       .finally(function() {
-        setMailSyncing(false);
+        if (!quiet) {
+          setMailSyncing(false);
+        }
       });
   }
 

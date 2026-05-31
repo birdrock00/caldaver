@@ -117,6 +117,21 @@ test('topbar user actions stay in a horizontal row under Bootstrap 5', () => {
     /text-decoration:\s*none;/,
     'the username pill should not show browser link underlines'
   );
+  assert.doesNotMatch(
+    navbar,
+    /<a class="logout"/,
+    'logout should not render as a standalone topbar icon'
+  );
+  assert.match(
+    navbar,
+    /<details class="user-menu-dropdown">[\s\S]*<summary class="user-pill"[\s\S]*<a class="user-menu-item user-menu-logout" href="\{\{ app\.url_generator\.generate\('logout'\) \}\}">/,
+    'the username pill should own the logout dropdown menu'
+  );
+  assert.match(
+    cssBlock(less, '.user-menu-list'),
+    /position:\s*absolute;[\s\S]*right:\s*0;/,
+    'the user dropdown should align to the right edge of the username pill'
+  );
 });
 
 test('Caldaver branding does not render the legacy image logo', () => {
@@ -421,6 +436,43 @@ test('Caldaver login credentials are separate from DAV service credentials', () 
   assert.match(run, /CALDAVER_CALDAV_PASSWORD:=/);
 });
 
+test('Caldaver sessions survive backend redeploys with browser and WebView friendly cookies', () => {
+  const prod = read('web/config/prod.php');
+  const dockerSettings = read('docker/settings.php');
+  const dockerRun = read('docker/run.sh');
+  const dockerInit = read('docker/initialize-database.php');
+  const ansibleSettings = read('ansible/caldaver/settings.php.j2');
+  const readme = read('README.md');
+
+  assert.match(prod, /'name'\s*=>\s*'caldaver_sess'/);
+  assert.doesNotMatch(prod, /'name'\s*=>\s*[^,]*Version::V/);
+  assert.match(prod, /'cookie_lifetime'\s*=>\s*30 \* 24 \* 60 \* 60/);
+  assert.match(prod, /'gc_maxlifetime'\s*=>\s*30 \* 24 \* 60 \* 60/);
+  assert.match(prod, /'cookie_httponly'\s*=>\s*true/);
+  assert.match(prod, /'cookie_samesite'\s*=>\s*'Lax'/);
+  assert.doesNotMatch(prod, /'cookie_lifetime'\s*=>\s*0/);
+
+  assert.match(dockerSettings, /\$app\['session\.storage\.options'\]\s*=\s*array_replace\(\$app\['session\.storage\.options'\]/);
+  assert.match(dockerSettings, /'cookie_lifetime'\s*=>\s*CALDAVER_SESSION_LIFETIME/);
+  assert.match(dockerSettings, /'gc_maxlifetime'\s*=>\s*CALDAVER_SESSION_LIFETIME/);
+  assert.match(dockerRun, /CALDAVER_CSRF_SECRET:\?CALDAVER_CSRF_SECRET is required/);
+  assert.match(dockerRun, /CALDAVER_SESSION_LIFETIME:=2592000/);
+  assert.match(dockerRun, /CALDAVER_SESSION_LIFETIME.*non-negative integer number of seconds/);
+  assert.match(dockerRun, /replace_config "CALDAVER_SESSION_LIFETIME" "\$CALDAVER_SESSION_LIFETIME"/);
+  assert.match(dockerInit, /CREATE TABLE IF NOT EXISTS sessions/);
+  assert.doesNotMatch(dockerInit, /DROP TABLE\s+sessions/i);
+
+  assert.match(ansibleSettings, /'name'\s*=>\s*'caldaver_sess'/);
+  assert.match(ansibleSettings, /'cookie_lifetime'\s*=>\s*30 \* 24 \* 60 \* 60/);
+  assert.match(ansibleSettings, /'gc_maxlifetime'\s*=>\s*30 \* 24 \* 60 \* 60/);
+  assert.match(ansibleSettings, /'cookie_samesite'\s*=>\s*'Lax'/);
+  assert.doesNotMatch(ansibleSettings, /'cookie_lifetime'\s*=>\s*0/);
+  assert.doesNotMatch(ansibleSettings, /'gc_maxlifetime'\s*=>\s*1200/);
+
+  assert.match(readme, /CALDAVER_CSRF_SECRET.*keep the same value across redeployments/);
+  assert.match(readme, /CALDAVER_SESSION_LIFETIME.*2592000.*30 days/);
+});
+
 test('Caldaver Docker image and runtime use Postgres instead of SQLite', () => {
   const dockerfile = read('Dockerfile');
   const settings = read('docker/settings.php');
@@ -484,6 +536,8 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.doesNotMatch(mail, /id="mail_message_detail"/);
   assert.match(mailMessage, /id="mail_reader"/);
   assert.match(mailMessage, /data-message-url/);
+  assert.match(mailMessage, /data-messages-url/);
+  assert.match(mailMessage, /data-read-url/);
   assert.match(mailMessage, /data-unread-url/);
   assert.match(mailMessage, /data-inbox-url/);
   assert.match(mailMessage, /id="mail_reader_unread"/);
@@ -501,6 +555,10 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /setInterval/);
   assert.match(mailJs, /refresh_interval_seconds/);
   assert.match(mailJs, /setMailSyncing/);
+  assert.match(mailJs, /function messagesSignature\(data\)/);
+  assert.match(mailJs, /function replaceMessages\(nextMessages\)/);
+  assert.match(mailJs, /syncMessages\(\+\+messageRequestId, \{ quiet: true \}\);/);
+  assert.match(mailJs, /if \(changed\) \{\s*renderMessages\(\);/);
   assert.match(mailJs, /function setMailStatus\(status, message\)/);
   assert.match(mailJs, /setMailStatus\(account \? 'loading' : 'ready', account \? 'Checking the IMAP server for mail\.\.\.' : ''\)/);
   assert.match(mailJs, /setMailStatus\('syncing', 'Syncing with the IMAP server\.\.\.'\)/);
@@ -511,11 +569,24 @@ test('mail section exposes IMAP account routes and a Gmail-like left tab', () =>
   assert.match(mailJs, /window\.location\.href/);
   assert.doesNotMatch(mailJs, /function loadMessage\(/);
   assert.match(mailMessage, /app\.url_generator\.generate\('mail\.message'\)/);
+  assert.match(mailMessage, /app\.url_generator\.generate\('mail\.messages'\)/);
+  assert.match(mailMessage, /app\.url_generator\.generate\('mail\.read'\)/);
   assert.match(mailMessage, /app\.url_generator\.generate\('mail\.message\.unread'\)/);
   assert.match(mailMessage, /app\.url_generator\.generate\('mail\.attachment'\)/);
   assert.match(mailMessageJs, /dataset\.messageUrl/);
+  assert.match(mailMessageJs, /dataset\.messagesUrl/);
+  assert.match(mailMessageJs, /dataset\.readUrl/);
   assert.match(mailMessageJs, /dataset\.unreadUrl/);
   assert.match(mailMessageJs, /dataset\.inboxUrl/);
+  assert.match(mailMessageJs, /function setupSwipeNavigation\(\)/);
+  assert.match(mailMessageJs, /touchstart/);
+  assert.match(mailMessageJs, /touchend/);
+  assert.match(mailMessageJs, /pointerdown/);
+  assert.match(mailMessageJs, /pointerup/);
+  assert.match(mailMessageJs, /mousedown/);
+  assert.match(mailMessageJs, /mouseup/);
+  assert.match(mailMessageJs, /navigateBySwipe\(deltaX > 0 \? 'newer' : 'older'\)/);
+  assert.match(mailMessageJs, /targetIndex = direction === 'newer' \? currentIndex - 1 : currentIndex \+ 1/);
   assert.match(mailMessageJs, /unread_uid/);
   assert.match(mailMessageJs, /mail_reader_unread/);
   assert.match(mailMessageJs, /srcdoc/);
@@ -624,4 +695,26 @@ test('mail account schema is available to non-Docker migrations', () => {
   assert.match(migration, /createTable\('mail_accounts'\)/);
   assert.match(migration, /addColumn\('password_encrypted', 'text'\)/);
   assert.match(migration, /addIndex\(\['owner'\]\)/);
+});
+
+test('Rust backend migration starts with translated mail account validation tests', () => {
+  const toolchain = read('rust-toolchain.toml');
+  const workspace = read('rust/Cargo.toml');
+  const packageJson = JSON.parse(read('package.json'));
+  const coreManifest = read('rust/crates/caldaver-core/Cargo.toml');
+  const mailAccount = read('rust/crates/caldaver-core/src/mail_account.rs');
+
+  assert.match(toolchain, /channel = "stable"/);
+  assert.match(workspace, /resolver = "3"/);
+  assert.match(workspace, /edition = "2024"/);
+  assert.match(coreManifest, /name = "caldaver-core"/);
+  assert.equal(packageJson.scripts['test:rust'], 'cargo test --manifest-path rust/Cargo.toml');
+  assert.match(mailAccount, /pub struct MailAccount/);
+  assert.match(mailAccount, /pub enum ValidationError/);
+  assert.match(mailAccount, /pub trait HostResolver/);
+  assert.match(mailAccount, /fn public_ip\(address: IpAddr\)/);
+  assert.match(mailAccount, /fn rejects_zero_port_with_php_message\(\)/);
+  assert.match(mailAccount, /fn rejects_localhost_names\(\)/);
+  assert.match(mailAccount, /fn rejects_private_or_reserved_ip_literals\(\)/);
+  assert.match(mailAccount, /fn accepts_hostnames_that_resolve_to_public_addresses\(\)/);
 });
