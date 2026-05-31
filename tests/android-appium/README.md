@@ -14,7 +14,7 @@ CALDAVER_USERNAME=... CALDAVER_PASSWORD=... npm run test:android-appium
 
 Useful environment variables:
 
-- `CALDAVER_BASE_URL`, defaults to `https://caldaver.example.test`
+- `CALDAVER_BASE_URL`, required for live Android WebView tests and Android builds that point at a remote server
 - `CALDAVER_ANDROID_SERVER_URL`, overrides the Android Capacitor server URL at build time; when omitted, `CALDAVER_BASE_URL` is used
 - `CALDAVER_ANDROID_ALLOW_NAVIGATION`, optional comma-separated host list to keep inside the Android WebView at build time
 - `CALDAVER_USERNAME` and `CALDAVER_PASSWORD`, required
