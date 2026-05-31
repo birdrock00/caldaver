@@ -1241,8 +1241,29 @@ fn event_payload_from_object(object: &CalendarObject, calendar: &str) -> Option<
 }
 
 fn ical_property(data: &str, name: &str) -> Option<String> {
-    let unfolded = data.replace("\r\n ", "").replace("\n ", "");
+    let unfolded = data
+        .replace("\r\n ", "")
+        .replace("\r\n\t", "")
+        .replace("\n ", "")
+        .replace("\n\t", "");
+    let has_vevent = unfolded
+        .lines()
+        .any(|line| line.trim().eq_ignore_ascii_case("BEGIN:VEVENT"));
+    let mut in_vevent = false;
     unfolded.lines().find_map(|line| {
+        let trimmed = line.trim();
+        if trimmed.eq_ignore_ascii_case("BEGIN:VEVENT") {
+            in_vevent = true;
+            return None;
+        }
+        if trimmed.eq_ignore_ascii_case("END:VEVENT") && in_vevent {
+            in_vevent = false;
+            return None;
+        }
+        if has_vevent && !in_vevent {
+            return None;
+        }
+
         let (key, value) = line.split_once(':')?;
         let key = key.split(';').next().unwrap_or(key);
         (key.eq_ignore_ascii_case(name)).then(|| unescape_ical(value))
@@ -2003,6 +2024,36 @@ mod tests {
         assert!(merged.contains("RRULE:FREQ=DAILY;COUNT=3"));
         assert!(merged.contains("CLASS:PRIVATE"));
         assert!(merged.contains("BEGIN:VALARM"));
+    }
+
+    #[test]
+    fn caldav_event_parsing_ignores_vtimezone_dates() {
+        let mut object = CalendarObject::new("/user/calendar/event.ics");
+        object.set_etag(Some("\"etag\"".to_string()));
+        object.set_rendered_event(
+            concat!(
+                "BEGIN:VCALENDAR\r\n",
+                "BEGIN:VTIMEZONE\r\n",
+                "TZID:America/Los_Angeles\r\n",
+                "BEGIN:STANDARD\r\n",
+                "DTSTART:20071104T020000\r\n",
+                "END:STANDARD\r\n",
+                "END:VTIMEZONE\r\n",
+                "BEGIN:VEVENT\r\n",
+                "UID:event-1\r\n",
+                "SUMMARY:One hour event\r\n",
+                "DTSTART;TZID=America/Los_Angeles:20260528T190000\r\n",
+                "DTEND;TZID=America/Los_Angeles:20260528T200000\r\n",
+                "END:VEVENT\r\n",
+                "END:VCALENDAR\r\n"
+            )
+            .to_string(),
+        );
+
+        let event = event_payload_from_object(&object, "/user/calendar/").unwrap();
+        assert_eq!(event.start, "2026-05-28T19:00:00Z");
+        assert_eq!(event.end, "2026-05-28T20:00:00Z");
+        assert!(!event.all_day);
     }
 
     #[test]
