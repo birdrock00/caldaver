@@ -16,6 +16,7 @@ const capability = {
   'appium:autoWebviewTimeout': Number(process.env.CALDAVER_ANDROID_WEBVIEW_TIMEOUT_MS || 30000),
   'appium:ensureWebviewsHavePages': true,
   'appium:recreateChromeDriverSessions': true,
+  'appium:adbExecTimeout': Number(process.env.CALDAVER_ANDROID_ADB_EXEC_TIMEOUT_MS || 120000),
   'appium:newCommandTimeout': 120
 };
 
