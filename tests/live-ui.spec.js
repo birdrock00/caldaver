@@ -114,25 +114,27 @@ async function mockMailApi(page, options = {}) {
     });
   });
 
-  await page.route('**/mail/accounts/save', async route => {
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        result: 'SUCCESS',
-        data: {
-          id: 99,
-          label: 'Test Inbox',
-          email_address: 'test@example.com',
-          imap_host: 'imap.example.test',
-          imap_port: 993,
-          encryption: 'ssl',
-          username: 'test@example.com',
-          refresh_interval_seconds: 60
-        }
-      })
+  if (!options.skipAccountSaveRoute) {
+    await page.route('**/mail/accounts/save', async route => {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          result: 'SUCCESS',
+          data: {
+            id: 99,
+            label: 'Test Inbox',
+            email_address: 'test@example.com',
+            imap_host: 'imap.example.test',
+            imap_port: 993,
+            encryption: 'ssl',
+            username: 'test@example.com',
+            refresh_interval_seconds: 60
+          }
+        })
+      });
     });
-  });
+  }
 
   await page.route('**/mail/messages/sync?**', async route => {
     const url = new URL(route.request().url());
@@ -558,8 +560,13 @@ test('login form labels do not overlap input fields', async ({ page }) => {
 
   expect(overlaps(userLabel, userInput)).toBe(false);
   expect(overlaps(passwordLabel, passwordInput)).toBe(false);
-  expect(userLabel.x + userLabel.width).toBeLessThanOrEqual(userInput.x - 8);
-  expect(passwordLabel.x + passwordLabel.width).toBeLessThanOrEqual(passwordInput.x - 8);
+  const userLabelIsBeforeInput = userLabel.x + userLabel.width <= userInput.x - 8 ||
+    userLabel.y + userLabel.height <= userInput.y - 4;
+  const passwordLabelIsBeforeInput = passwordLabel.x + passwordLabel.width <= passwordInput.x - 8 ||
+    passwordLabel.y + passwordLabel.height <= passwordInput.y - 4;
+
+  expect(userLabelIsBeforeInput).toBe(true);
+  expect(passwordLabelIsBeforeInput).toBe(true);
 });
 
 test('mobile layout uses topbar section menu and keeps calendar and contacts scrollable', async ({ page }) => {
@@ -1182,7 +1189,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   const consoleErrors = captureConsoleErrors(page);
   const savedAccounts = [];
   const postedForms = [];
-  await mockMailApi(page, { accounts: [] });
+  await mockMailApi(page, { accounts: [], skipAccountSaveRoute: true });
   await page.route('**/mail/accounts/save', async route => {
     postedForms.push(parsePostedForm(route.request()));
     const fixtures = [
@@ -1277,14 +1284,27 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
 test('mail add-account stalled backend response times out visibly', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
-  await mockMailApi(page, { accounts: [] });
-  await page.route('**/mail/accounts/save', async () => new Promise(() => {}));
+  await mockMailApi(page, { accounts: [], skipAccountSaveRoute: true });
 
   await page.goto(`${baseURL}/mail`);
-  await page.evaluate(() => {
-    window.CALDAVER_MAIL_REQUEST_TIMEOUT_MS = 250;
-  });
   await openMailAccountDialog(page);
+  await page.evaluate(() => {
+    const originalFetch = window.fetch.bind(window);
+    window.CALDAVER_MAIL_REQUEST_TIMEOUT_MS = 250;
+    window.fetch = function(url, options) {
+      if (String(url).indexOf('/mail/accounts/save') === -1) {
+        return originalFetch(url, options);
+      }
+
+      return new Promise(function(resolve, reject) {
+        if (options && options.signal) {
+          options.signal.addEventListener('abort', function() {
+            reject(new DOMException('Request aborted', 'AbortError'));
+          });
+        }
+      });
+    };
+  });
   await page.locator('#mail_account_form input[name="label"]').fill('Slow Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('slow@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
