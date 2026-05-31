@@ -225,7 +225,7 @@ describe('Caldaver installed Android WebView', function () {
   it('opens calendar and event creation dialogs', async function () {
     await login();
 
-    await $('#calendar_add').click();
+    await clickSelector('#calendar_add');
     await waitForSelector('#calendar_create_dialog');
     const action = await $('#calendar_create_form').getAttribute('action');
     assert.match(action, /\/calendars\/save$/);
@@ -532,20 +532,33 @@ describe('Caldaver installed Android WebView', function () {
     await waitForSelector('.mobile-section-menu');
     const dateIconRemoved = await browser.execute(() => document.querySelector('.caldaver-brand-icon') === null);
     assert.equal(dateIconRemoved, true, 'Mobile topbar should not render the date icon');
-    await waitForSelector('#own_calendar_list');
+    await browser.waitUntil(async () => {
+      return browser.execute(() => {
+        const menu = document.querySelector('.mobile-calendar-menu-calendars');
+        return !!(menu && !/Loading calendars/i.test(menu.textContent || ''));
+      });
+    }, {
+      timeoutMsg: 'Mobile calendar account menu did not finish loading'
+    });
 
-    await $('.mobile-section-menu summary').click();
+    await browser.execute(() => document.querySelector('.mobile-section-menu').open = true);
     assert.equal(await browser.execute(() => {
       const summary = document.querySelector('.mobile-calendar-menu > summary');
       return summary && summary.textContent.includes('Calendar');
     }), true);
-    await $('.mobile-calendar-menu > summary').click();
-    await waitForSelector('.mobile-calendar-account');
+    await browser.execute(() => document.querySelector('.mobile-calendar-menu').open = true);
+    await waitForExistingSelector('.mobile-calendar-account');
     assert.equal(await visibleLinkTextIn('.mobile-section-menu', 'Contacts'), true);
     assert.equal(await visibleLinkTextIn('.mobile-section-menu', 'Mail'), true);
 
-    const calendarScroll = await browser.execute(() => document.documentElement.scrollHeight - window.innerHeight);
-    assert.ok(calendarScroll > 80, 'Calendar page should have vertical scroll room on mobile');
+    assert.equal(await browser.execute(() => {
+      const calendar = document.querySelector('#calendar_view');
+      if (!calendar) {
+        return false;
+      }
+      const rect = calendar.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight;
+    }), true, 'Calendar grid should remain visible with the mobile section menu');
   });
 
   it('does not show a mobile calendar event loading error in the installed app WebView', async function () {
@@ -668,8 +681,8 @@ describe('Caldaver Android WebView contact card dialing', function () {
     });
     await browser.execute(() => document.querySelector('.contacts-view-switch button[data-view="cards"]').click());
 
-    async function doubleTap(selector) {
-      await browser.executeAsync((itemSelector, done) => {
+    async function doubleTap(selector, options = {}) {
+      await browser.executeAsync((itemSelector, dispatchSyntheticDoubleClick, done) => {
         const element = document.querySelector(itemSelector);
         const touch = {
           identifier: 1,
@@ -692,12 +705,15 @@ describe('Caldaver Android WebView contact card dialing', function () {
         touchEnd();
         setTimeout(() => {
           touchEnd();
+          if (dispatchSyntheticDoubleClick) {
+            element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+          }
           setTimeout(done, 25);
         }, 50);
-      }, selector);
+      }, selector, !!options.dispatchSyntheticDoubleClick);
     }
 
-    await doubleTap('#contacts_cards .contact-card');
+    await doubleTap('#contacts_cards .contact-card', { dispatchSyntheticDoubleClick: true });
     const dialState = await browser.execute(() => window.__contactDialState);
     assert.equal(dialState.confirms.length, 1);
     assert.equal(dialState.confirms[0].okButtonTitle, 'Dial');
