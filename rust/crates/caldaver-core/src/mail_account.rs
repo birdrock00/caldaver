@@ -17,7 +17,7 @@ pub enum ValidationError {
 }
 
 impl ValidationError {
-    pub fn php_message(&self) -> &'static str {
+    pub fn legacy_message(&self) -> &'static str {
         match self {
             Self::InvalidPort => "IMAP port must be between 1 and 65535",
             Self::LocalhostHost => "IMAP host cannot be localhost",
@@ -157,12 +157,12 @@ mod tests {
     }
 
     #[test]
-    fn rejects_zero_port_with_php_message() {
+    fn rejects_zero_port_with_legacy_message() {
         let result = validate_with_resolver(&account("imap.example.com", 0), &FakeResolver::default());
 
         assert_eq!(result, Err(ValidationError::InvalidPort));
         assert_eq!(
-            ValidationError::InvalidPort.php_message(),
+            ValidationError::InvalidPort.legacy_message(),
             "IMAP port must be between 1 and 65535"
         );
     }
