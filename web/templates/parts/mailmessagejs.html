@@ -130,10 +130,40 @@
     }
   }
 
+  function proxiedImageUrl(source, accountId, uid) {
+    if (!/^\s*https?:\/\//i.test(source || '')) {
+      return source;
+    }
+
+    return '/mail/image?account_id=' + encodeURIComponent(accountId) +
+      '&uid=' + encodeURIComponent(uid) +
+      '&url=' + encodeURIComponent(source.trim());
+  }
+
+  function proxyMailImages(html, accountId, uid) {
+    var template = document.createElement('template');
+    template.innerHTML = html;
+    template.content.querySelectorAll('img').forEach(function(image) {
+      var source = image.getAttribute('src') || '';
+      if (source) {
+        image.setAttribute('src', proxiedImageUrl(source, accountId, uid));
+      }
+      if (image.hasAttribute('srcset')) {
+        image.removeAttribute('srcset');
+      }
+    });
+    return template.innerHTML;
+  }
+
   function renderBody(message) {
     var htmlFrame = $('#mail_reader_html');
     var plainBody = $('#mail_reader_body');
-    var html = sanitizeHtml(text(message.html_body));
+    var reader = $('#mail_reader');
+    var html = proxyMailImages(
+      sanitizeHtml(text(message.html_body)),
+      reader.dataset.accountId,
+      reader.dataset.uid
+    );
 
     if (html) {
       plainBody.hidden = true;
