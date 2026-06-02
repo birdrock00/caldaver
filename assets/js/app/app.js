@@ -54,6 +54,16 @@ var calendar_default_view_for_viewport = function calendar_default_view_for_view
   return fullcalendar_views[CaldaverUserPrefs.default_view];
 };
 
+var calendar_list_duration_days = function calendar_list_duration_days() {
+  var preferred_days = parseInt(CaldaverUserPrefs.list_days);
+
+  if (is_mobile_viewport()) {
+    return Math.max(120, preferred_days || 0);
+  }
+
+  return preferred_days || 7;
+};
+
 var calendar_timezone = function calendar_timezone() {
   return CaldaverUserPrefs.timezone || 'UTC';
 };
@@ -137,7 +147,7 @@ $(document).ready(function() {
     views: {
       customizable_list: {
         type: 'list',
-        duration: { days: parseInt(CaldaverUserPrefs.list_days) },
+        duration: { days: calendar_list_duration_days() },
         listDayFormat: 'dddd',
         listDayAltFormat: 'MMMM D'
       }
@@ -273,8 +283,7 @@ $(document).ready(function() {
       changeYear: true,
       closeText: t('labels', 'cancel'),
       onSelect: function(date, text) {
-        var d = $('#datepicker_fullcalendar').datepicker('getDate');
-        $('#calendar_view').fullCalendar('gotoDate', d);
+        goto_datepicker_selection($(this));
       }
     })
     .prev()
@@ -436,7 +445,7 @@ var sync_mobile_calendar_chrome = function sync_mobile_calendar_chrome(view) {
 };
 
 var show_calendar_datepicker = function show_calendar_datepicker() {
-  var $datepicker = $('#datepicker_fullcalendar');
+  var $datepicker = is_mobile_viewport() ? mobile_calendar_datepicker() : $('#datepicker_fullcalendar');
 
   if ($datepicker.length === 0) {
     return;
@@ -445,6 +454,62 @@ var show_calendar_datepicker = function show_calendar_datepicker() {
   var current_date = $('#calendar_view').fullCalendar('getDate').toDate();
   $datepicker.datepicker('setDate', current_date);
   $datepicker.datepicker('show');
+
+  if (is_mobile_viewport()) {
+    window.setTimeout(function() {
+      $('#ui-datepicker-div')
+        .addClass('mobile-calendar-datepicker')
+        .css({
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 3200
+        });
+    }, 0);
+  }
+};
+
+var mobile_calendar_datepicker = function mobile_calendar_datepicker() {
+  var $datepicker = $('#mobile_datepicker_fullcalendar');
+
+  if ($datepicker.length > 0) {
+    return $datepicker;
+  }
+
+  $datepicker = $('<input/>', {
+    type: 'text',
+    id: 'mobile_datepicker_fullcalendar',
+    'aria-hidden': 'true',
+    tabindex: '-1'
+  })
+    .css({
+      position: 'fixed',
+      width: '1px',
+      height: '1px',
+      opacity: 0,
+      pointerEvents: 'none',
+      top: '50%',
+      left: '50%'
+    })
+    .appendTo('body')
+    .datepicker({
+      changeYear: true,
+      closeText: t('labels', 'cancel'),
+      onSelect: function(date, text) {
+        goto_datepicker_selection($(this));
+      }
+    });
+
+  return $datepicker;
+};
+
+var goto_datepicker_selection = function goto_datepicker_selection($datepicker) {
+  var d = $datepicker.datepicker('getDate');
+
+  if (d) {
+    $('#calendar_view').fullCalendar('gotoDate', d);
+  }
 };
 
 var add_refresh_button = function add_refresh_button() {
