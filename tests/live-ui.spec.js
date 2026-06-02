@@ -1059,7 +1059,7 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
         subject: 'Rich newsletter',
         date: 'Fri, 29 May 2026 13:00:00 -0700',
         body: 'Plain fallback body',
-        html_body: '<article><h2>Rich newsletter</h2><p><strong>Styled content</strong></p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="hero"><script>window.top.__messageScriptRan = true;</script></article>'
+        html_body: '<article><h2>Rich newsletter</h2><p><strong>Styled content</strong></p><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="hero"><div style="height: 900px;">Full newsletter body</div><script>window.top.__messageScriptRan = true;</script></article>'
       }
     }
   });
@@ -1069,11 +1069,16 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
   await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=501/);
   await expect(page.locator('#mail_reader_html')).toBeVisible();
   await expect(page.locator('#mail_reader_body')).toBeHidden();
+  await expect(page.locator('#mail_reader_html')).toHaveAttribute('sandbox', /allow-same-origin/);
 
   const htmlFrame = page.frameLocator('#mail_reader_html');
   await expect(htmlFrame.locator('h2')).toHaveText('Rich newsletter');
   await expect(htmlFrame.locator('strong')).toHaveText('Styled content');
   await expect(htmlFrame.locator('img[alt="hero"]')).toBeVisible();
+  await expect.poll(async () => {
+    const box = await page.locator('#mail_reader_html').boundingBox();
+    return Math.round(box ? box.height : 0);
+  }).toBeGreaterThan(900);
   await expect(htmlFrame.locator('script')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.__messageScriptRan || false)).toBe(false);
 
