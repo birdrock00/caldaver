@@ -24,8 +24,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
+use std::time::Duration;
 use tower_http::services::ServeDir;
 use tower_http::trace::TraceLayer;
 use uuid::Uuid;
@@ -175,6 +176,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/mail/message", get(mail_message))
         .route("/mail/message/unread", post(mail_mark_unread))
         .route("/mail/attachment", get(mail_attachment))
+        .route("/mail/image", get(mail_image))
         .route("/preferences", get(preferences_page).post(preferences_save))
         .route("/calendars", get(calendars_list).post(calendar_save))
         .route("/calendars/save", post(calendar_save))
@@ -1193,6 +1195,133 @@ async fn mail_attachment(State(state): State<AppState>, headers: HeaderMap, Quer
     );
     headers.insert("x-content-type-options", HeaderValue::from_static("nosniff"));
     response
+}
+
+async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+    let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
+        return StatusCode::UNAUTHORIZED.into_response();
+    };
+    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let uid = query.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let image_url = query.get("url").cloned().unwrap_or_default();
+    let Ok(url) = reqwest::Url::parse(&image_url) else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    if !mail_image_url_allowed(&url) {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
+    if mail_account_for(&state, &session.username, account_id).await.is_err() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let message = match state.storage.cached_message(&session.username, account_id, uid).await {
+        Ok(Some(message)) => message,
+        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
+        Err(error) => {
+            tracing::error!(%error, "failed to load cached message for mail image proxy");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    if !message_html_allows_image_url(&message.html_body, &image_url) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+
+    let client = match reqwest::Client::builder()
+        .timeout(Duration::from_secs(12))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+    {
+        Ok(client) => client,
+        Err(error) => {
+            tracing::error!(%error, "failed to build mail image proxy client");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+    let remote = match client
+        .get(url)
+        .header("accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+        .header("user-agent", "Caldaver mail image proxy")
+        .send()
+        .await
+    {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::warn!(%error, "failed to fetch proxied mail image");
+            return StatusCode::BAD_GATEWAY.into_response();
+        }
+    };
+    if !remote.status().is_success() {
+        return StatusCode::BAD_GATEWAY.into_response();
+    }
+    let content_type = remote
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .to_string();
+    if !content_type.to_ascii_lowercase().starts_with("image/") {
+        return StatusCode::BAD_GATEWAY.into_response();
+    }
+    if remote.content_length().is_some_and(|length| length > 15 * 1024 * 1024) {
+        return StatusCode::PAYLOAD_TOO_LARGE.into_response();
+    }
+    let bytes = match remote.bytes().await {
+        Ok(bytes) if bytes.len() <= 15 * 1024 * 1024 => bytes,
+        Ok(_) => return StatusCode::PAYLOAD_TOO_LARGE.into_response(),
+        Err(error) => {
+            tracing::warn!(%error, "failed to read proxied mail image body");
+            return StatusCode::BAD_GATEWAY.into_response();
+        }
+    };
+
+    let mut response = (StatusCode::OK, bytes.to_vec()).into_response();
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(&content_type).unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+    );
+    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=86400"));
+    headers.insert("x-content-type-options", HeaderValue::from_static("nosniff"));
+    response
+}
+
+fn message_html_allows_image_url(html: &str, image_url: &str) -> bool {
+    html.contains(image_url) || html.contains(&image_url.replace('&', "&amp;"))
+}
+
+fn mail_image_url_allowed(url: &reqwest::Url) -> bool {
+    if !matches!(url.scheme(), "http" | "https") {
+        return false;
+    }
+    let Some(host) = url.host_str() else {
+        return false;
+    };
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    if host == "localhost" || host.ends_with(".localhost") {
+        return false;
+    }
+    match host.parse::<IpAddr>() {
+        Ok(IpAddr::V4(ip)) => !blocked_ipv4(ip),
+        Ok(IpAddr::V6(ip)) => !blocked_ipv6(ip),
+        Err(_) => true,
+    }
+}
+
+fn blocked_ipv4(ip: Ipv4Addr) -> bool {
+    ip.is_private()
+        || ip.is_loopback()
+        || ip.is_link_local()
+        || ip.is_broadcast()
+        || ip.is_documentation()
+        || ip.is_unspecified()
+        || ip.is_multicast()
+}
+
+fn blocked_ipv6(ip: Ipv6Addr) -> bool {
+    ip.is_loopback()
+        || ip.is_unspecified()
+        || ip.is_unique_local()
+        || ip.is_unicast_link_local()
+        || ip.is_multicast()
 }
 
 async fn principals(Query(query): Query<HashMap<String, String>>) -> Json<Value> {
@@ -2235,6 +2364,18 @@ mod tests {
         assert!(mail_js.contains(r#"var preferencesUrl = '/preferences';"#));
         assert!(!mail_js.contains("app.url_generator.generate"));
         assert!(!mail_js.contains("{{"));
+    }
+
+    #[test]
+    fn mail_image_proxy_allows_only_message_urls_and_public_http_images() {
+        assert!(message_html_allows_image_url(
+            r#"<img src="https://example.test/image.png?a=1&amp;b=2">"#,
+            "https://example.test/image.png?a=1&b=2"
+        ));
+        assert!(mail_image_url_allowed(&reqwest::Url::parse("https://example.test/image.png").unwrap()));
+        assert!(!mail_image_url_allowed(&reqwest::Url::parse("javascript:alert(1)").unwrap()));
+        assert!(!mail_image_url_allowed(&reqwest::Url::parse("http://127.0.0.1/image.png").unwrap()));
+        assert!(!mail_image_url_allowed(&reqwest::Url::parse("http://localhost/image.png").unwrap()));
     }
 
     #[tokio::test]
