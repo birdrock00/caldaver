@@ -1029,6 +1029,7 @@ async fn mail_account_save(State(state): State<AppState>, headers: HeaderMap, Fo
             Ok(password) => password,
             Err(error) => return mail_backend_response(error),
         },
+        password_needs_reset: false,
         refresh_interval_seconds: form
             .get("refresh_interval_minutes")
             .and_then(|v| v.parse::<u64>().ok())
@@ -1977,6 +1978,7 @@ mod tests {
             encryption: "ssl".to_string(),
             username: "ada".to_string(),
             password_sealed: SealedPassword::seal("secret").unwrap(),
+            password_needs_reset: false,
             refresh_interval_seconds: 60,
         }
     }

@@ -12,6 +12,8 @@
   var defaultRequestTimeoutMs = 20000;
   var initialAccountId = null;
   var highlightedUnreadUid = null;
+  var resetPasswordMessage = 'Saved IMAP password needs to be reset after Caldaver credential rotation.';
+  var preferencesUrl = '{{ app.url_generator.generate('preferences') }}';
 
   function $(selector) {
     return document.querySelector(selector);
@@ -54,6 +56,14 @@
       button.innerHTML = '<i class="fa fa-inbox"></i><span></span><small></small>';
       button.querySelector('span').textContent = account.label;
       button.querySelector('small').textContent = account.email_address;
+      if (account.password_needs_reset) {
+        button.classList.add('needs-reset');
+        button.title = 'Saved IMAP password needs to be reset';
+        var resetIcon = document.createElement('i');
+        resetIcon.className = 'fa fa-exclamation-circle mail-account-reset-icon';
+        resetIcon.setAttribute('aria-label', 'Saved IMAP password needs to be reset');
+        button.appendChild(resetIcon);
+      }
       button.addEventListener('click', function() {
         selectAccount(account.id, true, true);
       });
@@ -198,11 +208,27 @@
     mailStatus = status;
     mailStatusMessage = message || '';
     if (status === 'error') {
-      $('#mail_error').textContent = mailStatusMessage;
+      renderMailError(mailStatusMessage);
     } else {
       $('#mail_error').hidden = true;
     }
     renderMailStatus();
+  }
+
+  function renderMailError(message) {
+    var container = $('#mail_error');
+    container.innerHTML = '';
+    var textNode = document.createElement('span');
+    textNode.textContent = message;
+    container.appendChild(textNode);
+    if ((message || '').indexOf(resetPasswordMessage) === 0) {
+      var link = document.createElement('a');
+      link.href = preferencesUrl;
+      link.className = 'mail-error-action';
+      link.textContent = 'Open Preferences';
+      container.appendChild(link);
+    }
+    container.hidden = false;
   }
 
   function narrowViewport() {
