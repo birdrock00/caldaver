@@ -1202,8 +1202,10 @@ async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(que
         return StatusCode::UNAUTHORIZED.into_response();
     };
     let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = query.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
     let image_url = query.get("url").cloned().unwrap_or_default();
+    if query.get("_token").is_none_or(|token| token != &session.csrf) {
+        return StatusCode::UNAUTHORIZED.into_response();
+    }
     let Ok(url) = reqwest::Url::parse(&image_url) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
@@ -1212,17 +1214,6 @@ async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(que
     }
     if mail_account_for(&state, &session.username, account_id).await.is_err() {
         return StatusCode::NOT_FOUND.into_response();
-    }
-    let message = match state.storage.cached_message(&session.username, account_id, uid).await {
-        Ok(Some(message)) => message,
-        Ok(None) => return StatusCode::NOT_FOUND.into_response(),
-        Err(error) => {
-            tracing::error!(%error, "failed to load cached message for mail image proxy");
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
-        }
-    };
-    if !message_html_allows_image_url(&message.html_body, &image_url) {
-        return StatusCode::FORBIDDEN.into_response();
     }
 
     let client = match reqwest::Client::builder()
@@ -1282,10 +1273,6 @@ async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(que
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=86400"));
     headers.insert("x-content-type-options", HeaderValue::from_static("nosniff"));
     response
-}
-
-fn message_html_allows_image_url(html: &str, image_url: &str) -> bool {
-    html.contains(image_url) || html.contains(&image_url.replace('&', "&amp;"))
 }
 
 fn mail_image_url_allowed(url: &reqwest::Url) -> bool {
@@ -2367,11 +2354,7 @@ mod tests {
     }
 
     #[test]
-    fn mail_image_proxy_allows_only_message_urls_and_public_http_images() {
-        assert!(message_html_allows_image_url(
-            r#"<img src="https://example.test/image.png?a=1&amp;b=2">"#,
-            "https://example.test/image.png?a=1&b=2"
-        ));
+    fn mail_image_proxy_allows_only_public_http_images() {
         assert!(mail_image_url_allowed(&reqwest::Url::parse("https://example.test/image.png").unwrap()));
         assert!(!mail_image_url_allowed(&reqwest::Url::parse("javascript:alert(1)").unwrap()));
         assert!(!mail_image_url_allowed(&reqwest::Url::parse("http://127.0.0.1/image.png").unwrap()));
