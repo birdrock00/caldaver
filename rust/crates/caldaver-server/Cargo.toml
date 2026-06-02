@@ -7,7 +7,6 @@ repository.workspace = true
 
 [dependencies]
 aes-gcm = "0.10"
-ammonia = "4"
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
 caldaver-core = { path = "../caldaver-core" }
