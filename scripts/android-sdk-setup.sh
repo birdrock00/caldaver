@@ -170,7 +170,56 @@ install_sdk_packages() {
     [[ "$license_status" -eq 0 ]] || fail "sdkmanager license acceptance failed"
   fi
 
-  "$sdkmanager" --sdk_root="$sdk_root" "${packages[@]}"
+  for package in "${packages[@]}"; do
+    install_sdk_package "$sdkmanager" "$package"
+  done
+}
+
+sdk_package_dir() {
+  local package="$1"
+
+  case "$package" in
+    build-tools\;*)
+      printf '%s\n' "$sdk_root/build-tools/${package#build-tools;}"
+      ;;
+    platforms\;android-*)
+      printf '%s\n' "$sdk_root/platforms/android-${package#platforms;android-}"
+      ;;
+    platform-tools)
+      printf '%s\n' "$sdk_root/platform-tools"
+      ;;
+    *)
+      printf '\n'
+      ;;
+  esac
+}
+
+install_sdk_package() {
+  local sdkmanager="$1"
+  local package="$2"
+  local package_dir=""
+  local attempt=1
+  local max_attempts=3
+
+  package_dir="$(sdk_package_dir "$package")"
+  while [[ "$attempt" -le "$max_attempts" ]]; do
+    if "$sdkmanager" --sdk_root="$sdk_root" "$package"; then
+      return 0
+    fi
+
+    if [[ "$attempt" -eq "$max_attempts" ]]; then
+      break
+    fi
+
+    printf 'Retrying Android SDK package %s after failed install attempt %s\n' "$package" "$attempt" >&2
+    if [[ -n "$package_dir" ]]; then
+      rm -rf "$package_dir"
+    fi
+    sleep "$((attempt * 2))"
+    attempt="$((attempt + 1))"
+  done
+
+  fail "sdkmanager package install failed after ${max_attempts} attempts: ${package}"
 }
 
 write_android_local_properties() {
