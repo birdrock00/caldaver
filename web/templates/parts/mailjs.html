@@ -364,6 +364,12 @@
       return Promise.resolve();
     }
 
+    if (account.password_needs_reset) {
+      setMailStatus('error', resetPasswordMessage + ' Re-save the mail account password in Preferences.');
+      renderMessages();
+      return Promise.resolve();
+    }
+
     return jsonFetch(
       '{{ app.url_generator.generate('mail.messages') }}?account_id=' + encodeURIComponent(account.id),
       {},
