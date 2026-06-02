@@ -272,6 +272,21 @@
       '&uid=' + encodeURIComponent(uid);
   }
 
+  function messageNavigationState(messages, uid) {
+    var currentIndex = -1;
+    messages.forEach(function(message, index) {
+      if (String(message.uid) === String(uid)) {
+        currentIndex = index;
+      }
+    });
+
+    return {
+      currentIndex: currentIndex,
+      previous: currentIndex > 0 ? messages[currentIndex - 1] : null,
+      next: currentIndex !== -1 && currentIndex < messages.length - 1 ? messages[currentIndex + 1] : null
+    };
+  }
+
   function navigateTo(url) {
     if (typeof window.CALDAVER_MAIL_NAVIGATE === 'function') {
       window.CALDAVER_MAIL_NAVIGATE(url);
@@ -291,28 +306,42 @@
 
     return loadInboxMessages(reader)
       .then(function(messages) {
-        var currentIndex = -1;
-        messages.forEach(function(message, index) {
-          if (String(message.uid) === String(reader.dataset.uid)) {
-            currentIndex = index;
-          }
-        });
-
-        if (currentIndex === -1) {
-          return;
-        }
-
-        var targetIndex = direction === 'newer' ? currentIndex - 1 : currentIndex + 1;
-        if (targetIndex < 0 || targetIndex >= messages.length) {
+        var state = messageNavigationState(messages, reader.dataset.uid);
+        var target = direction === 'newer' ? state.previous : state.next;
+        if (!target) {
           return;
         }
 
         swipeNavigating = true;
-        navigateTo(messageReadUrl(reader, messages[targetIndex].uid));
+        navigateTo(messageReadUrl(reader, target.uid));
       })
       .catch(function(error) {
         $('#mail_reader_error').textContent = error.message;
         $('#mail_reader_error').hidden = false;
+      });
+  }
+
+  function updateMessageNavButtons() {
+    var reader = $('#mail_reader');
+    var previousButton = $('#mail_reader_previous');
+    var nextButton = $('#mail_reader_next');
+
+    if (!previousButton || !nextButton) {
+      return Promise.resolve();
+    }
+
+    previousButton.disabled = true;
+    nextButton.disabled = true;
+
+    return loadInboxMessages(reader)
+      .then(function(messages) {
+        var state = messageNavigationState(messages, reader.dataset.uid);
+        previousButton.disabled = !state.previous;
+        nextButton.disabled = !state.next;
+      })
+      .catch(function() {
+        previousButton.disabled = true;
+        nextButton.disabled = true;
       });
   }
 
@@ -436,7 +465,14 @@
   document.addEventListener('DOMContentLoaded', function() {
     $('#mail_reader_refresh').addEventListener('click', loadMessage);
     $('#mail_reader_unread').addEventListener('click', markUnread);
+    $('#mail_reader_previous').addEventListener('click', function() {
+      navigateBySwipe('newer');
+    });
+    $('#mail_reader_next').addEventListener('click', function() {
+      navigateBySwipe('older');
+    });
     setupSwipeNavigation();
+    updateMessageNavButtons();
     loadMessage();
   });
 })();
