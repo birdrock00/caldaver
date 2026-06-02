@@ -140,7 +140,7 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.doesNotMatch(mailMessage, /compose-button[\s\S]*labels\.inbox/);
   assert.match(mailMessageJs, /function setupSwipeNavigation\(\)/);
   assert.match(mailMessageJs, /function resizeHtmlFrame\(htmlFrame\)/);
-  assert.match(mailMessageJs, /function proxyMailImages\(html, accountId, uid\)/);
+  assert.match(mailMessageJs, /function proxyMailImages\(html, accountId, uid, csrfToken\)/);
   assert.match(mailMessageJs, /\/mail\/image\?account_id=/);
   assert.match(mailMessageJs, /document\.images/);
   assert.match(mailMessageJs, /navigateBySwipe\(deltaX > 0 \? 'newer' : 'older'\)/);

@@ -130,23 +130,24 @@
     }
   }
 
-  function proxiedImageUrl(source, accountId, uid) {
+  function proxiedImageUrl(source, accountId, uid, csrfToken) {
     if (!/^\s*https?:\/\//i.test(source || '')) {
       return source;
     }
 
     return '/mail/image?account_id=' + encodeURIComponent(accountId) +
       '&uid=' + encodeURIComponent(uid) +
+      '&_token=' + encodeURIComponent(csrfToken) +
       '&url=' + encodeURIComponent(source.trim());
   }
 
-  function proxyMailImages(html, accountId, uid) {
+  function proxyMailImages(html, accountId, uid, csrfToken) {
     var template = document.createElement('template');
     template.innerHTML = html;
     template.content.querySelectorAll('img').forEach(function(image) {
       var source = image.getAttribute('src') || '';
       if (source) {
-        image.setAttribute('src', proxiedImageUrl(source, accountId, uid));
+        image.setAttribute('src', proxiedImageUrl(source, accountId, uid, csrfToken));
       }
       if (image.hasAttribute('srcset')) {
         image.removeAttribute('srcset');
@@ -162,7 +163,8 @@
     var html = proxyMailImages(
       sanitizeHtml(text(message.html_body)),
       reader.dataset.accountId,
-      reader.dataset.uid
+      reader.dataset.uid,
+      reader.dataset.csrfToken
     );
 
     if (html) {
