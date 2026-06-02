@@ -35,6 +35,14 @@
         <button type="button" id="mail_reader_unread" title="{% trans %}labels.mark_unread{% endtrans %}" hidden>
           <i class="fa fa-envelope"></i>
         </button>
+        <div class="mail-reader-toolbar-nav" aria-label="{% trans %}labels.mail{% endtrans %}">
+          <button type="button" id="mail_reader_previous" title="Previous message" aria-label="Previous message" disabled>
+            <i class="fa fa-chevron-left"></i>
+          </button>
+          <button type="button" id="mail_reader_next" title="Next message" aria-label="Next message" disabled>
+            <i class="fa fa-chevron-right"></i>
+          </button>
+        </div>
       </div>
       <div id="mail_reader_error" class="mail-error" hidden></div>
       <article id="mail_reader_message" class="mail-reader-message" hidden>

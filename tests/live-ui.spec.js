@@ -1133,6 +1133,50 @@ test('mobile mail reader swipe navigates newer and older inbox messages', async 
   expect(consoleErrors).toEqual([]);
 });
 
+test('mail reader previous and next controls navigate adjacent messages', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+
+  const inboxMessages = [
+    { uid: 701, from: 'Newest Sender', subject: 'Newer message', date: 'Fri, 29 May 2026 15:00:00 -0700', seen: true },
+    { uid: 702, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', seen: true },
+    { uid: 703, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', seen: true }
+  ];
+
+  await mockMailApi(page, {
+    accounts: [{ id: 1, label: 'Button Inbox', email_address: 'buttons@example.test' }],
+    cachedMessagesByAccount: { 1: inboxMessages },
+    messagesByAccount: { 1: inboxMessages },
+    messageDetails: {
+      701: { uid: 701, from: 'Newest Sender', subject: 'Newer message', date: 'Fri, 29 May 2026 15:00:00 -0700', body: 'Newer body' },
+      702: { uid: 702, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', body: 'Current body' },
+      703: { uid: 703, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', body: 'Older body' }
+    }
+  });
+
+  await page.goto(`${baseURL}/mail/read?account_id=1&uid=702`);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Current message');
+  await expect(page.locator('#mail_reader_previous')).toBeEnabled();
+  await expect(page.locator('#mail_reader_next')).toBeEnabled();
+
+  await page.locator('#mail_reader_previous').click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=701/);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Newer message');
+  await expect(page.locator('#mail_reader_previous')).toBeDisabled();
+  await expect(page.locator('#mail_reader_next')).toBeEnabled();
+
+  await page.goto(`${baseURL}/mail/read?account_id=1&uid=702`);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Current message');
+  await page.locator('#mail_reader_next').click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=703/);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Older message');
+  await expect(page.locator('#mail_reader_previous')).toBeEnabled();
+  await expect(page.locator('#mail_reader_next')).toBeDisabled();
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
 test('mark unread keeps the action visible while IMAP update is pending', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
