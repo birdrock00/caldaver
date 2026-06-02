@@ -547,6 +547,24 @@ body.caldaver-calendar-page {
   white-space: nowrap;
 }
 
+.mobile-calendar-toolbar-title,
+.mobile-calendar-toolbar-action {
+  display: none;
+}
+
+.mobile-calendar-toolbar-action button {
+  display: inline-flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font-size: 22px;
+}
+
 .mobile-section-menu {
   position: relative;
   display: none;
@@ -2285,6 +2303,82 @@ summary:focus-visible,
     overflow: auto;
   }
 
+  body.caldaver-calendar-page .caldaver-topbar.navbar {
+    min-height: 92px;
+    color: #fff;
+    background: #2876f9;
+    border-bottom: 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, .28);
+
+    .container-fluid {
+      min-height: 92px;
+      padding: 0 ~"calc(8px + env(safe-area-inset-right))" 0 ~"calc(8px + env(safe-area-inset-left))";
+    }
+
+    .navbar-header {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .navbar-brand {
+      height: 92px;
+      max-width: none;
+      color: #fff;
+      line-height: 1.1;
+    }
+
+    .caldaver-brand-title {
+      display: none;
+    }
+
+    .mobile-calendar-toolbar-title {
+      display: grid;
+      min-width: 0;
+      gap: 4px;
+      color: #fff;
+    }
+
+    #mobile_calendar_toolbar_date {
+      overflow: hidden;
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 1.1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #mobile_calendar_toolbar_day {
+      color: rgba(0, 0, 0, .62);
+      font-size: 17px;
+      font-weight: 400;
+      line-height: 1.1;
+    }
+
+    .mobile-section-menu {
+      margin-right: 10px;
+    }
+
+    .mobile-section-menu > summary,
+    .topbar-menu,
+    .mobile-calendar-toolbar-action button {
+      color: #fff;
+      font-size: 28px;
+
+      &:hover,
+      &:focus {
+        background: rgba(255, 255, 255, .16);
+      }
+    }
+
+    .mobile-calendar-toolbar-action {
+      display: flex;
+    }
+
+    #usermenu > li:not(.mobile-calendar-toolbar-action) {
+      display: none;
+    }
+  }
+
   .caldaver-topbar.navbar {
     min-height: 56px;
 
@@ -2390,6 +2484,12 @@ summary:focus-visible,
     min-height: ~"calc(100dvh - 56px)";
   }
 
+  body.caldaver-calendar-page .calendar-shell {
+    min-height: ~"calc(100vh - 92px)";
+    min-height: ~"calc(100dvh - 92px)";
+    background: #fff;
+  }
+
   #wrapper.calendar-layout {
     display: block;
     height: auto;
@@ -2417,6 +2517,36 @@ summary:focus-visible,
     margin-bottom: 0;
   }
 
+  body.caldaver-calendar-page #sidebar {
+    padding: 0;
+  }
+
+  body.caldaver-calendar-page #sidebar #shortcuts {
+    position: fixed;
+    right: ~"calc(24px + env(safe-area-inset-right))";
+    bottom: ~"calc(24px + env(safe-area-inset-bottom))";
+    z-index: 900;
+    margin: 0;
+  }
+
+  body.caldaver-calendar-page #shortcut_add_event.create-event-button {
+    width: 72px;
+    min-width: 72px;
+    height: 72px;
+    padding: 0;
+    color: transparent;
+    background: #7e7aa7;
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .28);
+    overflow: hidden;
+
+    i {
+      margin: 0;
+      color: #fff;
+      font-size: 32px;
+    }
+  }
+
   #sidebar .calendar-sidebar-section,
   #sidebar #footer {
     display: none !important;
@@ -2429,11 +2559,25 @@ summary:focus-visible,
     overflow-x: auto;
   }
 
+  body.caldaver-calendar-page #content {
+    min-height: ~"calc(100vh - 92px)";
+    min-height: ~"calc(100dvh - 92px)";
+    padding: 0;
+    overflow: visible;
+  }
+
   #calendar_view {
     border-radius: 18px;
     min-width: 760px;
     min-height: 720px;
     overflow: visible;
+  }
+
+  body.caldaver-calendar-page #calendar_view {
+    min-width: 0;
+    min-height: ~"calc(100vh - 92px)";
+    min-height: ~"calc(100dvh - 92px)";
+    border-radius: 0;
   }
 
   .cards-shell {
@@ -2608,6 +2752,285 @@ summary:focus-visible,
   #calendar_view .fc-toolbar {
     flex-wrap: wrap;
     min-height: 112px;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-toolbar {
+    display: none;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-view-container {
+    height: auto;
+    padding: 0 0 96px;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-view {
+    border: 0;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-table {
+    border-collapse: collapse;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-heading td {
+    padding: 18px 40px 8px;
+    background: #fff;
+    border-top: 1px solid #ddd;
+    border-bottom: 0;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-heading-main {
+    display: block;
+    float: none;
+    color: #5f6368;
+    font-size: 19px;
+    font-weight: 400;
+    line-height: 1.05;
+    text-transform: uppercase;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-heading-alt {
+    display: block;
+    float: none;
+    color: #5f6368;
+    font-size: 34px;
+    font-weight: 300;
+    line-height: 1.05;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item {
+    display: grid;
+    grid-template-columns: 82px minmax(0, 1fr);
+    padding: 18px 0 22px;
+    border-bottom: 1px solid #ddd;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item td {
+    display: block;
+    padding: 0;
+    background: #fff;
+    border-top: 0;
+    border-bottom: 0;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item-marker {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: auto;
+    padding-left: 40px;
+    vertical-align: top;
+
+    .fc-event-dot {
+      width: 31px;
+      height: 31px;
+      margin-top: 2px;
+      border-radius: 0;
+    }
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item-time {
+    grid-column: 2;
+    grid-row: 2;
+    width: auto;
+    padding: 4px 40px 0 0;
+    color: #5f6368;
+    font-size: 22px;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item-title {
+    grid-column: 2;
+    grid-row: 1;
+    padding: 0 40px 0 0;
+    color: #212121;
+    font-size: 27px;
+    font-weight: 700;
+    line-height: 1.18;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-empty {
+    padding: 48px 24px;
+    color: #5f6368;
+    background: #fff;
+    font-size: 18px;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item:hover td {
+    background: #f8f8f8;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker {
+    width: ~"calc(100vw - 48px)" !important;
+    max-width: 360px;
+    padding: 0 0 20px;
+    border: 0;
+    border-radius: 2px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .32);
+    overflow: hidden;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-header {
+    min-height: 96px;
+    padding: 18px 24px;
+    color: #fff;
+    background: #7e7aa7;
+    border: 0;
+    border-radius: 0;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-title {
+    margin: 0;
+    padding-top: 26px;
+    color: #fff;
+    font-size: 32px;
+    font-weight: 400;
+    line-height: 1.1;
+    text-align: left;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-prev,
+  body.caldaver-calendar-page .ui-datepicker-next {
+    top: 106px;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-prev {
+    left: 24px;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-next {
+    right: 24px;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-calendar {
+    width: ~"calc(100% - 48px)";
+    margin: 72px 24px 16px;
+    font-size: 16px;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-calendar th {
+    padding: 9px 0;
+    color: #6f6f6f;
+    font-weight: 400;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-calendar td {
+    padding: 3px;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-calendar .ui-state-default {
+    display: flex;
+    width: 40px;
+    height: 40px;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+    color: #202124;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    text-align: center;
+  }
+
+  body.caldaver-calendar-page .ui-datepicker-calendar .ui-state-active {
+    color: #fff;
+    background: #7e7aa7;
+  }
+
+  body.mobile-event-details-open {
+    overflow: hidden;
+  }
+
+  .mobile-event-details-view {
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    background: #faf9ff;
+  }
+
+  .mobile-event-details-toolbar {
+    display: flex;
+    min-height: 72px;
+    align-items: center;
+    padding: env(safe-area-inset-top) 12px 0;
+    color: #fff;
+    background: #2876f9;
+  }
+
+  .mobile-event-detail-back,
+  .mobile-event-detail-actions button {
+    display: inline-flex;
+    width: 48px;
+    height: 48px;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background: transparent;
+    border: 0;
+    border-radius: 50%;
+    font-size: 28px;
+  }
+
+  .mobile-event-detail-actions {
+    display: flex;
+    margin-left: auto;
+  }
+
+  .mobile-event-details-hero {
+    padding: 28px 40px 30px;
+    color: #fff;
+
+    h1 {
+      margin: 0 0 12px;
+      color: #fff;
+      font-size: 34px;
+      font-weight: 700;
+      line-height: 1.12;
+    }
+
+    p {
+      margin: 0;
+      color: #fff;
+      font-size: 21px;
+      line-height: 1.35;
+    }
+  }
+
+  .mobile-event-details-body {
+    flex: 1 1 auto;
+    padding: 26px 40px;
+    overflow: auto;
+    color: #686868;
+    background: #faf9ff;
+
+    h2 {
+      margin: 28px 0 8px;
+      padding-bottom: 8px;
+      color: #777;
+      border-bottom: 3px solid #d8d8dd;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+  }
+
+  .mobile-event-calendar-line,
+  .mobile-event-muted-line,
+  .mobile-event-reminder-line {
+    margin: 0 0 18px;
+    font-size: 22px;
+    line-height: 1.35;
   }
 
   #calendar_view .fc-center,
