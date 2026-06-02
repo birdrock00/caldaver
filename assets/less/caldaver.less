@@ -2096,7 +2096,23 @@ body.caldaver-calendar-page {
       outline: 0;
       text-decoration: none;
     }
+
+    &:disabled {
+      color: #c4c7c5;
+      cursor: default;
+
+      &:hover,
+      &:focus {
+        background: transparent;
+      }
+    }
   }
+}
+
+.mail-reader-toolbar-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .mail-reader-message {
