@@ -448,7 +448,7 @@ fn collect_parts(
         if include_body && part.ctype.mimetype.eq_ignore_ascii_case("text/plain") && plain_body.is_empty() {
             *plain_body = part.get_body().unwrap_or_default();
         } else if include_body && part.ctype.mimetype.eq_ignore_ascii_case("text/html") && html_body.is_empty() {
-            *html_body = ammonia::clean(&part.get_body().unwrap_or_default());
+            *html_body = part.get_body().unwrap_or_default();
         }
         return;
     }
@@ -567,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_message_sanitizes_html_and_collects_attachments() {
+    fn parse_message_preserves_html_and_collects_attachments() {
         let raw = concat!(
             "From: Ada <ada@example.test>\r\n",
             "Subject: Report\r\n",
@@ -590,8 +590,8 @@ mod tests {
 
         assert_eq!(message.uid, 42);
         assert_eq!(message.subject, "Report");
-        assert!(!message.html_body.contains("script"));
-        assert!(!message.html_body.contains("onclick"));
+        assert!(message.html_body.contains("onclick"));
+        assert!(message.html_body.contains("script"));
         assert_eq!(
             message.attachments,
             vec![MailAttachment {
