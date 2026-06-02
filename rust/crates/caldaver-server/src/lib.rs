@@ -1887,6 +1887,7 @@ fn part_js(name: &str) -> String {
         .replace("{{ app.url_generator.generate('mail.accounts') }}", "/mail/accounts")
         .replace("{{ app.url_generator.generate('mail.messages') }}", "/mail/messages")
         .replace("{{ app.url_generator.generate('mail.messages.sync') }}", "/mail/messages/sync")
+        .replace("{{ app.url_generator.generate('preferences') }}", "/preferences")
         .replace("{{ 'labels.delete'|trans }}", "Delete")
         .replace("{{ 'labels.mail'|trans }}", "Mail")
         .replace("{% trans %}labels.cancel{% endtrans %}", "Cancel")
@@ -2226,6 +2227,14 @@ mod tests {
         assert!(mail_javascript_disabled(&session, &HashMap::from([("nojs".to_string(), "true".to_string())])));
         session.preferences.disable_javascript = true;
         assert!(mail_javascript_disabled(&session, &HashMap::new()));
+    }
+
+    #[test]
+    fn rust_rendered_mail_javascript_has_concrete_route_urls() {
+        let mail_js = part_js("mailjs");
+        assert!(mail_js.contains(r#"var preferencesUrl = '/preferences';"#));
+        assert!(!mail_js.contains("app.url_generator.generate"));
+        assert!(!mail_js.contains("{{"));
     }
 
     #[tokio::test]
