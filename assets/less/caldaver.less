@@ -1850,6 +1850,10 @@ body.caldaver-calendar-page {
       color: #001d35;
     }
   }
+
+  &.needs-reset {
+    grid-template-columns: 24px minmax(0, 1fr) 20px;
+  }
 }
 
 .mail-content {
@@ -2012,6 +2016,20 @@ body.caldaver-calendar-page {
 }
 
 .mail-error {
+  color: #b3261e;
+}
+
+.mail-error-action {
+  display: inline-block;
+  margin-left: 12px;
+  color: #0b57d0;
+  font-weight: 600;
+}
+
+.mail-account-reset-icon {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  justify-self: center;
   color: #b3261e;
 }
 

@@ -22,6 +22,8 @@ pub(crate) struct MailAccount {
     pub encryption: String,
     pub username: String,
     pub password_sealed: SealedPassword,
+    #[serde(default)]
+    pub password_needs_reset: bool,
     pub refresh_interval_seconds: u64,
 }
 
@@ -34,6 +36,7 @@ pub(crate) struct MailAccountPublic {
     pub imap_port: u16,
     pub encryption: String,
     pub username: String,
+    pub password_needs_reset: bool,
     pub refresh_interval_seconds: u64,
 }
 
@@ -47,6 +50,7 @@ impl From<&MailAccount> for MailAccountPublic {
             imap_port: account.imap_port,
             encryption: account.encryption.clone(),
             username: account.username.clone(),
+            password_needs_reset: account.password_needs_reset,
             refresh_interval_seconds: account.refresh_interval_seconds,
         }
     }
@@ -222,6 +226,10 @@ pub(crate) trait MailBackend: Send + Sync {
 #[derive(Default)]
 pub(crate) struct ImapMailBackend;
 
+fn reset_mail_password_message() -> String {
+    "Saved IMAP password needs to be reset after Caldaver credential rotation. Re-save the mail account password in Preferences.".to_string()
+}
+
 impl MailBackend for ImapMailBackend {
     fn fetch_inbox_overview(&self, account: &MailAccount) -> Result<Vec<MailMessage>, MailBackendError> {
         self.with_session(account, |session| {
@@ -296,10 +304,18 @@ impl ImapMailBackend {
                 client
                     .login(fallback_username, password.as_str())
                     .map_err(|(fallback_error, _)| {
+                        if account.password_needs_reset {
+                            return MailBackendError::Credentials(reset_mail_password_message());
+                        }
                         MailBackendError::Credentials(format!("{error}; fallback login failed: {fallback_error}"))
                     })?
             }
-            Err((error, _)) => return Err(MailBackendError::Credentials(error.to_string())),
+            Err((error, _)) => {
+                if account.password_needs_reset {
+                    return Err(MailBackendError::Credentials(reset_mail_password_message()));
+                }
+                return Err(MailBackendError::Credentials(error.to_string()));
+            }
         };
         session.select("INBOX")?;
 
