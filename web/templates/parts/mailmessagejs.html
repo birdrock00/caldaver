@@ -130,6 +130,15 @@
     }
   }
 
+  function hideBrokenHtmlImage(image) {
+    image.classList.add('caldaver-mail-image-failed');
+    image.removeAttribute('srcset');
+    image.removeAttribute('sizes');
+    image.removeAttribute('width');
+    image.removeAttribute('height');
+    image.setAttribute('alt', '');
+  }
+
   function proxiedImageUrl(source, accountId, uid, csrfToken) {
     if (!/^\s*https?:\/\//i.test(source || '')) {
       return source;
@@ -171,16 +180,32 @@
       plainBody.hidden = true;
       plainBody.textContent = '';
       htmlFrame.hidden = false;
-      htmlFrame.srcdoc = '<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#202124;font:14px Arial,sans-serif;line-height:1.5;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}table{max-width:100%;}</style></head><body>' + html + '</body></html>';
+      htmlFrame.srcdoc = '<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#202124;font:14px Arial,sans-serif;line-height:1.5;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}img.caldaver-mail-image-failed{display:none!important;width:0!important;height:0!important;}table{max-width:100%;}</style></head><body>' + html + '</body></html>';
       htmlFrame.onload = function() {
         resizeHtmlFrame(htmlFrame);
         try {
           Array.prototype.slice.call(htmlFrame.contentWindow.document.images).forEach(function(image) {
             image.addEventListener('load', function() { resizeHtmlFrame(htmlFrame); });
-            image.addEventListener('error', function() { resizeHtmlFrame(htmlFrame); });
+            image.addEventListener('error', function() {
+              hideBrokenHtmlImage(image);
+              resizeHtmlFrame(htmlFrame);
+            });
+            if (image.complete && image.naturalWidth === 0) {
+              hideBrokenHtmlImage(image);
+            }
           });
         } catch (error) {}
         window.setTimeout(function() { resizeHtmlFrame(htmlFrame); }, 250);
+        window.setTimeout(function() {
+          try {
+            Array.prototype.slice.call(htmlFrame.contentWindow.document.images).forEach(function(image) {
+              if (image.complete && image.naturalWidth === 0) {
+                hideBrokenHtmlImage(image);
+              }
+            });
+          } catch (error) {}
+          resizeHtmlFrame(htmlFrame);
+        }, 750);
         window.setTimeout(function() { resizeHtmlFrame(htmlFrame); }, 1500);
       };
       return;
