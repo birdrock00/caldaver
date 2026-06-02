@@ -117,6 +117,19 @@
     return template.innerHTML;
   }
 
+  function resizeHtmlFrame(htmlFrame) {
+    try {
+      var doc = htmlFrame.contentWindow.document;
+      htmlFrame.style.height = Math.max(
+        340,
+        doc.documentElement.scrollHeight,
+        doc.body ? doc.body.scrollHeight : 0
+      ) + 'px';
+    } catch (error) {
+      htmlFrame.style.height = '520px';
+    }
+  }
+
   function renderBody(message) {
     var htmlFrame = $('#mail_reader_html');
     var plainBody = $('#mail_reader_body');
@@ -128,11 +141,15 @@
       htmlFrame.hidden = false;
       htmlFrame.srcdoc = '<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#202124;font:14px Arial,sans-serif;line-height:1.5;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}table{max-width:100%;}</style></head><body>' + html + '</body></html>';
       htmlFrame.onload = function() {
+        resizeHtmlFrame(htmlFrame);
         try {
-          htmlFrame.style.height = Math.max(340, htmlFrame.contentWindow.document.documentElement.scrollHeight) + 'px';
-        } catch (error) {
-          htmlFrame.style.height = '520px';
-        }
+          Array.prototype.slice.call(htmlFrame.contentWindow.document.images).forEach(function(image) {
+            image.addEventListener('load', function() { resizeHtmlFrame(htmlFrame); });
+            image.addEventListener('error', function() { resizeHtmlFrame(htmlFrame); });
+          });
+        } catch (error) {}
+        window.setTimeout(function() { resizeHtmlFrame(htmlFrame); }, 250);
+        window.setTimeout(function() { resizeHtmlFrame(htmlFrame); }, 1500);
       };
       return;
     }

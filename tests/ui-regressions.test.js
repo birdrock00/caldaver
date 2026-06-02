@@ -135,8 +135,12 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(mailMessage, /id="mail_reader"/);
   assert.match(mailMessage, /data-unread-url/);
   assert.match(mailMessage, /id="mail_reader_unread"/);
+  assert.match(mailMessage, /sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"/);
+  assert.match(server, /sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"/);
   assert.doesNotMatch(mailMessage, /compose-button[\s\S]*labels\.inbox/);
   assert.match(mailMessageJs, /function setupSwipeNavigation\(\)/);
+  assert.match(mailMessageJs, /function resizeHtmlFrame\(htmlFrame\)/);
+  assert.match(mailMessageJs, /document\.images/);
   assert.match(mailMessageJs, /navigateBySwipe\(deltaX > 0 \? 'newer' : 'older'\)/);
   assert.match(mailMessageJs, /targetIndex = direction === 'newer' \? currentIndex - 1 : currentIndex \+ 1/);
   assert.match(mailMessageJs, /function sanitizeHtml\(html\)/);
