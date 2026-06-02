@@ -33,9 +33,9 @@ var is_mobile_viewport = function is_mobile_viewport() {
 var calendar_header_for_viewport = function calendar_header_for_viewport() {
   if (is_mobile_viewport()) {
     return {
-      right: 'customizable_list,agendaDay agendaWeek,month',
-      center: 'title',
-      left: 'today prev,next'
+      right: '',
+      center: '',
+      left: ''
     };
   }
 
@@ -47,6 +47,10 @@ var calendar_header_for_viewport = function calendar_header_for_viewport() {
 };
 
 var calendar_default_view_for_viewport = function calendar_default_view_for_viewport(fullcalendar_views) {
+  if (is_mobile_viewport()) {
+    return 'customizable_list';
+  }
+
   return fullcalendar_views[CaldaverUserPrefs.default_view];
 };
 
@@ -124,13 +128,18 @@ $(document).ready(function() {
       var new_height = calendar_height();
       $(this).fullCalendar('option', 'height', new_height);
       $(this).fullCalendar('option', 'header', calendar_header_for_viewport());
+      if (is_mobile_viewport() && view.name !== 'customizable_list') {
+        $(this).fullCalendar('changeView', 'customizable_list');
+      }
+      sync_mobile_calendar_chrome(view);
       add_refresh_button();
     },
     views: {
       customizable_list: {
         type: 'list',
         duration: { days: parseInt(CaldaverUserPrefs.list_days) },
-        listDayAltFormat: 'dddd'
+        listDayFormat: 'dddd',
+        listDayAltFormat: 'MMMM D'
       }
     },
     header: calendar_header_for_viewport(),
@@ -158,6 +167,9 @@ $(document).ready(function() {
 
     eventRender: event_render_callback,
     eventClick: event_click_callback,
+    viewRender: function(view, element) {
+      sync_mobile_calendar_chrome(view);
+    },
 
     // Add new event by dragging. Click also triggers this event,
     // if you define dayClick and select there is some kind of
@@ -267,9 +279,7 @@ $(document).ready(function() {
     })
     .prev()
       .on('click', function() {
-        var current_date = $('#calendar_view').fullCalendar('getDate').toDate();
-        $('#datepicker_fullcalendar').datepicker('setDate', current_date);
-        $('#datepicker_fullcalendar').datepicker('show');
+        show_calendar_datepicker();
       });
   });
 
@@ -373,6 +383,7 @@ $(document).ready(function() {
     // Printing
     setup_print_tweaks();
     setup_topbar_menu();
+    setup_mobile_calendar_chrome();
     setup_android_back_behavior();
 
 });
@@ -390,6 +401,50 @@ var calendar_height = function calendar_height() {
   }
 
   return Math.max(480, calculated_height);
+};
+
+var setup_mobile_calendar_chrome = function setup_mobile_calendar_chrome() {
+  $('#mobile_calendar_date_action').on('click', function(e) {
+    e.preventDefault();
+    show_calendar_datepicker();
+  });
+
+  $('#mobile_calendar_more_action').on('click', function(e) {
+    e.preventDefault();
+    $('.mobile-section-menu').prop('open', true);
+    $('.topbar-menu').attr('aria-expanded', 'true');
+  });
+
+  sync_mobile_calendar_chrome();
+};
+
+var sync_mobile_calendar_chrome = function sync_mobile_calendar_chrome(view) {
+  var $calendar = $('#calendar_view');
+
+  if ($calendar.data('fullCalendar') === undefined) {
+    return;
+  }
+
+  var date = $calendar.fullCalendar('getDate');
+
+  if (!date || !moment.isMoment(date)) {
+    return;
+  }
+
+  $('#mobile_calendar_toolbar_date').text(date.format('MMMM D, YYYY'));
+  $('#mobile_calendar_toolbar_day').text(date.format('dddd'));
+};
+
+var show_calendar_datepicker = function show_calendar_datepicker() {
+  var $datepicker = $('#datepicker_fullcalendar');
+
+  if ($datepicker.length === 0) {
+    return;
+  }
+
+  var current_date = $('#calendar_view').fullCalendar('getDate').toDate();
+  $datepicker.datepicker('setDate', current_date);
+  $datepicker.datepicker('show');
 };
 
 var add_refresh_button = function add_refresh_button() {
@@ -1737,6 +1792,11 @@ var event_click_callback = function event_click_callback(event,
 
   event_data.readable_dates = CaldaverDateAndTime.formatEventDates(event_data);
 
+  if (is_mobile_viewport()) {
+    show_mobile_event_details(event_data);
+    return;
+  }
+
   // Event details popup
   render_template('event_details_popup', event_data, function(out) {
     event_details_popup.set({
@@ -1748,6 +1808,129 @@ var event_click_callback = function event_click_callback(event,
   });
 
 
+};
+
+var show_mobile_event_details = function show_mobile_event_details(event_data) {
+  var color = event_data.caldata.color || CaldaverConf.default_calendar_color;
+  var $view = $('<section/>', {
+    id: 'mobile_event_details_view',
+    'class': 'mobile-event-details-view',
+    role: 'dialog',
+    'aria-modal': 'true',
+    'aria-labelledby': 'mobile_event_details_title'
+  });
+  var $toolbar = $('<div/>', {
+    'class': 'mobile-event-details-toolbar'
+  }).appendTo($view);
+
+  $('<button/>', {
+    type: 'button',
+    'class': 'mobile-event-detail-back',
+    'aria-label': 'Back'
+  })
+    .append('<i class="fa fa-arrow-left" aria-hidden="true"></i>')
+    .appendTo($toolbar)
+    .on('click', close_mobile_event_details);
+
+  var $actions = $('<div/>', {
+    'class': 'mobile-event-detail-actions'
+  }).appendTo($toolbar);
+
+  if (event_data.disable_actions !== true) {
+    $('<button/>', {
+      type: 'button',
+      'aria-label': t('labels', 'modify')
+    })
+      .append('<i class="fa fa-pencil" aria-hidden="true"></i>')
+      .appendTo($actions)
+      .on('click', function() {
+        close_mobile_event_details();
+        modify_event_handler(event_data.id);
+      });
+
+    $('<button/>', {
+      type: 'button',
+      'aria-label': t('labels', 'delete')
+    })
+      .append('<i class="fa fa-trash" aria-hidden="true"></i>')
+      .appendTo($actions)
+      .on('click', function() {
+        close_mobile_event_details();
+        event_delete(event_data.id);
+      });
+  }
+
+  $('<button/>', {
+    type: 'button',
+    'aria-label': 'More'
+  })
+    .append('<i class="fa fa-ellipsis-v" aria-hidden="true"></i>')
+    .appendTo($actions);
+
+  var $hero = $('<header/>', {
+    'class': 'mobile-event-details-hero'
+  })
+    .css('background-color', color)
+    .appendTo($view);
+
+  $('<h1/>', {
+    id: 'mobile_event_details_title',
+    text: event_data.title || ''
+  }).appendTo($hero);
+
+  $('<p/>', {
+    text: event_data.readable_dates || ''
+  }).appendTo($hero);
+
+  var $body = $('<div/>', {
+    'class': 'mobile-event-details-body'
+  }).appendTo($view);
+
+  $('<p/>', {
+    'class': 'mobile-event-calendar-line',
+    text: t('labels', 'calendar') + ': ' + (event_data.caldata.displayname || '')
+  }).appendTo($body);
+
+  if (event_data.location) {
+    $('<p/>', {
+      'class': 'mobile-event-muted-line',
+      text: event_data.location
+    }).appendTo($body);
+  }
+
+  if (event_data.description) {
+    $('<p/>', {
+      'class': 'mobile-event-muted-line',
+      text: event_data.description
+    }).appendTo($body);
+  }
+
+  $('<h2/>', {
+    text: 'REMINDERS'
+  }).appendTo($body);
+
+  var reminders = event_data.reminders || [];
+  if (reminders.length === 0) {
+    $('<p/>', {
+      'class': 'mobile-event-muted-line',
+      text: 'No reminders'
+    }).appendTo($body);
+  } else {
+    $.each(reminders, function(index, reminder) {
+      $('<p/>', {
+        'class': 'mobile-event-reminder-line',
+        text: reminder.related === 'END' ? 'After end of event' : 'Before start of event'
+      }).appendTo($body);
+    });
+  }
+
+  $('#mobile_event_details_view').remove();
+  $('body').addClass('mobile-event-details-open').append($view);
+};
+
+var close_mobile_event_details = function close_mobile_event_details() {
+  $('#mobile_event_details_view').remove();
+  $('body').removeClass('mobile-event-details-open');
 };
 
 /**
