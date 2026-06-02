@@ -375,16 +375,21 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             .await?;
         Ok(rows
             .into_iter()
-            .map(|row| MailAccount {
-                id: row.get::<_, i64>("id") as u64,
-                label: row.get("label"),
-                email_address: row.get("email_address"),
-                imap_host: row.get("imap_host"),
-                imap_port: row.get::<_, i32>("imap_port") as u16,
-                encryption: row.get("encryption"),
-                username: row.get("username"),
-                password_sealed: self.open_mail_password(&row.get::<_, String>("password_secret")),
-                refresh_interval_seconds: row.get::<_, i64>("refresh_interval_seconds") as u64,
+            .map(|row| {
+                let (password_sealed, password_needs_reset) =
+                    self.open_mail_password(&row.get::<_, String>("password_secret"));
+                MailAccount {
+                    id: row.get::<_, i64>("id") as u64,
+                    label: row.get("label"),
+                    email_address: row.get("email_address"),
+                    imap_host: row.get("imap_host"),
+                    imap_port: row.get::<_, i32>("imap_port") as u16,
+                    encryption: row.get("encryption"),
+                    username: row.get("username"),
+                    password_sealed,
+                    password_needs_reset,
+                    refresh_interval_seconds: row.get::<_, i64>("refresh_interval_seconds") as u64,
+                }
             })
             .collect())
     }
@@ -400,16 +405,21 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
                 &[&owner, &id_i64],
             )
             .await?
-            .map(|row| MailAccount {
-                id: row.get::<_, i64>("id") as u64,
-                label: row.get("label"),
-                email_address: row.get("email_address"),
-                imap_host: row.get("imap_host"),
-                imap_port: row.get::<_, i32>("imap_port") as u16,
-                encryption: row.get("encryption"),
-                username: row.get("username"),
-                password_sealed: self.open_mail_password(&row.get::<_, String>("password_secret")),
-                refresh_interval_seconds: row.get::<_, i64>("refresh_interval_seconds") as u64,
+            .map(|row| {
+                let (password_sealed, password_needs_reset) =
+                    self.open_mail_password(&row.get::<_, String>("password_secret"));
+                MailAccount {
+                    id: row.get::<_, i64>("id") as u64,
+                    label: row.get("label"),
+                    email_address: row.get("email_address"),
+                    imap_host: row.get("imap_host"),
+                    imap_port: row.get::<_, i32>("imap_port") as u16,
+                    encryption: row.get("encryption"),
+                    username: row.get("username"),
+                    password_sealed,
+                    password_needs_reset,
+                    refresh_interval_seconds: row.get::<_, i64>("refresh_interval_seconds") as u64,
+                }
             }))
     }
 
@@ -490,6 +500,7 @@ WHERE owner=$1 AND id=$2
         };
         let mut saved = account.clone();
         saved.id = row.get::<_, i64>("id") as u64;
+        saved.password_needs_reset = false;
         Ok(saved)
     }
 
@@ -631,15 +642,23 @@ WHERE owner=$1 AND account_id=$2 AND uid=$3
         }
     }
 
-    fn open_mail_password(&self, value: &str) -> SealedPassword {
+    fn open_mail_password(&self, value: &str) -> (SealedPassword, bool) {
         if value.trim().is_empty() {
-            return SealedPassword::default();
+            return (SealedPassword::default(), true);
         }
 
-        serde_json::from_str(value).unwrap_or_else(|_| {
+        if let Ok(password) = serde_json::from_str(value) {
+            return (password, false);
+        }
+
+        let password = {
             let opened = self.open(value);
+            if opened.trim().is_empty() {
+                return (SealedPassword::default(), true);
+            }
             SealedPassword::seal(&opened).unwrap_or_default()
-        })
+        };
+        (password, true)
     }
 }
 
@@ -769,6 +788,7 @@ mod tests {
             encryption: "ssl".to_string(),
             username: "ada".to_string(),
             password_sealed: SealedPassword::seal("mail-password").unwrap(),
+            password_needs_reset: false,
             refresh_interval_seconds: 60,
         }
     }
