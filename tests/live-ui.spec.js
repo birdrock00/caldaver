@@ -1075,7 +1075,7 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
   await expect(htmlFrame.locator('h2')).toHaveText('Rich newsletter');
   await expect(htmlFrame.locator('strong')).toHaveText('Styled content');
   await expect(htmlFrame.locator('img[alt="hero"]')).toBeVisible();
-  await expect(htmlFrame.locator('img[alt="remote hero"]')).toHaveAttribute('src', /\/mail\/image\?account_id=1&uid=501&url=/);
+  await expect(htmlFrame.locator('img[alt="remote hero"]')).toHaveAttribute('src', /\/mail\/image\?account_id=1&uid=501&_token=[^&]+&url=/);
   await expect.poll(async () => {
     const box = await page.locator('#mail_reader_html').boundingBox();
     return Math.round(box ? box.height : 0);

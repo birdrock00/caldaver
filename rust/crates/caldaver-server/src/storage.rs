@@ -523,29 +523,6 @@ WHERE owner=$1 AND id=$2
             .collect()
     }
 
-    pub async fn cached_message(
-        &self,
-        owner: &str,
-        account_id: u64,
-        uid: u64,
-    ) -> Result<Option<MailMessage>, StorageError> {
-        let account_id = account_id as i64;
-        let uid = uid as i64;
-        self.pool
-            .get()
-            .await?
-            .query_opt(
-                "SELECT message::JSONB AS message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 AND uid=$3 AND message IS NOT NULL",
-                &[&owner, &account_id, &uid],
-            )
-            .await?
-            .map(|row| {
-                let message: Value = row.try_get("message")?;
-                serde_json::from_value(message).map_err(Into::into)
-            })
-            .transpose()
-    }
-
     pub async fn replace_message_cache(
         &self,
         owner: &str,
