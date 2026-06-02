@@ -1063,6 +1063,13 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
       }
     }
   });
+  await page.route('**/mail/image?**', async route => {
+    await route.fulfill({
+      status: 502,
+      contentType: 'text/plain',
+      body: 'Image unavailable'
+    });
+  });
 
   await page.goto(`${baseURL}/mail`);
   await page.locator('#mail_rows .mail-row').first().click();
@@ -1076,6 +1083,8 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
   await expect(htmlFrame.locator('strong')).toHaveText('Styled content');
   await expect(htmlFrame.locator('img[alt="hero"]')).toBeVisible();
   await expect(htmlFrame.locator('img[alt="remote hero"]')).toHaveAttribute('src', /\/mail\/image\?account_id=1&uid=501&_token=[^&]+&url=/);
+  await expect(htmlFrame.locator('img[alt=""]')).toHaveClass(/caldaver-mail-image-failed/);
+  await expect(htmlFrame.locator('.caldaver-mail-image-failed')).toBeHidden();
   await expect.poll(async () => {
     const box = await page.locator('#mail_reader_html').boundingBox();
     return Math.round(box ? box.height : 0);
