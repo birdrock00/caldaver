@@ -11,6 +11,7 @@ axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
 caldaver-core = { path = "../caldaver-core" }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+chrono-tz = "0.10"
 deadpool-postgres = "0.14"
 http = "1"
 imap = "3.0.0-alpha.15"
