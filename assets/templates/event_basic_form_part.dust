@@ -28,6 +28,14 @@
 </select>
 {>form_element_end/}
 
+{>form_element_start for="event_timezone" label="timezone" /}
+<select name="timezone" id="event_timezone" class="timezone form-control">
+{#available_timezones current_timezone=timezone}
+ <option value="{name}"{@eq key="{name}" value="{current_timezone}"} selected="selected"{/eq}>{label}</option>
+{/available_timezones}
+</select>
+{>form_element_end/}
+
 <div class="generate-iso8601" data-only-date-if-checked="input.allday">
 <input class="generated" type="hidden" name="start" id="start" />
 {>form_element_start for="start_date" label="startdate" /}
