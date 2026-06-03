@@ -198,6 +198,26 @@
       '&uid=' + encodeURIComponent(uid);
   }
 
+  function findAdjacentMessage(reader, messages, direction) {
+    var currentIndex = -1;
+    messages.forEach(function(message, index) {
+      if (String(message.uid) === String(reader.dataset.uid)) {
+        currentIndex = index;
+      }
+    });
+
+    if (currentIndex === -1) {
+      return null;
+    }
+
+    var targetIndex = direction === 'newer' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= messages.length) {
+      return null;
+    }
+
+    return messages[targetIndex];
+  }
+
   function navigateTo(url) {
     if (typeof window.CALDAVER_MAIL_NAVIGATE === 'function') {
       window.CALDAVER_MAIL_NAVIGATE(url);
@@ -217,24 +237,36 @@
 
     return loadInboxMessages(reader)
       .then(function(messages) {
-        var currentIndex = -1;
-        messages.forEach(function(message, index) {
-          if (String(message.uid) === String(reader.dataset.uid)) {
-            currentIndex = index;
-          }
-        });
-
-        if (currentIndex === -1) {
-          return;
-        }
-
-        var targetIndex = direction === 'newer' ? currentIndex - 1 : currentIndex + 1;
-        if (targetIndex < 0 || targetIndex >= messages.length) {
+        var targetMessage = findAdjacentMessage(reader, messages, direction);
+        if (!targetMessage) {
           return;
         }
 
         swipeNavigating = true;
-        navigateTo(messageReadUrl(reader, messages[targetIndex].uid));
+        navigateTo(messageReadUrl(reader, targetMessage.uid));
+      })
+      .catch(function(error) {
+        $('#mail_reader_error').textContent = error.message;
+        $('#mail_reader_error').hidden = false;
+      });
+  }
+
+  function updateNavigationButtons() {
+    var reader = $('#mail_reader');
+    var newerButton = $('#mail_reader_newer');
+    var olderButton = $('#mail_reader_older');
+
+    if (!newerButton || !olderButton) {
+      return Promise.resolve();
+    }
+
+    newerButton.disabled = true;
+    olderButton.disabled = true;
+
+    return loadInboxMessages(reader)
+      .then(function(messages) {
+        newerButton.disabled = !findAdjacentMessage(reader, messages, 'newer');
+        olderButton.disabled = !findAdjacentMessage(reader, messages, 'older');
       })
       .catch(function(error) {
         $('#mail_reader_error').textContent = error.message;
@@ -362,8 +394,21 @@
   document.addEventListener('DOMContentLoaded', function() {
     $('#mail_reader_refresh').addEventListener('click', loadMessage);
     $('#mail_reader_unread').addEventListener('click', markUnread);
+    var newerButton = $('#mail_reader_newer');
+    var olderButton = $('#mail_reader_older');
+    if (newerButton) {
+      newerButton.addEventListener('click', function() {
+        navigateBySwipe('newer');
+      });
+    }
+    if (olderButton) {
+      olderButton.addEventListener('click', function() {
+        navigateBySwipe('older');
+      });
+    }
     setupSwipeNavigation();
     loadMessage();
+    updateNavigationButtons();
   });
 })();
 </script>
