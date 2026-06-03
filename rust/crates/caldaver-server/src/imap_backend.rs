@@ -71,6 +71,12 @@ pub(crate) struct MailMessage {
     pub html_body: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct MailMessageNavigation {
+    pub previous: Option<u64>,
+    pub next: Option<u64>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct MailAttachment {
     pub part: String,
@@ -214,6 +220,17 @@ impl From<mailparse::MailParseError> for MailBackendError {
 pub(crate) trait MailBackend: Send + Sync {
     fn fetch_inbox_overview(&self, account: &MailAccount) -> Result<Vec<MailMessage>, MailBackendError>;
     fn fetch_message(&self, account: &MailAccount, uid: u64) -> Result<MailMessage, MailBackendError>;
+    fn fetch_message_navigation(
+        &self,
+        account: &MailAccount,
+        uid: u64,
+    ) -> Result<MailMessageNavigation, MailBackendError> {
+        let messages = self.fetch_inbox_overview(account)?;
+        Ok(message_navigation_from_uids(
+            messages.into_iter().map(|message| message.uid),
+            uid,
+        ))
+    }
     fn download_attachment(
         &self,
         account: &MailAccount,
@@ -251,6 +268,20 @@ impl MailBackend for ImapMailBackend {
         self.with_session(account, |session| fetch_message_by_uid(session, uid, true))
     }
 
+    fn fetch_message_navigation(
+        &self,
+        account: &MailAccount,
+        uid: u64,
+    ) -> Result<MailMessageNavigation, MailBackendError> {
+        let uid = uid32(uid)?;
+        self.with_session(account, |session| {
+            Ok(message_navigation_from_uids(
+                session.uid_search("ALL")?.into_iter().map(u64::from),
+                u64::from(uid),
+            ))
+        })
+    }
+
     fn download_attachment(
         &self,
         account: &MailAccount,
@@ -273,6 +304,24 @@ impl MailBackend for ImapMailBackend {
             session.uid_store(uid.to_string(), flags)?;
             Ok(())
         })
+    }
+}
+
+pub(crate) fn message_navigation_from_uids<I>(uids: I, current_uid: u64) -> MailMessageNavigation
+where
+    I: IntoIterator<Item = u64>,
+{
+    let mut ordered_uids = uids.into_iter().collect::<Vec<_>>();
+    ordered_uids.sort_unstable_by(|a, b| b.cmp(a));
+    ordered_uids.dedup();
+    let current_index = ordered_uids.iter().position(|uid| *uid == current_uid);
+    MailMessageNavigation {
+        previous: current_index.and_then(|index| {
+            index
+                .checked_sub(1)
+                .map(|previous| ordered_uids[previous])
+        }),
+        next: current_index.and_then(|index| ordered_uids.get(index + 1).copied()),
     }
 }
 
@@ -623,6 +672,14 @@ mod tests {
         assert_eq!(download.filename, "file.bin");
         assert_eq!(download.content_type, "application/octet-stream");
         assert_eq!(download.bytes, b"bytes");
+    }
+
+    #[test]
+    fn message_navigation_uses_sorted_uid_neighbors_with_gaps() {
+        let navigation = message_navigation_from_uids(vec![101, 740, 742, 900, 743], 742);
+
+        assert_eq!(navigation.previous, Some(743));
+        assert_eq!(navigation.next, Some(740));
     }
 
     #[test]

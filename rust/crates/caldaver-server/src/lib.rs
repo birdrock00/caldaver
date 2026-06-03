@@ -182,6 +182,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/mail/messages", get(mail_messages))
         .route("/mail/messages/sync", get(mail_messages_sync))
         .route("/mail/message", get(mail_message))
+        .route("/mail/message/navigation", get(mail_message_navigation))
         .route("/mail/message/unread", post(mail_mark_unread))
         .route("/mail/attachment", get(mail_attachment))
         .route("/mail/image", get(mail_image))
@@ -1142,6 +1143,30 @@ async fn mail_message(State(state): State<AppState>, headers: HeaderMap, Query(q
     Json(json!({"result": "SUCCESS", "data": message})).into_response()
 }
 
+async fn mail_message_navigation(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
+    };
+    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let uid = query.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account = match mail_account_for(&state, &session.username, account_id).await {
+        Ok(account) => account,
+        Err(response) => return response,
+    };
+    match run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
+        backend.fetch_message_navigation(account, uid)
+    })
+    .await
+    {
+        Ok(navigation) => Json(json!({"result": "SUCCESS", "data": navigation})).into_response(),
+        Err(error) => mail_backend_response(error),
+    }
+}
+
 async fn mail_mark_unread(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
@@ -1952,7 +1977,7 @@ fn render_mail(state: &AppState, session: &Session, no_js: bool) -> String {
 
 fn render_mail_read(state: &AppState, session: &Session, account_id: u64, uid: u64) -> String {
     let content = format!(
-        r#"{navbar}<div class="container-fluid mail-shell mail-read-shell"><aside class="mail-sidebar">{sidebrand}{appnav}</aside><main class="mail-content"><section id="mail_reader" class="mail-reader" data-account-id="{account_id}" data-uid="{uid}" data-message-url="/mail/message" data-messages-url="/mail/messages" data-read-url="/mail/read" data-unread-url="/mail/message/unread" data-inbox-url="/mail" data-attachment-url="/mail/attachment" data-csrf-token="{csrf}"><div class="mail-reader-toolbar"><a href="/mail" id="mail_reader_back" title="Return"><i class="fa fa-arrow-left"></i></a><button type="button" id="mail_reader_refresh" title="Refresh"><i class="fa fa-refresh"></i></button><button type="button" id="mail_reader_unread" title="Mark unread" hidden><i class="fa fa-envelope"></i></button><div class="mail-reader-toolbar-nav" aria-label="Mail"><button type="button" id="mail_reader_previous" title="Previous message" aria-label="Previous message" disabled><i class="fa fa-chevron-left"></i></button><button type="button" id="mail_reader_next" title="Next message" aria-label="Next message" disabled><i class="fa fa-chevron-right"></i></button></div></div><div id="mail_reader_error" class="mail-error" hidden></div><article id="mail_reader_message" class="mail-reader-message" hidden><h1 id="mail_reader_subject"></h1><div class="mail-reader-meta"><div class="mail-reader-avatar" aria-hidden="true"></div><div><strong id="mail_reader_from"></strong><span id="mail_reader_date"></span></div></div><pre id="mail_reader_body"></pre><iframe id="mail_reader_html" class="mail-reader-html" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="Mail" hidden></iframe><div id="mail_reader_attachments" class="mail-attachments" data-testid="mail-attachments"></div></article><div id="mail_reader_loading" class="mail-empty">Loading message</div></section></main></div>"#,
+        r#"{navbar}<div class="container-fluid mail-shell mail-read-shell"><aside class="mail-sidebar">{sidebrand}{appnav}</aside><main class="mail-content"><section id="mail_reader" class="mail-reader" data-account-id="{account_id}" data-uid="{uid}" data-message-url="/mail/message" data-navigation-url="/mail/message/navigation" data-messages-url="/mail/messages" data-read-url="/mail/read" data-unread-url="/mail/message/unread" data-inbox-url="/mail" data-attachment-url="/mail/attachment" data-csrf-token="{csrf}"><div class="mail-reader-toolbar"><a href="/mail" id="mail_reader_back" title="Return"><i class="fa fa-arrow-left"></i></a><button type="button" id="mail_reader_refresh" title="Refresh"><i class="fa fa-refresh"></i></button><button type="button" id="mail_reader_unread" title="Mark unread" hidden><i class="fa fa-envelope"></i></button><div class="mail-reader-toolbar-nav" aria-label="Mail"><button type="button" id="mail_reader_previous" title="Previous message" aria-label="Previous message" disabled><i class="fa fa-chevron-left"></i></button><button type="button" id="mail_reader_next" title="Next message" aria-label="Next message" disabled><i class="fa fa-chevron-right"></i></button></div></div><div id="mail_reader_error" class="mail-error" hidden></div><article id="mail_reader_message" class="mail-reader-message" hidden><h1 id="mail_reader_subject"></h1><div class="mail-reader-meta"><div class="mail-reader-avatar" aria-hidden="true"></div><div><strong id="mail_reader_from"></strong><span id="mail_reader_date"></span></div></div><pre id="mail_reader_body"></pre><iframe id="mail_reader_html" class="mail-reader-html" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="Mail" hidden></iframe><div id="mail_reader_attachments" class="mail-attachments" data-testid="mail-attachments"></div></article><div id="mail_reader_loading" class="mail-empty">Loading message</div></section></main></div>"#,
         navbar = navbar(state, session, "mail"),
         sidebrand = sidebrand(),
         appnav = appnav("mail"),
@@ -2142,6 +2167,7 @@ fn part_js(name: &str) -> String {
         .replace("{{ app.url_generator.generate('mail.accounts') }}", "/mail/accounts")
         .replace("{{ app.url_generator.generate('mail.messages') }}", "/mail/messages")
         .replace("{{ app.url_generator.generate('mail.messages.sync') }}", "/mail/messages/sync")
+        .replace("{{ app.url_generator.generate('mail.message.navigation') }}", "/mail/message/navigation")
         .replace("{{ app.url_generator.generate('preferences') }}", "/preferences")
         .replace("{{ 'labels.delete'|trans }}", "Delete")
         .replace("{{ 'labels.mail'|trans }}", "Mail")

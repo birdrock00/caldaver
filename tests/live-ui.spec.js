@@ -177,6 +177,26 @@ async function mockMailApi(page, options = {}) {
     });
   });
 
+  await page.route('**/mail/message/navigation?**', async route => {
+    const url = new URL(route.request().url());
+    const accountId = url.searchParams.get('account_id');
+    const uid = url.searchParams.get('uid');
+    const messages = messagesByAccount[accountId] || cachedMessagesByAccount[accountId] || [];
+    const currentIndex = messages.findIndex(message => String(message.uid) === String(uid));
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        result: 'SUCCESS',
+        data: {
+          previous: currentIndex > 0 ? messages[currentIndex - 1].uid : null,
+          next: currentIndex !== -1 && currentIndex < messages.length - 1 ? messages[currentIndex + 1].uid : null
+        }
+      })
+    });
+  });
+
   await page.route('**/mail/message/unread', async route => {
     const form = parsePostedForm(route.request());
     unreadRequests.push(form);
@@ -1176,6 +1196,40 @@ test('mail reader previous and next controls navigate adjacent messages', async 
   await expect(page.locator('#mail_reader_subject')).toHaveText('Older message');
   await expect(page.locator('#mail_reader_previous')).toBeEnabled();
   await expect(page.locator('#mail_reader_next')).toBeDisabled();
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail reader navigation controls do not depend on cached inbox page containing current message', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+
+  const fullInboxMessages = [
+    { uid: 740, from: 'Newer Sender', subject: 'Newer message', date: 'Wed, 03 Jun 2026 12:00:00 -0700', seen: true },
+    { uid: 742, from: 'Current Sender', subject: 'Current message', date: 'Wed, 03 Jun 2026 11:00:00 -0700', seen: true },
+    { uid: 743, from: 'Older Sender', subject: 'Older message', date: 'Wed, 03 Jun 2026 10:00:00 -0700', seen: true }
+  ];
+
+  await mockMailApi(page, {
+    accounts: [{ id: 1, label: 'Long Inbox', email_address: 'long@example.test' }],
+    cachedMessagesByAccount: { 1: [{ uid: 799, from: 'Cached Sender', subject: 'Cached only', date: 'Wed, 03 Jun 2026 13:00:00 -0700', seen: true }] },
+    messagesByAccount: { 1: fullInboxMessages },
+    messageDetails: {
+      740: { uid: 740, from: 'Newer Sender', subject: 'Newer message', date: 'Wed, 03 Jun 2026 12:00:00 -0700', body: 'Newer body' },
+      742: { uid: 742, from: 'Current Sender', subject: 'Current message', date: 'Wed, 03 Jun 2026 11:00:00 -0700', body: 'Current body' },
+      743: { uid: 743, from: 'Older Sender', subject: 'Older message', date: 'Wed, 03 Jun 2026 10:00:00 -0700', body: 'Older body' }
+    }
+  });
+
+  await page.goto(`${baseURL}/mail/read?account_id=1&uid=742`);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Current message');
+  await expect(page.locator('#mail_reader_previous')).toBeEnabled();
+  await expect(page.locator('#mail_reader_next')).toBeEnabled();
+
+  await page.locator('#mail_reader_next').click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=743/);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Older message');
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);

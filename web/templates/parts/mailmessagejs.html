@@ -3,6 +3,7 @@
   var swipeStart = null;
   var swipeNavigating = false;
   var inboxMessagesPromise = null;
+  var messageNavigationPromise = null;
   var mobileViewportQuery = '(max-width: 900px)';
 
   function $(selector) {
@@ -287,6 +288,39 @@
     };
   }
 
+  function messageNavigationFromPayload(payload) {
+    var data = payload.data || {};
+    return {
+      previous: data.previous ? { uid: data.previous } : null,
+      next: data.next ? { uid: data.next } : null
+    };
+  }
+
+  function loadMessageNavigation(reader) {
+    if (messageNavigationPromise !== null) {
+      return messageNavigationPromise;
+    }
+
+    if (!reader.dataset.navigationUrl) {
+      return loadInboxMessages(reader).then(function(messages) {
+        return messageNavigationState(messages, reader.dataset.uid);
+      });
+    }
+
+    messageNavigationPromise = jsonFetch(
+      reader.dataset.navigationUrl +
+        '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
+        '&uid=' + encodeURIComponent(reader.dataset.uid),
+      {},
+      'Unable to load message navigation'
+    ).then(messageNavigationFromPayload).catch(function(error) {
+      messageNavigationPromise = null;
+      throw error;
+    });
+
+    return messageNavigationPromise;
+  }
+
   function navigateTo(url) {
     if (typeof window.CALDAVER_MAIL_NAVIGATE === 'function') {
       window.CALDAVER_MAIL_NAVIGATE(url);
@@ -304,9 +338,8 @@
     var reader = $('#mail_reader');
     $('#mail_reader_error').hidden = true;
 
-    return loadInboxMessages(reader)
-      .then(function(messages) {
-        var state = messageNavigationState(messages, reader.dataset.uid);
+    return loadMessageNavigation(reader)
+      .then(function(state) {
         var target = direction === 'newer' ? state.previous : state.next;
         if (!target) {
           return;
@@ -333,9 +366,8 @@
     previousButton.disabled = true;
     nextButton.disabled = true;
 
-    return loadInboxMessages(reader)
-      .then(function(messages) {
-        var state = messageNavigationState(messages, reader.dataset.uid);
+    return loadMessageNavigation(reader)
+      .then(function(state) {
         previousButton.disabled = !state.previous;
         nextButton.disabled = !state.next;
       })
