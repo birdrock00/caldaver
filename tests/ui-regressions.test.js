@@ -61,6 +61,7 @@ test('Rust server exposes the web route surface', () => {
     'route("/mail/messages", get(mail_messages))',
     'route("/mail/messages/sync", get(mail_messages_sync))',
     'route("/mail/message", get(mail_message))',
+    'route("/mail/message/navigation", get(mail_message_navigation))',
     'route("/mail/message/unread", post(mail_mark_unread))',
     'route("/mail/attachment", get(mail_attachment))',
     'route("/preferences", get(preferences_page).post(preferences_save))',
@@ -142,6 +143,7 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.doesNotMatch(mail, /id="mail_account_create"/);
   assert.match(preferences, /class="prefs-section prefs-mail-section"[\s\S]*id="mail_account_create"/);
   assert.match(mailMessage, /id="mail_reader"/);
+  assert.match(mailMessage, /data-navigation-url/);
   assert.match(mailMessage, /data-unread-url/);
   assert.match(mailMessage, /id="mail_reader_unread"/);
   assert.match(mailMessage, /id="mail_reader_previous"/);
@@ -151,9 +153,11 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(server, /sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"/);
   assert.match(server, /id="mail_reader_previous"/);
   assert.match(server, /id="mail_reader_next"/);
+  assert.match(server, /data-navigation-url="\/mail\/message\/navigation"/);
   assert.doesNotMatch(mailMessage, /compose-button[\s\S]*labels\.inbox/);
   assert.match(mailMessageJs, /function setupSwipeNavigation\(\)/);
   assert.match(mailMessageJs, /function messageNavigationState\(messages, uid\)/);
+  assert.match(mailMessageJs, /function loadMessageNavigation\(reader\)/);
   assert.match(mailMessageJs, /function updateMessageNavButtons\(\)/);
   assert.match(mailMessageJs, /function resizeHtmlFrame\(htmlFrame\)/);
   assert.match(mailMessageJs, /function hideBrokenHtmlImage\(image\)/);
