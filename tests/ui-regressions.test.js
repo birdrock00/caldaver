@@ -113,6 +113,8 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   const mail = read('web/templates/mail.html');
   const mailMessage = read('web/templates/mail_message.html');
   const preferences = read('web/templates/preferences.html');
+  const eventBasicForm = read('assets/templates/event_basic_form_part.dust');
+  const appJs = read('assets/js/app/app.js');
   const mailJs = read('web/templates/parts/mailjs.html');
   const mailMessageJs = read('web/templates/parts/mailmessagejs.html');
   const less = read('assets/less/caldaver.less');
@@ -124,6 +126,13 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(navbar, /class="mobile-calendar-menu-calendars"/);
   assert.match(server, /class="mobile-calendar-menu"/);
   assert.match(server, /class="mobile-calendar-menu-calendars"/);
+  assert.match(eventBasicForm, /select name="timezone" id="event_timezone"/);
+  assert.match(eventBasicForm, /\{#available_timezones current_timezone=timezone\}/);
+  assert.match(appJs, /var default_calendar_timezone = 'America\/Los_Angeles';/);
+  assert.match(appJs, /event_fields\.timezone = event_fields\.timezone \|\| calendar_timezone\(\);/);
+  assert.match(appJs, /form_timezone\(element\)/);
+  assert.match(server, /DEFAULT_TIMEZONE: &str = "America\/Los_Angeles"/);
+  assert.match(server, /DTSTART;TZID=\{property_timezone\}/);
   assert.doesNotMatch(navbar, /caldaver-brand-icon/);
   assert.doesNotMatch(navbar, /<a class="logout"/);
   assert.match(navbar, /<details class="user-menu-dropdown">[\s\S]*user-menu-logout/);
