@@ -330,6 +330,10 @@ test('calendar create and event create controls open usable dialogs', async ({ p
   await page.locator('#shortcut_add_event').click();
   await expect(page.locator('#event_edit_dialog')).toBeVisible();
   await expect(page.locator('#event_edit_dialog input.summary')).toBeVisible();
+  await expect(page.locator('#event_edit_form select[name="timezone"]')).toBeVisible();
+  await expect(page.locator('#event_edit_form select[name="timezone"]')).toHaveValue('America/Los_Angeles');
+  await page.locator('#event_edit_form select[name="timezone"]').selectOption('Europe/London');
+  await expect(page.locator('#event_edit_form select[name="timezone"]')).toHaveValue('Europe/London');
 
   expect(pageErrors).toEqual([]);
 });
