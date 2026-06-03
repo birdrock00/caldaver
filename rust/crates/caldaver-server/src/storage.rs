@@ -761,6 +761,7 @@ mod tests {
             color: "#03A9F4".to_string(),
             location: "Office".to_string(),
             description: "Stored in Postgres".to_string(),
+            timezone: crate::DEFAULT_TIMEZONE.to_string(),
         }
     }
 
