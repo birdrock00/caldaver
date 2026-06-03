@@ -32,6 +32,7 @@ use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 
 const DEFAULT_CALENDAR: &str = "/calendars/default/";
+const DEFAULT_TIMEZONE: &str = "America/Los_Angeles";
 
 #[derive(Clone)]
 pub struct AppState {
@@ -61,6 +62,7 @@ pub(crate) struct Preferences {
     time_format: String,
     date_format: String,
     weekstart: u8,
+    #[serde(default = "default_timezone")]
     timezone: String,
     show_week_nb: bool,
     show_now_indicator: bool,
@@ -78,7 +80,7 @@ impl Default for Preferences {
             time_format: "24".to_string(),
             date_format: "ymd".to_string(),
             weekstart: 0,
-            timezone: env::var("CALDAVER_TIMEZONE").unwrap_or_else(|_| "UTC".to_string()),
+            timezone: env::var("CALDAVER_TIMEZONE").unwrap_or_else(|_| DEFAULT_TIMEZONE.to_string()),
             show_week_nb: false,
             show_now_indicator: true,
             list_days: 7,
@@ -104,6 +106,12 @@ pub(crate) struct CalendarEvent {
     color: String,
     location: String,
     description: String,
+    #[serde(default = "default_timezone")]
+    timezone: String,
+}
+
+fn default_timezone() -> String {
+    DEFAULT_TIMEZONE.to_string()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -390,7 +398,10 @@ async fn preferences_save(State(state): State<AppState>, headers: HeaderMap, For
         return StatusCode::UNAUTHORIZED.into_response();
     }
     session.preferences.language = form.get("language").cloned().unwrap_or_else(|| "en".to_string());
-    session.preferences.timezone = form.get("timezone").cloned().unwrap_or_else(|| "UTC".to_string());
+    session.preferences.timezone = form
+        .get("timezone")
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_TIMEZONE.to_string());
     session.preferences.default_calendar = form
         .get("default_calendar")
         .cloned()
@@ -558,6 +569,11 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
         color: "#03A9F4".to_string(),
         location: form.get("location").cloned().unwrap_or_default(),
         description: form.get("description").cloned().unwrap_or_default(),
+        timezone: form
+            .get("timezone")
+            .cloned()
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| session.preferences.timezone.clone()),
     };
     if let Ok(client) = caldav_client_for_session(&state.config, &session) {
         if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
@@ -1341,9 +1357,27 @@ fn site_config_json(state: &AppState) -> String {
         "caldav_public_base_url": state.config.caldav_public_url,
         "enable_calendar_sharing": state.config.calendar_sharing,
         "default_calendar_color": "#03A9F4",
-        "calendar_colors": ["03A9F4","3F51B5","F44336","4CAF50","FFC107","9E9E9E"]
+        "calendar_colors": ["03A9F4","3F51B5","F44336","4CAF50","FFC107","9E9E9E"],
+        "available_timezones": available_timezones()
     })
     .to_string()
+}
+
+fn available_timezones() -> Vec<&'static str> {
+    vec![
+        DEFAULT_TIMEZONE,
+        "UTC",
+        "America/New_York",
+        "America/Chicago",
+        "America/Denver",
+        "America/Phoenix",
+        "America/Anchorage",
+        "Pacific/Honolulu",
+        "Europe/London",
+        "Europe/Paris",
+        "Asia/Tokyo",
+        "Australia/Sydney",
+    ]
 }
 
 fn json_error(status: StatusCode, message: &str) -> Response {
@@ -1473,6 +1507,9 @@ fn event_payload_from_object(object: &CalendarObject, calendar: &str) -> Option<
         color: "#03A9F4".to_string(),
         location: ical_property(data, "LOCATION").unwrap_or_default(),
         description: ical_property(data, "DESCRIPTION").unwrap_or_default(),
+        timezone: ical_property_parameter(data, "DTSTART", "TZID")
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(default_timezone),
     })
 }
 
@@ -1503,6 +1540,46 @@ fn ical_property(data: &str, name: &str) -> Option<String> {
         let (key, value) = line.split_once(':')?;
         let key = key.split(';').next().unwrap_or(key);
         (key.eq_ignore_ascii_case(name)).then(|| unescape_ical(value))
+    })
+}
+
+fn ical_property_parameter(data: &str, name: &str, parameter: &str) -> Option<String> {
+    let unfolded = data
+        .replace("\r\n ", "")
+        .replace("\r\n\t", "")
+        .replace("\n ", "")
+        .replace("\n\t", "");
+    let has_vevent = unfolded
+        .lines()
+        .any(|line| line.trim().eq_ignore_ascii_case("BEGIN:VEVENT"));
+    let mut in_vevent = false;
+    unfolded.lines().find_map(|line| {
+        let trimmed = line.trim();
+        if trimmed.eq_ignore_ascii_case("BEGIN:VEVENT") {
+            in_vevent = true;
+            return None;
+        }
+        if trimmed.eq_ignore_ascii_case("END:VEVENT") && in_vevent {
+            in_vevent = false;
+            return None;
+        }
+        if has_vevent && !in_vevent {
+            return None;
+        }
+
+        let (key, _) = line.split_once(':')?;
+        let mut parts = key.split(';');
+        let property = parts.next().unwrap_or(key);
+        if !property.eq_ignore_ascii_case(name) {
+            return None;
+        }
+
+        parts.find_map(|part| {
+            let (param_name, param_value) = part.split_once('=')?;
+            param_name
+                .eq_ignore_ascii_case(parameter)
+                .then(|| param_value.trim_matches('"').to_string())
+        })
     })
 }
 
@@ -1643,6 +1720,13 @@ fn event_datetime_properties(event: &CalendarEvent) -> (String, String, String, 
             "DTEND;VALUE=DATE".to_string(),
             end,
         )
+    } else if let Some((property_timezone, start, end)) = timezone_event_datetimes(event) {
+        (
+            format!("DTSTART;TZID={property_timezone}"),
+            start,
+            format!("DTEND;TZID={property_timezone}"),
+            end,
+        )
     } else {
         (
             "DTSTART".to_string(),
@@ -1651,6 +1735,29 @@ fn event_datetime_properties(event: &CalendarEvent) -> (String, String, String, 
             caldav_datetime(&event.end),
         )
     }
+}
+
+fn timezone_event_datetimes(event: &CalendarEvent) -> Option<(String, String, String)> {
+    let timezone = event.timezone.trim();
+    if timezone.is_empty() || timezone.eq_ignore_ascii_case("UTC") || timezone.eq_ignore_ascii_case("Etc/UTC") {
+        return None;
+    }
+
+    let timezone: chrono_tz::Tz = timezone.parse().ok()?;
+    let start = caldav_datetime_in_timezone(&event.start, timezone)?;
+    let end = caldav_datetime_in_timezone(&event.end, timezone)?;
+    Some((timezone.name().to_string(), start, end))
+}
+
+fn caldav_datetime_in_timezone(value: &str, timezone: chrono_tz::Tz) -> Option<String> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|datetime| {
+            datetime
+                .with_timezone(&timezone)
+                .format("%Y%m%dT%H%M%S")
+                .to_string()
+        })
 }
 
 fn exclusive_all_day_end(value: &str) -> String {
@@ -1964,6 +2071,7 @@ fn translations_json() -> String {
         ("labels.generaloptions", "General options"), ("labels.repeatoptions", "Repeat"),
         ("labels.remindersoptions", "Reminders"), ("labels.workgroupoptions", "Workgroup"),
         ("labels.summary", "Summary"), ("labels.location", "Location"), ("labels.description", "Description"),
+        ("labels.timezone", "Timezone"),
         ("labels.startdate", "Start date"), ("labels.enddate", "End date"), ("labels.alldayform", "All day"),
         ("labels.displayname", "Display name"), ("labels.color", "Color"), ("labels.privacy", "Privacy"),
         ("labels.public", "Public"), ("labels.private", "Private"), ("labels.confidential", "Confidential"),
@@ -2159,6 +2267,7 @@ mod tests {
             color: "#03A9F4".to_string(),
             location: "Room".to_string(),
             description: "Description".to_string(),
+            timezone: DEFAULT_TIMEZONE.to_string(),
         }
     }
 
@@ -2359,6 +2468,20 @@ mod tests {
         assert!(merged.contains("DTEND;VALUE=DATE:20260602"));
         assert!(merged.contains("BEGIN:VALARM"));
         assert!(merged.contains("DESCRIPTION:Reminder"));
+    }
+
+    #[test]
+    fn caldav_event_serialization_preserves_selected_timezone() {
+        let mut event = fake_event(false);
+        event.start = "2026-01-15T17:00:00Z".to_string();
+        event.end = "2026-01-15T18:00:00Z".to_string();
+        event.timezone = "America/Los_Angeles".to_string();
+
+        let icalendar = icalendar_from_event(&event);
+
+        assert!(icalendar.contains("DTSTART;TZID=America/Los_Angeles:20260115T090000"));
+        assert!(icalendar.contains("DTEND;TZID=America/Los_Angeles:20260115T100000"));
+        assert!(!icalendar.contains("DTSTART:20260115T170000Z"));
     }
 
     #[test]
