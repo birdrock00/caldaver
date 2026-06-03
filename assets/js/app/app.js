@@ -64,8 +64,48 @@ var calendar_list_duration_days = function calendar_list_duration_days() {
   return preferred_days || 7;
 };
 
+var default_calendar_timezone = 'America/Los_Angeles';
+
 var calendar_timezone = function calendar_timezone() {
-  return CaldaverUserPrefs.timezone || 'UTC';
+  return CaldaverUserPrefs.timezone || default_calendar_timezone;
+};
+
+var available_calendar_timezones = function available_calendar_timezones() {
+  if (CaldaverConf.available_timezones !== undefined && CaldaverConf.available_timezones.length > 0) {
+    return CaldaverConf.available_timezones;
+  }
+
+  if (moment.tz !== undefined && moment.tz.names !== undefined) {
+    return moment.tz.names();
+  }
+
+  return [ default_calendar_timezone, 'UTC' ];
+};
+
+var timezone_select_options = function timezone_select_options(selected_timezone) {
+  var selected = selected_timezone || calendar_timezone();
+  var seen = {};
+  var options = [];
+
+  $.each([ selected ].concat(available_calendar_timezones()), function(index, timezone) {
+    if (timezone === undefined || timezone === '' || seen[timezone] === true) {
+      return true;
+    }
+
+    seen[timezone] = true;
+    options.push({
+      name: timezone,
+      label: timezone
+    });
+  });
+
+  return options;
+};
+
+var form_timezone = function form_timezone(where) {
+  var selected = $(where).find('select[name="timezone"]').val();
+
+  return selected || calendar_timezone();
 };
 
 $(document).ready(function() {
@@ -847,6 +887,8 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
         method: 'post'
       },
       calendars: calendar_list(),
+      timezone: event.timezone || calendar_timezone(),
+      available_timezones: timezone_select_options(event.timezone || calendar_timezone()),
 
       // Dates and times
       start_date: CaldaverDateAndTime.extractDate(event.start),
@@ -873,7 +915,7 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     'click': function() {
       var event_fields = $('#event_edit_form').serializeObject();
 
-      event_fields.timezone = CaldaverUserPrefs.timezone;
+      event_fields.timezone = event_fields.timezone || calendar_timezone();
 
       send_form({
         form_object: $('#event_edit_form'),
@@ -990,7 +1032,7 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
     .on('change', 'input.start_time', function(event) {
       var start = CaldaverDateAndTime.getMoment(
           $('#start').val(),
-          CaldaverUserPrefs.timezone
+          form_timezone(where)
       );
       var duration = $end_time.data('duration');
 
@@ -1006,7 +1048,7 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
     });
 
     // Update start/end times
-    $('input.date, input.time').on('change', function(event) {
+    $('input.date, input.time, select[name="timezone"]').on('change', function(event) {
       generate_iso8601_values($(where));
     });
 
@@ -1028,11 +1070,11 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
 var calculate_event_duration = function calculate_event_duration() {
   var start = CaldaverDateAndTime.getMoment(
       $('#start').val(),
-      CaldaverUserPrefs.timezone
+      form_timezone('#event_edit_dialog')
   );
   var end = CaldaverDateAndTime.getMoment(
       $('#end').val(),
-      CaldaverUserPrefs.timezone
+      form_timezone('#event_edit_dialog')
   );
 
   var result = end.diff(start, 'minutes');
@@ -2563,7 +2605,7 @@ var generate_iso8601_values = function generate_iso8601_values(element) {
           datepicker,
           timepicker,
           ignore_time,
-          CaldaverUserPrefs.timezone
+          form_timezone(element)
         )
     );
 
