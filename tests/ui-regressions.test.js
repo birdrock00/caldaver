@@ -127,7 +127,12 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(mailMessage, /id="mail_reader"/);
   assert.match(mailMessage, /data-unread-url/);
   assert.match(mailMessage, /id="mail_reader_unread"/);
+  assert.match(mailMessage, /id="mail_reader_newer"/);
+  assert.match(mailMessage, /id="mail_reader_older"/);
   assert.doesNotMatch(mailMessage, /compose-button[\s\S]*labels\.inbox/);
+  assert.match(mailMessageJs, /function updateNavigationButtons\(\)/);
+  assert.match(mailMessageJs, /findAdjacentMessage\(reader, messages, 'newer'\)/);
+  assert.match(mailMessageJs, /findAdjacentMessage\(reader, messages, 'older'\)/);
   assert.match(mailMessageJs, /function setupSwipeNavigation\(\)/);
   assert.match(mailMessageJs, /navigateBySwipe\(deltaX > 0 \? 'newer' : 'older'\)/);
   assert.match(mailMessageJs, /targetIndex = direction === 'newer' \? currentIndex - 1 : currentIndex \+ 1/);
@@ -211,5 +216,7 @@ test('Rust server handles sessions, CSRF, no-JS mail, and unread updates', () =>
   assert.match(server, /backend\.mark_seen\(account, uid, false\)/);
   assert.match(server, /mark_cached_seen\(&session\.username, account_id, uid, false\)/);
   assert.match(storage, /jsonb_set\(message, '\{seen\}', to_jsonb\(\$4::boolean\), true\)/);
+  assert.match(server, /id="mail_reader_newer"/);
+  assert.match(server, /id="mail_reader_older"/);
   assert.match(mailMessageJs, /unread_uid/);
 });
