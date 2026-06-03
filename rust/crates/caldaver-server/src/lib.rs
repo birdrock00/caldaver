@@ -1565,25 +1565,56 @@ fn add_recurrence_exdate(existing: &str, recurrence_id: &str) -> String {
 fn replace_vevent_properties(existing: &str, replacements: &[(&str, String, String)]) -> String {
     let mut seen = vec![false; replacements.len()];
     let mut output = Vec::new();
+    let mut in_vevent = false;
+    let mut vevent_depth = 0usize;
     for line in existing.replace("\r\n", "\n").lines() {
-        let property = line
-            .split_once(':')
-            .map(|(name, _)| name.split(';').next().unwrap_or(name))
-            .unwrap_or(line);
-        if let Some(index) = replacements
-            .iter()
-            .position(|(name, _, _)| property.eq_ignore_ascii_case(name))
-        {
-            let (_, replacement_name, value) = &replacements[index];
-            output.push(format!("{replacement_name}:{value}"));
-            seen[index] = true;
-        } else if line.eq_ignore_ascii_case("END:VEVENT") {
+        if line.eq_ignore_ascii_case("BEGIN:VEVENT") {
+            seen.fill(false);
+            in_vevent = true;
+            vevent_depth = 1;
+            output.push(line.to_string());
+            continue;
+        }
+
+        if in_vevent && line.to_ascii_uppercase().starts_with("BEGIN:") {
+            vevent_depth += 1;
+            output.push(line.to_string());
+            continue;
+        }
+
+        if in_vevent && line.eq_ignore_ascii_case("END:VEVENT") && vevent_depth == 1 {
             for (index, (_, replacement_name, value)) in replacements.iter().enumerate() {
                 if !seen[index] {
                     output.push(format!("{replacement_name}:{value}"));
                 }
             }
             output.push(line.to_string());
+            in_vevent = false;
+            vevent_depth = 0;
+            continue;
+        }
+
+        if in_vevent && line.to_ascii_uppercase().starts_with("END:") && vevent_depth > 1 {
+            vevent_depth -= 1;
+            output.push(line.to_string());
+            continue;
+        }
+
+        let property = line
+            .split_once(':')
+            .map(|(name, _)| name.split(';').next().unwrap_or(name))
+            .unwrap_or(line);
+        let replacement_index = if in_vevent && vevent_depth == 1 {
+            replacements
+                .iter()
+                .position(|(name, _, _)| property.eq_ignore_ascii_case(name))
+        } else {
+            None
+        };
+        if let Some(index) = replacement_index {
+            let (_, replacement_name, value) = &replacements[index];
+            output.push(format!("{replacement_name}:{value}"));
+            seen[index] = true;
         } else {
             output.push(line.to_string());
         }
@@ -2280,6 +2311,54 @@ mod tests {
         assert!(merged.contains("RRULE:FREQ=DAILY;COUNT=3"));
         assert!(merged.contains("CLASS:PRIVATE"));
         assert!(merged.contains("BEGIN:VALARM"));
+    }
+
+    #[test]
+    fn caldav_event_merge_does_not_rewrite_vtimezone_dates() {
+        let event = fake_event(true);
+        let original = concat!(
+            "BEGIN:VCALENDAR\r\n",
+            "VERSION:2.0\r\n",
+            "BEGIN:VTIMEZONE\r\n",
+            "TZID:America/Los_Angeles\r\n",
+            "BEGIN:STANDARD\r\n",
+            "DTSTART:20071104T020000\r\n",
+            "RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r\n",
+            "TZNAME:PST\r\n",
+            "TZOFFSETFROM:-0700\r\n",
+            "TZOFFSETTO:-0800\r\n",
+            "END:STANDARD\r\n",
+            "BEGIN:DAYLIGHT\r\n",
+            "DTSTART:20070311T020000\r\n",
+            "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r\n",
+            "TZNAME:PDT\r\n",
+            "TZOFFSETFROM:-0800\r\n",
+            "TZOFFSETTO:-0700\r\n",
+            "END:DAYLIGHT\r\n",
+            "END:VTIMEZONE\r\n",
+            "BEGIN:VEVENT\r\n",
+            "UID:event-1\r\n",
+            "SUMMARY:Original\r\n",
+            "DTSTART;TZID=America/Los_Angeles:20260601T090000\r\n",
+            "DTEND;TZID=America/Los_Angeles:20260601T100000\r\n",
+            "BEGIN:VALARM\r\n",
+            "DESCRIPTION:Reminder\r\n",
+            "END:VALARM\r\n",
+            "END:VEVENT\r\n",
+            "END:VCALENDAR\r\n"
+        );
+
+        let merged = merge_icalendar_from_event(original, &event);
+
+        assert!(merged.contains("BEGIN:VTIMEZONE"));
+        assert!(merged.contains("DTSTART:20071104T020000"));
+        assert!(merged.contains("DTSTART:20070311T020000"));
+        assert!(!merged.contains("BEGIN:STANDARD\r\nDTSTART;VALUE=DATE"));
+        assert!(!merged.contains("BEGIN:DAYLIGHT\r\nDTSTART;VALUE=DATE"));
+        assert!(merged.contains("DTSTART;VALUE=DATE:20260601"));
+        assert!(merged.contains("DTEND;VALUE=DATE:20260602"));
+        assert!(merged.contains("BEGIN:VALARM"));
+        assert!(merged.contains("DESCRIPTION:Reminder"));
     }
 
     #[test]
