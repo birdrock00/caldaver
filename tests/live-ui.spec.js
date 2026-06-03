@@ -706,6 +706,14 @@ test('mail page renders mocked messages, message detail, search, and attachment 
         html_body: '<section><h2>Quarterly report</h2><p>Attached is the <strong>quarterly report</strong>.</p><a href="https://example.test/report">Open report</a></section>',
         attachments: [{ part: '2', filename: 'report.pdf', content_type: 'application/pdf', size: 12345 }]
       },
+      102: {
+        uid: 102,
+        from: 'Grace Hopper <grace@example.test>',
+        subject: 'Deployment update',
+        date: 'Thu, 28 May 2026 16:15:00 -0700',
+        body: 'Desktop navigation should reach the older message.',
+        attachments: []
+      },
       201: {
         uid: 201,
         from: 'Katherine Johnson <katherine@example.test>',
@@ -751,6 +759,22 @@ test('mail page renders mocked messages, message detail, search, and attachment 
   await expect(page.locator('#mail_reader_html')).toHaveAttribute('srcdoc', /<base target="_blank">/);
   await expect(page.locator('#mail_reader_unread')).toBeVisible();
   await expect(page.locator('#mail_message_detail')).toHaveCount(0);
+  await expect(page.locator('#mail_reader_newer')).toBeVisible();
+  await expect(page.locator('#mail_reader_older')).toBeVisible();
+  await expect(page.locator('#mail_reader_newer')).toBeDisabled();
+  await expect(page.locator('#mail_reader_older')).toBeEnabled();
+
+  await page.locator('#mail_reader_older').click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=102/);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Deployment update');
+  await expect(page.locator('#mail_reader_newer')).toBeEnabled();
+  await expect(page.locator('#mail_reader_older')).toBeDisabled();
+
+  await page.locator('#mail_reader_newer').click();
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=101/);
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Quarterly report');
+  await expect(page.locator('#mail_reader_newer')).toBeDisabled();
+  await expect(page.locator('#mail_reader_older')).toBeEnabled();
 
   const attachmentHref = await page.locator('#mail_reader_message [data-testid="mail-attachment-download"]').getAttribute('href');
   expect(attachmentHref).toContain('account_id=1');
@@ -819,6 +843,8 @@ test('mail page renders mocked messages, message detail, search, and attachment 
     { account_id: '2', uid: '201', part: '3' }
   ]);
   expect(messageRequests).toEqual([
+    { account_id: '1', uid: '101' },
+    { account_id: '1', uid: '102' },
     { account_id: '1', uid: '101' },
     { account_id: '1', uid: '101' },
     { account_id: '2', uid: '201' }
