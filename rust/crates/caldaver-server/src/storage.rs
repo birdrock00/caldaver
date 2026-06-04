@@ -57,6 +57,7 @@ impl Storage {
             secret: secret.into(),
         };
         storage.migrate().await?;
+        storage.reseal_legacy_account_credentials().await?;
         Ok(storage)
     }
 
@@ -213,6 +214,60 @@ ON dav_accounts (owner, account_type, lower(server_url), lower(username));
 "#,
             )
             .await?;
+        Ok(())
+    }
+
+    async fn reseal_legacy_account_credentials(&self) -> Result<(), StorageError> {
+        let client = self.pool.get().await?;
+
+        for row in client
+            .query(
+                "SELECT owner, id::BIGINT AS id, password_secret FROM mail_accounts WHERE password_secret <> ''",
+                &[],
+            )
+            .await?
+        {
+            let owner: String = row.get("owner");
+            let id: i64 = row.get("id");
+            let raw_secret: String = row.get("password_secret");
+            let (password, needs_reset) = self.open_mail_password(&raw_secret);
+            if needs_reset && !password.is_empty() {
+                let resealed = self.seal_mail_password(&password);
+                if !resealed.is_empty() {
+                    client
+                        .execute(
+                            "UPDATE mail_accounts SET password_secret = $1, updated_at = now() WHERE owner = $2 AND id = $3 AND password_secret = $4",
+                            &[&resealed, &owner, &id, &raw_secret],
+                        )
+                        .await?;
+                }
+            }
+        }
+
+        for row in client
+            .query(
+                "SELECT owner, id::BIGINT AS id, credential_secret FROM dav_accounts WHERE credential_secret <> ''",
+                &[],
+            )
+            .await?
+        {
+            let owner: String = row.get("owner");
+            let id: i64 = row.get("id");
+            let raw_secret: String = row.get("credential_secret");
+            let (credential, needs_reset) = self.open_mail_password(&raw_secret);
+            if needs_reset && !credential.is_empty() {
+                let resealed = self.seal_mail_password(&credential);
+                if !resealed.is_empty() {
+                    client
+                        .execute(
+                            "UPDATE dav_accounts SET credential_secret = $1, updated_at = now() WHERE owner = $2 AND id = $3 AND credential_secret = $4",
+                            &[&resealed, &owner, &id, &raw_secret],
+                        )
+                        .await?;
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -1071,6 +1126,21 @@ mod tests {
         }
     }
 
+    fn legacy_secret(storage_secret: &str, plaintext: &str) -> String {
+        let key = storage_secret.as_bytes();
+        let sealed: Vec<u8> = if key.is_empty() {
+            plaintext.as_bytes().to_vec()
+        } else {
+            plaintext
+                .as_bytes()
+                .iter()
+                .enumerate()
+                .map(|(index, byte)| byte ^ key[index % key.len()])
+                .collect()
+        };
+        BASE64.encode(sealed)
+    }
+
     fn test_message(uid: u64, seen: bool) -> MailMessage {
         MailMessage {
             uid,
@@ -1231,5 +1301,70 @@ mod tests {
         assert!(storage.dav_account(&owner, "carddav").await.unwrap().is_none());
         assert_eq!(storage.dav_accounts(&owner).await.unwrap().len(), 1);
         assert!(storage.dav_accounts(&unique_name("other-owner")).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn postgres_reseals_legacy_account_credentials_with_mail_password_key() {
+        let Some(storage) = test_storage().await else { return; };
+        let owner = unique_name("legacy-reseal");
+        let mail = storage.save_mail_account(&owner, &test_account()).await.unwrap();
+        let dav = storage
+            .save_dav_account(&owner, &test_dav_account("calendar", &owner, "new-dav-secret"))
+            .await
+            .unwrap();
+
+        let legacy_mail = legacy_secret("storage-test-secret", "legacy-mail-secret");
+        let legacy_dav = legacy_secret("storage-test-secret", "legacy-dav-secret");
+        let client = storage.pool.get().await.unwrap();
+        client
+            .execute(
+                "UPDATE mail_accounts SET password_secret = $1 WHERE owner = $2 AND id = $3",
+                &[&legacy_mail, &owner, &(mail.id as i64)],
+            )
+            .await
+            .unwrap();
+        client
+            .execute(
+                "UPDATE dav_accounts SET credential_secret = $1 WHERE owner = $2 AND id = $3",
+                &[&legacy_dav, &owner, &(dav.id as i64)],
+            )
+            .await
+            .unwrap();
+
+        storage.reseal_legacy_account_credentials().await.unwrap();
+
+        let raw_mail: String = client
+            .query_one(
+                "SELECT password_secret FROM mail_accounts WHERE owner = $1 AND id = $2",
+                &[&owner, &(mail.id as i64)],
+            )
+            .await
+            .unwrap()
+            .get("password_secret");
+        let raw_dav: String = client
+            .query_one(
+                "SELECT credential_secret FROM dav_accounts WHERE owner = $1 AND id = $2",
+                &[&owner, &(dav.id as i64)],
+            )
+            .await
+            .unwrap()
+            .get("credential_secret");
+
+        assert!(!raw_mail.contains("legacy-mail-secret"));
+        assert!(!raw_dav.contains("legacy-dav-secret"));
+        assert_eq!(
+            serde_json::from_str::<SealedPassword>(&raw_mail)
+                .unwrap()
+                .reveal()
+                .unwrap(),
+            "legacy-mail-secret"
+        );
+        assert_eq!(
+            serde_json::from_str::<SealedPassword>(&raw_dav)
+                .unwrap()
+                .reveal()
+                .unwrap(),
+            "legacy-dav-secret"
+        );
     }
 }
