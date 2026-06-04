@@ -3,14 +3,18 @@
 Configuration
 =============
 
-Caldaver is configured with environment variables.
+Caldaver is configured with environment variables for application, database,
+and login settings. Account credentials are different: PostgreSQL stores
+CalDAV, CardDAV, and email account credentials. Manage those accounts from
+**Preferences > Accounts**.
+
+Do not store CalDAV, CardDAV, or email account passwords in Kubernetes secrets
+or container environment variables. Existing DAV credentials found in a login
+session or legacy runtime configuration are migrated once into Postgres, and
+runtime DAV/mail access uses the stored account rows after that migration.
 
 Required settings
 -----------------
-
-.. confval:: CALDAVER_CALDAV_SERVER
-
-   Base CalDAV URL used for calendar discovery and requests.
 
 .. confval:: CALDAVER_CSRF_SECRET
 
@@ -34,21 +38,20 @@ Authentication and DAV settings
 
    Optional local password for ``CALDAVER_AUTH_USERNAME``.
 
-.. confval:: CALDAVER_CALDAV_USERNAME
+.. confval:: CALDAVER_CALDAV_SERVER
 
-   Optional service DAV username used when local login is enabled.
-
-.. confval:: CALDAVER_CALDAV_PASSWORD
-
-   Optional service DAV password used when local login is enabled.
+   Optional CalDAV bootstrap/default server URL used before an account has been
+   saved in Postgres. Do not pair this with DAV credentials in environment
+   variables or Kubernetes secrets.
 
 .. confval:: CALDAVER_CARDDAV_SERVER
 
-   CardDAV base URL. Defaults to ``CALDAVER_CALDAV_SERVER``.
+   Optional CardDAV bootstrap/default server URL. Defaults to
+   ``CALDAVER_CALDAV_SERVER``.
 
 .. confval:: CALDAVER_CALDAV_PUBLIC_URL
 
-   Public CalDAV URL shown to users. Defaults to ``CALDAVER_CALDAV_SERVER``.
+   Optional public CalDAV URL shown to users.
 
 .. confval:: CALDAVER_CALDAV_AUTHMETHOD
 

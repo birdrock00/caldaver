@@ -478,14 +478,29 @@ div.preferences-container {
   display: none;
 }
 
-.prefs-account-source {
+.prefs-account-actions {
   align-self: start;
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.prefs-account-source {
   padding: 4px 8px;
   color: #137333;
   background: #e6f4ea;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.prefs-account-edit {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 10px;
+  border-radius: 6px;
 }
 
 .prefs-account-warning {
@@ -2887,6 +2902,14 @@ body.mail-compose-open .mail-compose-screen {
   }
 }
 
+.account-credential-help {
+  display: block;
+  margin-top: 6px;
+  color: #5f6368;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .contact-dialog-header,
 .contact-dialog-footer {
   display: flex;
@@ -4081,8 +4104,14 @@ summary:focus-visible,
     height: 36px;
   }
 
-  .prefs-account-source {
+  .prefs-account-actions {
     grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .prefs-account-source {
     justify-self: start;
   }
 
