@@ -397,6 +397,8 @@ test('credential encryption requires dedicated strong mail password key only', (
   assert.match(imap, /pub\(crate\) fn validate_password_key_config\(\)/);
   assert.doesNotMatch(sourceBetween(imap, /fn password_key\(\)/, /pub\(crate\) fn validate_password_key_config/), /CALDAVER_AUTH_PASSWORD|caldaver-test-mail-password-key/);
   assert.match(server, /imap_backend::validate_password_key_config\(\)\?/);
+  assert.match(storage, /storage\.reseal_legacy_account_credentials\(\)\.await\?/);
+  assert.match(storage, /async fn reseal_legacy_account_credentials\(&self\)/);
   assert.match(storage, /if password\.reveal\(\)\.is_ok\(\)/);
   assert.match(storage, /return \(SealedPassword::default\(\), true\)/);
 });
