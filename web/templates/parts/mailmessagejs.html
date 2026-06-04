@@ -5,6 +5,8 @@
   var inboxMessagesPromise = null;
   var messageNavigationPromise = null;
   var mobileViewportQuery = '(max-width: 900px)';
+  var messageByUid = {};
+  var currentReplyUid = null;
 
   function $(selector) {
     return document.querySelector(selector);
@@ -166,15 +168,14 @@
     return template.innerHTML;
   }
 
-  function renderBody(message) {
-    var htmlFrame = $('#mail_reader_html');
-    var plainBody = $('#mail_reader_body');
-    var reader = $('#mail_reader');
+  function renderBody(container, message, accountId, csrfToken) {
+    var htmlFrame = container.querySelector('.mail-reader-html');
+    var plainBody = container.querySelector('pre');
     var html = proxyMailImages(
       sanitizeHtml(text(message.html_body)),
-      reader.dataset.accountId,
-      reader.dataset.uid,
-      reader.dataset.csrfToken
+      accountId,
+      message.uid,
+      csrfToken
     );
 
     if (html) {
@@ -218,6 +219,381 @@
     plainBody.textContent = text(message.body);
   }
 
+  function threadMessagesFromPayload(payload) {
+    var data = payload.data || {};
+    var candidates = [
+      payload.thread,
+      payload.thread_messages,
+      payload.messages,
+      data.thread,
+      data.thread_messages,
+      data.messages,
+      Array.isArray(payload.data) ? payload.data : null
+    ];
+
+    for (var index = 0; index < candidates.length; index += 1) {
+      if (Array.isArray(candidates[index]) && candidates[index].length > 0) {
+        return candidates[index];
+      }
+    }
+
+    return Array.isArray(data) ? [] : [data];
+  }
+
+  function primaryMessage(messages, uid) {
+    var fallback = messages[0] || {};
+    for (var index = 0; index < messages.length; index += 1) {
+      if (String(messages[index].uid) === String(uid)) {
+        return messages[index];
+      }
+    }
+
+    return fallback;
+  }
+
+  function buildMessageElement(message, isPrimary, accountId, attachmentUrl, csrfToken) {
+    var section = document.createElement('section');
+    section.className = 'mail-thread-message';
+    section.dataset.uid = message.uid;
+
+    var header = document.createElement('div');
+    header.className = 'mail-reader-message-header';
+
+    var meta = document.createElement('div');
+    meta.className = 'mail-reader-meta';
+
+    var avatar = document.createElement('div');
+    avatar.className = 'mail-reader-avatar';
+    avatar.setAttribute('aria-hidden', 'true');
+    avatar.textContent = initials(message.from);
+
+    var textWrap = document.createElement('div');
+    var from = document.createElement('strong');
+    var date = document.createElement('span');
+    if (isPrimary) {
+      from.id = 'mail_reader_from';
+      date.id = 'mail_reader_date';
+    }
+    from.textContent = text(message.from);
+    date.textContent = text(message.date);
+    textWrap.appendChild(from);
+    textWrap.appendChild(date);
+
+    meta.appendChild(avatar);
+    meta.appendChild(textWrap);
+
+    var reply = document.createElement('button');
+    reply.type = 'button';
+    reply.className = 'mail-reader-reply-button';
+    reply.dataset.uid = message.uid;
+    reply.setAttribute('aria-label', 'Reply to this message');
+    if (isPrimary) {
+      reply.id = 'mail_reader_reply';
+    }
+    reply.innerHTML = '<i class="fa fa-reply" aria-hidden="true"></i><span>Reply</span>';
+    reply.addEventListener('click', function(event) {
+      event.stopPropagation();
+      openReplyComposer(message);
+    });
+
+    header.appendChild(meta);
+    header.appendChild(reply);
+    section.appendChild(header);
+
+    var plainBody = document.createElement('pre');
+    if (isPrimary) {
+      plainBody.id = 'mail_reader_body';
+    }
+    section.appendChild(plainBody);
+
+    var htmlFrame = document.createElement('iframe');
+    if (isPrimary) {
+      htmlFrame.id = 'mail_reader_html';
+    }
+    htmlFrame.className = 'mail-reader-html';
+    htmlFrame.setAttribute('sandbox', 'allow-same-origin allow-popups allow-popups-to-escape-sandbox');
+    htmlFrame.setAttribute('referrerpolicy', 'no-referrer');
+    htmlFrame.setAttribute('title', 'Mail');
+    htmlFrame.hidden = true;
+    section.appendChild(htmlFrame);
+
+    var attachments = document.createElement('div');
+    if (isPrimary) {
+      attachments.id = 'mail_reader_attachments';
+    }
+    attachments.className = 'mail-attachments';
+    attachments.setAttribute('data-testid', 'mail-attachments');
+    section.appendChild(attachments);
+
+    renderBody(section, message, accountId, csrfToken);
+    renderAttachments(attachments, message, accountId, attachmentUrl);
+
+    return section;
+  }
+
+  function renderThread(messages, accountId, selectedUid, attachmentUrl, csrfToken) {
+    var thread = $('#mail_reader_thread');
+    var selected = primaryMessage(messages, selectedUid);
+    var hasSelected = false;
+
+    thread.innerHTML = '';
+    messageByUid = {};
+
+    messages.forEach(function(message) {
+      var uid = String(message.uid || selectedUid);
+      message.uid = message.uid || selectedUid;
+      messageByUid[uid] = message;
+      if (String(message.uid) === String(selectedUid)) {
+        hasSelected = true;
+      }
+    });
+
+    messages.forEach(function(message, index) {
+      thread.appendChild(buildMessageElement(
+        message,
+        hasSelected ? String(message.uid) === String(selectedUid) : index === 0,
+        accountId,
+        attachmentUrl,
+        csrfToken
+      ));
+    });
+
+    $('#mail_reader_subject').textContent = text(selected.subject);
+  }
+
+  function replyStorage() {
+    try {
+      return window.localStorage || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function replyDraftKey(accountId, uid) {
+    return 'caldaver.mail.reply.' + accountId + '.' + uid;
+  }
+
+  function replyFields() {
+    return {
+      to: $('#mail_reply_to'),
+      subject: $('#mail_reply_subject'),
+      body: $('#mail_reply_body')
+    };
+  }
+
+  function replyDraftValue() {
+    var fields = replyFields();
+    return {
+      to: fields.to ? fields.to.value : '',
+      subject: fields.subject ? fields.subject.value : '',
+      body: fields.body ? fields.body.value : ''
+    };
+  }
+
+  function replyDraftHasContent(draft) {
+    return !!(draft && (
+      (draft.to || '').trim() ||
+      (draft.subject || '').trim() ||
+      (draft.body || '').trim()
+    ));
+  }
+
+  function setReplyStatus(message) {
+    var status = $('#mail_reply_status');
+    if (status) {
+      status.textContent = message || '';
+    }
+  }
+
+  function setReplyError(message) {
+    var error = $('#mail_reply_error');
+    if (!error) {
+      return;
+    }
+
+    error.textContent = message || '';
+    error.hidden = !message;
+  }
+
+  function saveReplyDraft(showStatus) {
+    var reader = $('#mail_reader');
+    var storage = replyStorage();
+    if (!currentReplyUid || !storage) {
+      return;
+    }
+
+    var draft = replyDraftValue();
+    try {
+      if (replyDraftHasContent(draft)) {
+        storage.setItem(replyDraftKey(reader.dataset.accountId, currentReplyUid), JSON.stringify(draft));
+      } else {
+        storage.removeItem(replyDraftKey(reader.dataset.accountId, currentReplyUid));
+      }
+      if (showStatus) {
+        setReplyStatus('Saved on this device');
+      }
+    } catch (error) {
+      setReplyStatus('Draft could not be saved on this device.');
+    }
+  }
+
+  function loadReplyDraft(accountId, uid) {
+    var storage = replyStorage();
+    if (!storage) {
+      return null;
+    }
+
+    try {
+      var raw = storage.getItem(replyDraftKey(accountId, uid));
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearReplyDraft(accountId, uid) {
+    var storage = replyStorage();
+    if (!storage) {
+      return;
+    }
+
+    try {
+      storage.removeItem(replyDraftKey(accountId, uid));
+    } catch (error) {}
+  }
+
+  function replySubject(subject) {
+    var value = text(subject).trim();
+    if (/^re\s*:/i.test(value)) {
+      return value;
+    }
+
+    return value ? 'Re: ' + value : 'Re:';
+  }
+
+  function quotedOriginal(message) {
+    var body = text(message.body).trim();
+    if (!body) {
+      return '\n\n';
+    }
+
+    var intro = 'On ' + text(message.date) + ', ' + text(message.from) + ' wrote:';
+    var quoted = body.split(/\r?\n/).map(function(line) {
+      return '> ' + line;
+    }).join('\n');
+    return '\n\n' + intro + '\n' + quoted;
+  }
+
+  function resetReplyFields() {
+    var fields = replyFields();
+    fields.to.value = '';
+    fields.subject.value = '';
+    fields.body.value = '';
+    setReplyStatus('');
+    setReplyError('');
+  }
+
+  function openReplyComposer(message) {
+    var reader = $('#mail_reader');
+    var composer = $('#mail_reply_composer');
+    var fields = replyFields();
+    var uid = message.uid || reader.dataset.uid;
+    var draft;
+
+    if (!composer) {
+      return;
+    }
+
+    if (currentReplyUid && String(currentReplyUid) !== String(uid)) {
+      saveReplyDraft(false);
+    }
+
+    currentReplyUid = uid;
+    resetReplyFields();
+    draft = loadReplyDraft(reader.dataset.accountId, uid);
+
+    if (draft) {
+      fields.to.value = draft.to || '';
+      fields.subject.value = draft.subject || '';
+      fields.body.value = draft.body || '';
+      if (replyDraftHasContent(draft)) {
+        setReplyStatus('Saved on this device');
+      }
+    } else {
+      fields.to.value = text(message.from);
+      fields.subject.value = replySubject(message.subject);
+      fields.body.value = quotedOriginal(message);
+    }
+
+    composer.hidden = false;
+    window.requestAnimationFrame(function() {
+      composer.scrollIntoView({ block: 'nearest' });
+      (fields.to.value.trim() ? fields.body : fields.to).focus();
+    });
+  }
+
+  function closeReplyComposer() {
+    var composer = $('#mail_reply_composer');
+    if (!composer) {
+      return;
+    }
+
+    saveReplyDraft(false);
+    composer.hidden = true;
+    setReplyError('');
+  }
+
+  function showReplySendUnavailable() {
+    saveReplyDraft(true);
+    setReplyError('Sending is not configured for this account yet. Your reply draft is only saved on this device.');
+  }
+
+  function discardReplyDraft() {
+    var reader = $('#mail_reader');
+    if (!currentReplyUid || !window.confirm('Discard this reply draft?')) {
+      return;
+    }
+
+    clearReplyDraft(reader.dataset.accountId, currentReplyUid);
+    resetReplyFields();
+    $('#mail_reply_composer').hidden = true;
+    currentReplyUid = null;
+  }
+
+  function bindReplyComposer() {
+    ['#mail_reply_to', '#mail_reply_subject', '#mail_reply_body'].forEach(function(selector) {
+      var field = $(selector);
+      if (!field) {
+        return;
+      }
+
+      field.addEventListener('input', function() {
+        setReplyError('');
+        saveReplyDraft(true);
+      });
+    });
+
+    $('#mail_reply_close').addEventListener('click', closeReplyComposer);
+    $('#mail_reply_send').addEventListener('click', showReplySendUnavailable);
+    $('#mail_reply_discard').addEventListener('click', discardReplyDraft);
+    $('#mail_reply_form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      showReplySendUnavailable();
+    });
+    $('#mail_reply_form').addEventListener('keydown', function(event) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        showReplySendUnavailable();
+      }
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && !$('#mail_reply_composer').hidden) {
+        event.preventDefault();
+        closeReplyComposer();
+      }
+    });
+  }
+
   function loadMessage() {
     var reader = $('#mail_reader');
     var accountId = reader.dataset.accountId;
@@ -230,13 +606,11 @@
 
     jsonFetch(url, {}, 'Unable to load message')
       .then(function(payload) {
-        var message = payload.data || {};
-        $('#mail_reader_subject').textContent = text(message.subject);
-        $('#mail_reader_from').textContent = text(message.from);
-        $('#mail_reader_date').textContent = text(message.date);
-        renderBody(message);
-        $('#mail_reader .mail-reader-avatar').textContent = initials(message.from);
-        renderAttachments($('#mail_reader_attachments'), message, accountId, reader.dataset.attachmentUrl);
+        var messages = threadMessagesFromPayload(payload);
+        renderThread(messages, accountId, uid, reader.dataset.attachmentUrl, reader.dataset.csrfToken);
+        if (currentReplyUid && messageByUid[String(currentReplyUid)]) {
+          openReplyComposer(messageByUid[String(currentReplyUid)]);
+        }
         $('#mail_reader_loading').hidden = true;
         $('#mail_reader_message').hidden = false;
         $('#mail_reader_unread').hidden = false;
@@ -407,11 +781,15 @@
     return touches[0];
   }
 
+  function interactiveSwipeTarget(target) {
+    return !!(target && target.closest && target.closest('a, button, input, textarea, select, label'));
+  }
+
   function setupSwipeNavigation() {
     var message = $('#mail_reader_message');
 
     message.addEventListener('touchstart', function(event) {
-      if (!narrowViewport() || event.touches.length !== 1) {
+      if (!narrowViewport() || event.touches.length !== 1 || interactiveSwipeTarget(event.target)) {
         swipeStart = null;
         return;
       }
@@ -435,7 +813,7 @@
     }, { passive: true });
 
     message.addEventListener('pointerdown', function(event) {
-      if (!narrowViewport() || (event.pointerType !== 'touch' && event.pointerType !== 'pen')) {
+      if (!narrowViewport() || interactiveSwipeTarget(event.target) || (event.pointerType !== 'touch' && event.pointerType !== 'pen')) {
         return;
       }
 
@@ -458,7 +836,7 @@
     });
 
     message.addEventListener('mousedown', function(event) {
-      if (!narrowViewport() || event.button !== 0) {
+      if (!narrowViewport() || event.button !== 0 || interactiveSwipeTarget(event.target)) {
         return;
       }
 
@@ -504,6 +882,7 @@
       navigateBySwipe('older');
     });
     setupSwipeNavigation();
+    bindReplyComposer();
     updateMessageNavButtons();
     loadMessage();
   });
