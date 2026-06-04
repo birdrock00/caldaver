@@ -81,6 +81,7 @@ async function mockMailApi(page, options = {}) {
   const attachmentBodies = options.attachmentBodies || {};
   const attachmentRequests = options.attachmentRequests || [];
   const messageRequests = options.messageRequests || [];
+  const navigationRequests = options.navigationRequests || [];
   const syncRequests = options.syncRequests || [];
   const unreadRequests = options.unreadRequests || [];
 
@@ -243,6 +244,7 @@ async function mockMailApi(page, options = {}) {
     const url = new URL(route.request().url());
     const accountId = url.searchParams.get('account_id');
     const uid = url.searchParams.get('uid');
+    navigationRequests.push({ account_id: accountId, uid });
     const messages = messagesByAccount[accountId] || cachedMessagesByAccount[accountId] || [];
     const currentIndex = messages.findIndex(message => String(message.uid) === String(uid));
 
@@ -1189,39 +1191,45 @@ test('mail reader renders HTML email bodies and blocks message scripts', async (
   expect(consoleErrors).toEqual([]);
 });
 
-test('mobile mail reader swipe navigates newer and older inbox messages', async ({ page }) => {
+test('mobile mail reader swipe uses message navigation when current message is outside cached inbox page', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
+  const navigationRequests = [];
 
   const inboxMessages = [
     { uid: 701, from: 'Newest Sender', subject: 'Newer message', date: 'Fri, 29 May 2026 15:00:00 -0700', seen: true },
-    { uid: 702, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', seen: true },
-    { uid: 703, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', seen: true }
+    { uid: 742, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', seen: true },
+    { uid: 743, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', seen: true }
   ];
 
   await mockMailApi(page, {
     accounts: [{ id: 1, label: 'Swipe Inbox', email_address: 'swipe@example.test' }],
-    cachedMessagesByAccount: { 1: inboxMessages },
+    cachedMessagesByAccount: {
+      1: [{ uid: 799, from: 'Cached Sender', subject: 'Cached only', date: 'Fri, 29 May 2026 16:00:00 -0700', seen: true }]
+    },
     messagesByAccount: { 1: inboxMessages },
+    navigationRequests,
     messageDetails: {
       701: { uid: 701, from: 'Newest Sender', subject: 'Newer message', date: 'Fri, 29 May 2026 15:00:00 -0700', body: 'Newer body' },
-      702: { uid: 702, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', body: 'Current body' },
-      703: { uid: 703, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', body: 'Older body' }
+      742: { uid: 742, from: 'Current Sender', subject: 'Current message', date: 'Fri, 29 May 2026 14:00:00 -0700', body: 'Current body' },
+      743: { uid: 743, from: 'Older Sender', subject: 'Older message', date: 'Fri, 29 May 2026 13:00:00 -0700', body: 'Older body' }
     }
   });
 
-  await page.goto(`${baseURL}/mail/read?account_id=1&uid=702`);
+  await page.goto(`${baseURL}/mail/read?account_id=1&uid=742`);
   await expect(page.locator('#mail_reader_subject')).toHaveText('Current message');
   await dispatchTouchSwipe(page, '#mail_reader_message', 60, 320);
   await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=701/);
   await expect(page.locator('#mail_reader_subject')).toHaveText('Newer message');
+  expect(navigationRequests).toContainEqual({ account_id: '1', uid: '742' });
 
-  await page.goto(`${baseURL}/mail/read?account_id=1&uid=702`);
+  await page.goto(`${baseURL}/mail/read?account_id=1&uid=742`);
   await expect(page.locator('#mail_reader_subject')).toHaveText('Current message');
   await dispatchTouchSwipe(page, '#mail_reader_message', 320, 60);
-  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=703/);
+  await expect(page).toHaveURL(/\/mail\/read\?account_id=1&uid=743/);
   await expect(page.locator('#mail_reader_subject')).toHaveText('Older message');
+  expect(navigationRequests.filter(request => request.uid === '742')).toHaveLength(2);
 
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);

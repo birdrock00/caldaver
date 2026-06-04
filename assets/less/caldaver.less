@@ -3640,12 +3640,23 @@ summary:focus-visible,
   }
 
   body.caldaver-calendar-page #calendar_view .fc-view-container {
-    height: auto;
+    height: auto !important;
     padding: 0 0 96px;
+    overflow: visible;
   }
 
   body.caldaver-calendar-page #calendar_view .fc-list-view {
+    height: auto !important;
     border: 0;
+    overflow: visible;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-view .fc-scroller {
+    height: auto !important;
+    max-height: none !important;
+    overflow-x: hidden !important;
+    overflow-y: visible !important;
+    -webkit-overflow-scrolling: auto;
   }
 
   body.caldaver-calendar-page #calendar_view .fc-list-table {
