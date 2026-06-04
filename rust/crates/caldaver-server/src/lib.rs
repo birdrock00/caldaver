@@ -178,6 +178,7 @@ pub async fn run() {
 impl AppState {
     async fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let config = Config::from_env()?;
+        imap_backend::validate_password_key_config()?;
         let storage = Storage::connect(&config.database_url, config.csrf_secret.clone()).await?;
         if let Err(error) = bootstrap_postgres_accounts(&config, &storage).await {
             tracing::warn!(%error, "Postgres account bootstrap did not complete cleanly");
@@ -2909,6 +2910,7 @@ mod tests {
     }
 
     fn fake_account() -> MailAccount {
+        imap_backend::install_test_password_key();
         MailAccount {
             id: 1,
             label: "Inbox".to_string(),
@@ -2956,6 +2958,7 @@ mod tests {
     }
 
     async fn test_state() -> Option<AppState> {
+        imap_backend::install_test_password_key();
         let database_url = std::env::var("CALDAVER_TEST_DATABASE_URL").ok()?;
         let config = Config::for_tests(database_url);
         let storage = Storage::connect(&config.database_url, config.csrf_secret.clone())

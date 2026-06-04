@@ -71,12 +71,19 @@ Required runtime configuration:
 
 - Postgres configuration, either `CALDAVER_DATABASE_URL` or all of `CALDAVER_DB_HOST`, `CALDAVER_DB_NAME`, `CALDAVER_DB_USER`, and `CALDAVER_DB_PASSWORD`
 - `CALDAVER_CSRF_SECRET`, set to a persistent secret value and keep it stable across redeployments
+- `CALDAVER_MAIL_PASSWORD_KEY`, set from a Kubernetes Secret or equivalent
+  runtime secret. Use at least 32 bytes of random material and keep it stable
+  across redeployments.
 
 PostgreSQL stores CalDAV, CardDAV, and email account credentials. Configure
 those accounts from **Preferences > Accounts**. Do not store CalDAV, CardDAV, or email account passwords in Kubernetes secrets or container environment variables.
 Existing DAV credentials found in a login session or legacy runtime configuration
 are migrated once into Postgres and runtime DAV/mail access uses the stored
 account rows after that migration.
+Stored account credentials are encrypted with AES-256-GCM using random nonces.
+The encryption key is derived from `CALDAVER_MAIL_PASSWORD_KEY`; the server
+fails closed when that key is missing or shorter than 32 bytes. The local login
+password must never be used as an encryption-key fallback.
 
 Common optional runtime configuration:
 
@@ -98,6 +105,7 @@ docker run -d --name caldaver \
   -p 8080:8080 \
   -e CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
   -e CALDAVER_CSRF_SECRET=<SET_ME> \
+  -e CALDAVER_MAIL_PASSWORD_KEY=change-this-32-byte-minimum-secret \
   -e CALDAVER_TITLE=Caldaver \
   -e CALDAVER_AUTH_USERNAME=local-user \
   -e CALDAVER_AUTH_PASSWORD=change-this \
