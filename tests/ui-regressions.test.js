@@ -18,6 +18,15 @@ function cssBlock(source, selector) {
   return source.slice(blockStart + 1, blockEnd);
 }
 
+function sourceBetween(source, startPattern, endPattern) {
+  const start = source.search(startPattern);
+  assert.notEqual(start, -1, `missing source start ${startPattern}`);
+  const tail = source.slice(start);
+  const end = tail.search(endPattern);
+  assert.notEqual(end, -1, `missing source end ${endPattern}`);
+  return tail.slice(0, end);
+}
+
 test('Rust workspace owns backend crates and scripts', () => {
   const toolchain = read('rust-toolchain.toml');
   const workspace = read('rust/Cargo.toml');
@@ -256,6 +265,56 @@ test('account JavaScript loads and saves through unified accounts endpoints', ()
   assert.match(server, /async fn account_save\(/);
 });
 
+test('account JavaScript reuses the account dialog for editing', () => {
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+
+  assert.match(mailAccountJs, /function openDialog\(event, account\)/);
+  assert.match(mailAccountJs, /mail_account_dialog_title'\)\.textContent = account \? 'Edit account'/);
+  assert.match(mailAccountJs, /function accountStoredId\(account\)/);
+  assert.match(mailAccountJs, /account\.source !== 'session'/);
+  assert.match(mailAccountJs, /setInputValue\('password', ''\)/);
+  assert.match(mailAccountJs, /row\.querySelector\('\.prefs-account-edit'\)\.addEventListener\('click'/);
+});
+
+test('account edit rows expose a focused edit button', () => {
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+  const less = read('assets/less/caldaver.less');
+
+  assert.match(mailAccountJs, /class="prefs-account-edit btn btn-default" aria-label="Edit account"/);
+  assert.match(mailAccountJs, /fa fa-pencil/);
+  assert.match(less, /\.prefs-account-actions\s*\{[\s\S]*justify-items:\s*end;/);
+  assert.match(less, /\.prefs-account-edit\s*\{[\s\S]*display:\s*inline-flex;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.prefs-account-actions\s*\{[\s\S]*justify-content:\s*flex-start;/);
+});
+
+test('account edit payloads include only non-secret public fields', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  const publicStruct = server.match(/struct ConnectedAccountPublic \{[\s\S]*?\n\}/)[0];
+  for (const field of ['auth_method', 'username', 'email_address', 'imap_host', 'imap_port', 'encryption', 'refresh_interval_seconds']) {
+    assert.match(publicStruct, new RegExp(`${field}:`));
+  }
+  assert.doesNotMatch(publicStruct, /password_secret/);
+  assert.doesNotMatch(publicStruct, /password_sealed/);
+  assert.doesNotMatch(publicStruct, /credential/);
+  assert.match(server, /auth_method: account\.auth_method\.clone\(\)/);
+  assert.match(server, /imap_host: account\.imap_host\.clone\(\)/);
+  assert.match(server, /refresh_interval_seconds: account\.refresh_interval_seconds/);
+});
+
+test('blank credentials preserve stored secrets during account edits', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const storage = read('rust/crates/caldaver-server/src/storage.rs');
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+
+  assert.match(server, /id != 0 && form\.get\("password"\)\.is_none_or\(\|value\| value\.trim\(\)\.is_empty\(\)\)/);
+  assert.match(server, /state\.storage\.mail_account\(owner, id\)\.await/);
+  assert.match(server, /state\.storage\.dav_account_by_id\(owner, id\)\.await/);
+  assert.match(server, /Ok\(Some\(_\)\) => return Err\(json_error\(StatusCode::BAD_REQUEST, "Account type cannot be changed"\)\)/);
+  assert.match(storage, /pub async fn dav_account_by_id/);
+  assert.match(mailAccountJs, /password\.required = !editingStoredAccount/);
+});
+
 test('account JavaScript switches required fields by account type', () => {
   const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
 
@@ -266,20 +325,76 @@ test('account JavaScript switches required fields by account type', () => {
   assert.match(mailAccountJs, /setRequired\(\$\(.*email_address.*\), isEmail\)/);
 });
 
-test('account API aggregates session DAV fallback and stored accounts without secrets', () => {
+test('account API aggregates only stored accounts without secrets', () => {
   const server = read('rust/crates/caldaver-server/src/lib.rs');
 
   assert.match(server, /struct ConnectedAccountPublic/);
   const publicStruct = server.match(/struct ConnectedAccountPublic \{[\s\S]*?\n\}/)[0];
   assert.doesNotMatch(publicStruct, /credential_secret/);
   assert.doesNotMatch(publicStruct, /credential_sealed/);
-  assert.match(server, /session_fallback_accounts\(state: &AppState, session: &Session\)/);
+  assert.doesNotMatch(publicStruct, /password_secret/);
+  assert.doesNotMatch(publicStruct, /dav_password/);
+  assert.doesNotMatch(publicStruct, /token/);
+  assert.doesNotMatch(server, /session_fallback_accounts/);
+  assert.doesNotMatch(server, /source: "session"\.to_string\(\)/);
   assert.match(server, /connected_account_from_dav/);
   assert.match(server, /connected_account_from_mail/);
   assert.match(server, /state\.storage\.dav_account\(&session\.username, "calendar"\)\.await/);
   assert.match(server, /state\.storage\.dav_account\(&session\.username, "carddav"\)\.await/);
   assert.match(server, /caldav_client_for_request\(&state, &session\)\.await/);
   assert.match(server, /carddav_client_for_request\(&state, &session\)\.await/);
+});
+
+test('Postgres-only credential migration bootstraps DAV accounts from session credentials once', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const storage = read('rust/crates/caldaver-server/src/storage.rs');
+
+  assert.match(server, /bootstrap_postgres_accounts\(&config, &storage\)\.await/);
+  assert.match(server, /bootstrap_env_dav_accounts\(config, storage\)\.await/);
+  assert.match(server, /bootstrap_session_dav_accounts\(config, storage\)\.await/);
+  assert.match(server, /storage[\s\S]*\.dav_account\(owner, account_type\)[\s\S]*\.is_some\(\)[\s\S]*return Ok\(false\)/);
+  assert.match(server, /storage[\s\S]*\.save_dav_account\(owner, &account\)/);
+  assert.match(storage, /pub async fn session_dav_credentials\(&self\)/);
+  assert.match(storage, /SELECT DISTINCT ON \(username\)[\s\S]*FROM caldaver_sessions[\s\S]*WHERE expires_at > \$1/);
+  assert.match(storage, /credential_secret = CASE WHEN \$8 = '' THEN credential_secret ELSE \$8 END/);
+});
+
+test('runtime DAV clients use Postgres account credentials after migration with no session fallback', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const caldavRequest = sourceBetween(server, /async fn caldav_client_for_request\(/, /async fn carddav_client_for_request\(/);
+  const carddavRequest = sourceBetween(server, /async fn carddav_client_for_request\(/, /fn dav_auth_for_account\(/);
+
+  assert.match(caldavRequest, /state\.storage\.dav_account\(&session\.username, "calendar"\)\.await/);
+  assert.match(caldavRequest, /dav_auth_for_account\(&account\)/);
+  assert.doesNotMatch(caldavRequest, /caldav_client_for_session/);
+  assert.doesNotMatch(caldavRequest, /falling back to session credentials/);
+  assert.match(carddavRequest, /state\.storage\.dav_account\(&session\.username, "carddav"\)\.await/);
+  assert.match(carddavRequest, /dav_auth_for_account\(&account\)/);
+  assert.doesNotMatch(carddavRequest, /carddav_client_for_session/);
+  assert.doesNotMatch(carddavRequest, /falling back to session credentials/);
+});
+
+test('mail credentials are Postgres-only and are not sourced from runtime environment variables', () => {
+  const config = read('rust/crates/caldaver-server/src/config.rs');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const storage = read('rust/crates/caldaver-server/src/storage.rs');
+
+  assert.doesNotMatch(config, /MAIL_[A-Z_]*(PASSWORD|SECRET|TOKEN)|EMAIL_[A-Z_]*(PASSWORD|SECRET|TOKEN)|IMAP_[A-Z_]*(PASSWORD|SECRET|TOKEN)/);
+  assert.match(server, /mail_account_for\(&state, &session\.username, account_id\)\.await/);
+  assert.match(storage, /SELECT id::BIGINT AS id, label, email_address, imap_host, imap_port::INTEGER AS imap_port, encryption, username, password_secret/);
+  assert.match(storage, /self\.open_mail_password\(&row\.get::<_, String>\("password_secret"\)\)/);
+});
+
+test('credential storage docs describe Postgres-only DAV CardDAV and email account credentials', () => {
+  const readme = read('README.md');
+  const configuration = read('doc/source/admin/configuration.rst');
+  const installation = read('doc/source/admin/installation.rst');
+
+  for (const doc of [readme, configuration, installation]) {
+    assert.match(doc, /(PostgreSQL|Postgres) stores\s+CalDAV,\s+CardDAV,\s+and email account credentials/i);
+    assert.match(doc, /Do not store CalDAV,\s+CardDAV,\s+or\s+email account passwords in Kubernetes secrets\s+or\s+container\s+environment\s+variables/i);
+    assert.match(doc, /Preferences > Accounts/i);
+  }
 });
 
 test('DAV accounts are stored in Postgres with sealed credentials', () => {
@@ -331,12 +446,34 @@ test('account public rows include status and source metadata', () => {
   const server = read('rust/crates/caldaver-server/src/lib.rs');
   const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
 
-  assert.match(server, /source: "session"\.to_string\(\)/);
+  assert.doesNotMatch(server, /source: "session"\.to_string\(\)/);
   assert.match(server, /source: "postgres"\.to_string\(\)/);
   assert.match(server, /password_needs_reset: account\.credential_needs_reset/);
   assert.match(server, /last_error: account\.last_error\.clone\(\)/);
-  assert.match(mailAccountJs, /account\.source === 'session' \? 'Session' : 'Postgres'/);
+  assert.match(mailAccountJs, /Postgres/);
   assert.match(mailAccountJs, /account\.password_needs_reset/);
+});
+
+test('preferences account edit keeps credentials private and preserves blank-password updates', () => {
+  const preferences = read('web/templates/preferences.html');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const storage = read('rust/crates/caldaver-server/src/storage.rs');
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+  const mail = read('web/templates/mail.html');
+
+  assert.match(preferences, /id="mail_account_dialog_title"[\s\S]*labels\.addaccount/);
+  assert.match(mailAccountJs, /function openDialog\(event, account\)/);
+  assert.match(mailAccountJs, /class="prefs-account-edit/);
+  assert.match(mailAccountJs, /mail_account_dialog_title[\s\S]*Edit account/);
+  assert.match(mailAccountJs, /input\[name="id"\]'\)\.value = accountStoredId\(account\)/);
+  assert.match(mailAccountJs, /setInputValue\('label', account\.label/);
+  assert.match(mailAccountJs, /setInputValue\('server_url', account\.server/);
+  assert.match(mailAccountJs, /setInputValue\('email_address', account\.email_address \|\| account\.identifier/);
+  assert.match(mailAccountJs, /setInputValue\('password', ''\)/);
+  assert.doesNotMatch(server.match(/struct ConnectedAccountPublic \{[\s\S]*?\n\}/)[0], /password_secret|credential|token/i);
+  assert.match(storage, /password_secret = CASE WHEN \$9 = '' THEN password_secret ELSE \$9 END/);
+  assert.match(storage, /credential_secret = CASE WHEN \$8 = '' THEN credential_secret ELSE \$8 END/);
+  assert.doesNotMatch(mail, /prefs-account-edit/);
 });
 
 test('layout CSS keeps mobile pages scrollable and controls visible', () => {

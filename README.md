@@ -19,8 +19,8 @@ This fork has moved beyond the original AgenDAV codebase:
 - Shared domain logic lives in `caldaver-core`, including CalDAV filtering and
   resources, CardDAV parsing, XML generation/parsing, preferences, reminders,
   shares, and IMAP account validation.
-- PostgreSQL is now the runtime store for sessions, preferences, shares, mail
-  accounts, and cached mail metadata.
+- PostgreSQL is now the runtime store for sessions, preferences, shares,
+  CalDAV/CardDAV account credentials, mail accounts, and cached mail metadata.
 - The legacy backend, dependency runtime, bundled Ansible example, and old
   web-server Docker runtime have been removed from the active application path.
 - The Docker image now builds frontend assets, compiles the Rust server, and
@@ -40,7 +40,8 @@ Caldaver requires:
 - A CalDAV server like [Baïkal](http://baikal-server.com/),
   [DAViCal](http://www.davical.org/),
   [Radicale](https://radicale.org/tutorial/), etc
-- PostgreSQL for sessions, preferences, mail accounts, and cached mail metadata
+- PostgreSQL for sessions, preferences, CalDAV/CardDAV account credentials,
+  mail accounts, and cached mail metadata
 - Rust stable for source builds
 - Optional: nodejs & npm to build assets (releases include a build)
 - Optional: Android SDK, Java 21, and Node.js when building the Android APK
@@ -68,16 +69,21 @@ APK and updates GitHub Releases. The dated release is the durable release record
 
 Required runtime configuration:
 
-- `CALDAVER_CALDAV_SERVER`, for example `https://dav.example.com/dav/`
 - Postgres configuration, either `CALDAVER_DATABASE_URL` or all of `CALDAVER_DB_HOST`, `CALDAVER_DB_NAME`, `CALDAVER_DB_USER`, and `CALDAVER_DB_PASSWORD`
 - `CALDAVER_CSRF_SECRET`, set to a persistent secret value and keep it stable across redeployments
+
+PostgreSQL stores CalDAV, CardDAV, and email account credentials. Configure
+those accounts from **Preferences > Accounts**. Do not store CalDAV, CardDAV, or email account passwords in Kubernetes secrets or container environment variables.
+Existing DAV credentials found in a login session or legacy runtime configuration
+are migrated once into Postgres and runtime DAV/mail access uses the stored
+account rows after that migration.
 
 Common optional runtime configuration:
 
 - `CALDAVER_AUTH_USERNAME` and `CALDAVER_AUTH_PASSWORD`, when local login should be restricted to one account
-- `CALDAVER_CALDAV_USERNAME` and `CALDAVER_CALDAV_PASSWORD`, service DAV credentials used when local login is enabled
-- `CALDAVER_CARDDAV_SERVER`, defaults to `CALDAVER_CALDAV_SERVER`
-- `CALDAVER_CALDAV_PUBLIC_URL`, defaults to `CALDAVER_CALDAV_SERVER`
+- `CALDAVER_CALDAV_SERVER`, optional DAV base URL used only as a bootstrap/default server URL before an account has been saved in Postgres
+- `CALDAVER_CARDDAV_SERVER`, optional CardDAV bootstrap/default server URL that defaults to `CALDAVER_CALDAV_SERVER`
+- `CALDAVER_CALDAV_PUBLIC_URL`, optional public CalDAV URL shown to users
 - `CALDAVER_SESSION_LIFETIME`, defaults to 30 days
 - `CALDAVER_TITLE`, defaults to `Caldaver`
 - `CALDAVER_FOOTER`, defaults to `Caldaver`
@@ -90,7 +96,6 @@ Example:
 ```sh
 docker run -d --name caldaver \
   -p 8080:8080 \
-  -e CALDAVER_CALDAV_SERVER=https://dav.example.com/dav/ \
   -e CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
   -e CALDAVER_CSRF_SECRET=<SET_ME> \
   -e CALDAVER_TITLE=Caldaver \

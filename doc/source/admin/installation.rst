@@ -32,16 +32,20 @@ The container image is published to GitHub Container Registry as
 
 Required runtime configuration:
 
-* ``CALDAVER_CALDAV_SERVER``
 * ``CALDAVER_CSRF_SECRET``
 * ``CALDAVER_DATABASE_URL`` or all of ``CALDAVER_DB_HOST``,
   ``CALDAVER_DB_NAME``, ``CALDAVER_DB_USER``, and ``CALDAVER_DB_PASSWORD``
+
+PostgreSQL stores CalDAV, CardDAV, and email account credentials. Add and
+maintain those accounts from **Preferences > Accounts**. Do not store CalDAV, CardDAV, or email account passwords in Kubernetes secrets or container environment variables.
+Existing DAV credentials found in a login session or legacy runtime configuration
+are migrated once into Postgres, and runtime DAV/mail access uses the stored
+account rows after that migration.
 
 Example::
 
   $ docker run -d --name caldaver \
       -p 8080:8080 \
-      -e CALDAVER_CALDAV_SERVER=https://dav.example.com/dav/ \
       -e CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
       -e CALDAVER_CSRF_SECRET=<SET_ME> \
       ghcr.io/caldaver-app/caldaver:latest
@@ -56,17 +60,17 @@ Install frontend dependencies and build the assets::
 
 Run the Rust server with the required environment variables set::
 
-  $ CALDAVER_CALDAV_SERVER=https://dav.example.com/dav/ \
-    CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
+  $ CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
     CALDAVER_CSRF_SECRET=<SET_ME> \
     cargo run --manifest-path rust/Cargo.toml --bin caldaver-server
 
 Database setup
 --------------
 
-Caldaver stores sessions, preferences, shares, mail account metadata, and local
-calendar/contact cache data in PostgreSQL. The server creates and updates its
-tables automatically when it starts.
+Caldaver stores sessions, preferences, shares, CalDAV/CardDAV account
+credentials, mail account metadata and credentials, and local calendar/contact
+cache data in PostgreSQL. The server creates and updates its tables
+automatically when it starts.
 
 .. _webserver:
 
