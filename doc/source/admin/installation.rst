@@ -33,6 +33,9 @@ The container image is published to GitHub Container Registry as
 Required runtime configuration:
 
 * ``CALDAVER_CSRF_SECRET``
+* ``CALDAVER_MAIL_PASSWORD_KEY`` from a Kubernetes Secret or equivalent
+  runtime secret. Use at least 32 bytes of random material and keep it stable
+  across redeployments.
 * ``CALDAVER_DATABASE_URL`` or all of ``CALDAVER_DB_HOST``,
   ``CALDAVER_DB_NAME``, ``CALDAVER_DB_USER``, and ``CALDAVER_DB_PASSWORD``
 
@@ -40,7 +43,11 @@ PostgreSQL stores CalDAV, CardDAV, and email account credentials. Add and
 maintain those accounts from **Preferences > Accounts**. Do not store CalDAV, CardDAV, or email account passwords in Kubernetes secrets or container environment variables.
 Existing DAV credentials found in a login session or legacy runtime configuration
 are migrated once into Postgres, and runtime DAV/mail access uses the stored
-account rows after that migration.
+account rows after that migration. Credential rows are sealed with
+``CALDAVER_MAIL_PASSWORD_KEY`` before being saved. Stored account credentials
+are encrypted with AES-256-GCM using random nonces. The server fails closed when
+the key is missing or shorter than 32 bytes, and the local login password must
+never be used as an encryption-key fallback.
 
 Example::
 
@@ -48,6 +55,7 @@ Example::
       -p 8080:8080 \
       -e CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
       -e CALDAVER_CSRF_SECRET=<SET_ME> \
+      -e CALDAVER_MAIL_PASSWORD_KEY=change-this-32-byte-minimum-secret \
       ghcr.io/caldaver-app/caldaver:latest
 
 Source installation
@@ -62,6 +70,7 @@ Run the Rust server with the required environment variables set::
 
   $ CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
     CALDAVER_CSRF_SECRET=<SET_ME> \
+    CALDAVER_MAIL_PASSWORD_KEY=change-this-32-byte-minimum-secret \
     cargo run --manifest-path rust/Cargo.toml --bin caldaver-server
 
 Database setup

@@ -385,6 +385,22 @@ test('mail credentials are Postgres-only and are not sourced from runtime enviro
   assert.match(storage, /self\.open_mail_password\(&row\.get::<_, String>\("password_secret"\)\)/);
 });
 
+test('credential encryption requires dedicated strong mail password key only', () => {
+  const imap = read('rust/crates/caldaver-server/src/imap_backend.rs');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const storage = read('rust/crates/caldaver-server/src/storage.rs');
+
+  assert.match(imap, /const MAIL_PASSWORD_KEY_ENV: &str = "CALDAVER_MAIL_PASSWORD_KEY"/);
+  assert.match(imap, /const MIN_MAIL_PASSWORD_KEY_BYTES: usize = 32/);
+  assert.match(imap, /fn derive_password_key\(secret: Option<&str>\)/);
+  assert.match(imap, /Sha256::digest\(secret\.as_bytes\(\)\)/);
+  assert.match(imap, /pub\(crate\) fn validate_password_key_config\(\)/);
+  assert.doesNotMatch(sourceBetween(imap, /fn password_key\(\)/, /pub\(crate\) fn validate_password_key_config/), /CALDAVER_AUTH_PASSWORD|caldaver-test-mail-password-key/);
+  assert.match(server, /imap_backend::validate_password_key_config\(\)\?/);
+  assert.match(storage, /if password\.reveal\(\)\.is_ok\(\)/);
+  assert.match(storage, /return \(SealedPassword::default\(\), true\)/);
+});
+
 test('credential storage docs describe Postgres-only DAV CardDAV and email account credentials', () => {
   const readme = read('README.md');
   const configuration = read('doc/source/admin/configuration.rst');
@@ -394,7 +410,26 @@ test('credential storage docs describe Postgres-only DAV CardDAV and email accou
     assert.match(doc, /(PostgreSQL|Postgres) stores\s+CalDAV,\s+CardDAV,\s+and email account credentials/i);
     assert.match(doc, /Do not store CalDAV,\s+CardDAV,\s+or\s+email account passwords in Kubernetes secrets\s+or\s+container\s+environment\s+variables/i);
     assert.match(doc, /Preferences > Accounts/i);
+    assert.match(doc, /CALDAVER_MAIL_PASSWORD_KEY/i);
+    assert.match(doc, /at least 32 bytes/i);
+    assert.match(doc, /AES-256-GCM/i);
+    assert.match(doc, /local\s+login\s+password[\s\S]*must\s+never\s+be\s+used\s+as\s+an\s+encryption-key\s+fallback/i);
   }
+});
+
+test('local Ansible playbook sources account encryption key from encrypted Caldaver secrets into Kubernetes Secret', () => {
+  const playbookPath = path.resolve(root, '..', '..', '127-install-caldaver.yaml');
+  if (!fs.existsSync(playbookPath)) {
+    return;
+  }
+  const playbook = fs.readFileSync(playbookPath, 'utf8');
+
+  assert.match(playbook, /vars_files:\s*\n(?:.*\n)*\s+- secrets\/caldaver\.enc/);
+  assert.match(playbook, /caldaverMailPasswordKey/);
+  assert.match(playbook, /CALDAVER_MAIL_PASSWORD_KEY/);
+  assert.match(playbook, /kind:\s+Secret/);
+  assert.match(playbook, /stringData:\s*\n(?:.*\n)*\s+CALDAVER_MAIL_PASSWORD_KEY:/);
+  assert.match(playbook, /no_log:\s+true/);
 });
 
 test('DAV accounts are stored in Postgres with sealed credentials', () => {
