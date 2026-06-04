@@ -184,6 +184,7 @@
       htmlFrame.hidden = false;
       htmlFrame.srcdoc = '<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#202124;font:14px Arial,sans-serif;line-height:1.5;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}img.caldaver-mail-image-failed{display:none!important;width:0!important;height:0!important;}table{max-width:100%;}</style></head><body>' + html + '</body></html>';
       htmlFrame.onload = function() {
+        setupHtmlFrameSwipeNavigation(htmlFrame);
         resizeHtmlFrame(htmlFrame);
         try {
           Array.prototype.slice.call(htmlFrame.contentWindow.document.images).forEach(function(image) {
@@ -785,10 +786,8 @@
     return !!(target && target.closest && target.closest('a, button, input, textarea, select, label'));
   }
 
-  function setupSwipeNavigation() {
-    var message = $('#mail_reader_message');
-
-    message.addEventListener('touchstart', function(event) {
+  function bindSwipeNavigationTarget(target, captureTarget) {
+    target.addEventListener('touchstart', function(event) {
       if (!narrowViewport() || event.touches.length !== 1 || interactiveSwipeTarget(event.target)) {
         swipeStart = null;
         return;
@@ -800,9 +799,9 @@
       } else {
         swipeStart = null;
       }
-    }, { passive: true });
+    }, { passive: true, capture: true });
 
-    message.addEventListener('touchend', function(event) {
+    target.addEventListener('touchend', function(event) {
       var point = touchPoint(event);
       if (!point) {
         swipeStart = null;
@@ -810,46 +809,68 @@
       }
 
       finishSwipe(point.clientX, point.clientY);
-    }, { passive: true });
+    }, { passive: true, capture: true });
 
-    message.addEventListener('pointerdown', function(event) {
+    target.addEventListener('touchcancel', function() {
+      swipeStart = null;
+    }, { passive: true, capture: true });
+
+    target.addEventListener('pointerdown', function(event) {
       if (!narrowViewport() || interactiveSwipeTarget(event.target) || (event.pointerType !== 'touch' && event.pointerType !== 'pen')) {
         return;
       }
 
       beginSwipe(event.clientX, event.clientY);
-      if (message.setPointerCapture) {
-        message.setPointerCapture(event.pointerId);
+      if (captureTarget && captureTarget.setPointerCapture) {
+        try {
+          captureTarget.setPointerCapture(event.pointerId);
+        } catch (error) {}
       }
-    });
+    }, true);
 
-    message.addEventListener('pointerup', function(event) {
+    target.addEventListener('pointerup', function(event) {
       if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
         return;
       }
 
       finishSwipe(event.clientX, event.clientY);
-    });
+    }, true);
 
-    message.addEventListener('pointercancel', function() {
+    target.addEventListener('pointercancel', function() {
       swipeStart = null;
-    });
+    }, true);
 
-    message.addEventListener('mousedown', function(event) {
+    target.addEventListener('mousedown', function(event) {
       if (!narrowViewport() || event.button !== 0 || interactiveSwipeTarget(event.target)) {
         return;
       }
 
       beginSwipe(event.clientX, event.clientY);
-    });
+    }, true);
 
-    message.addEventListener('mouseup', function(event) {
+    target.addEventListener('mouseup', function(event) {
       if (event.button !== 0) {
         return;
       }
 
       finishSwipe(event.clientX, event.clientY);
-    });
+    }, true);
+  }
+
+  function setupHtmlFrameSwipeNavigation(htmlFrame) {
+    try {
+      if (!htmlFrame.contentWindow || !htmlFrame.contentWindow.document) {
+        return;
+      }
+
+      bindSwipeNavigationTarget(htmlFrame.contentWindow.document, htmlFrame);
+    } catch (error) {}
+  }
+
+  function setupSwipeNavigation() {
+    var message = $('#mail_reader_message');
+
+    bindSwipeNavigationTarget(message, message);
   }
 
   function markUnread() {
