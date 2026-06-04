@@ -1,9 +1,16 @@
 <script>
 (function() {
   var defaultRequestTimeoutMs = 20000;
+  var accountsUrl = '/accounts';
+  var accountSaveUrl = '/accounts/save';
+  var lastFocused = null;
 
   function $(selector) {
     return document.querySelector(selector);
+  }
+
+  function $all(selector, root) {
+    return Array.prototype.slice.call((root || document).querySelectorAll(selector));
   }
 
   function jsonFetch(url, options, fallbackMessage) {
@@ -15,15 +22,26 @@
     var timeoutMs = Number(window.CALDAVER_MAIL_REQUEST_TIMEOUT_MS || defaultRequestTimeoutMs);
     var controller = typeof AbortController !== 'undefined' && !options.signal ? new AbortController() : null;
     var timeoutId = null;
+    var fetchPromise;
 
     if (controller) {
       options.signal = controller.signal;
       timeoutId = window.setTimeout(function() {
         controller.abort();
       }, timeoutMs > 0 ? timeoutMs : defaultRequestTimeoutMs);
+      fetchPromise = fetch(url, options);
+    } else {
+      fetchPromise = Promise.race([
+        fetch(url, options),
+        new Promise(function(_, reject) {
+          timeoutId = window.setTimeout(function() {
+            reject(new Error((fallbackMessage || 'Account request') + ' because the server did not respond in time.'));
+          }, timeoutMs > 0 ? timeoutMs : defaultRequestTimeoutMs);
+        })
+      ]);
     }
 
-    return fetch(url, options).then(function(response) {
+    return fetchPromise.then(function(response) {
       return response.text().then(function(body) {
         var payload = {};
         if (body) {
@@ -33,19 +51,19 @@
             if (response.status === 401) {
               throw new Error('Your session expired. Reload Caldaver and sign in again.');
             }
-            throw new Error(fallbackMessage || 'Unable to complete mail request');
+            throw new Error(fallbackMessage || 'Unable to complete account request');
           }
         }
 
         if (!response.ok) {
-          throw new Error(payload.message || (response.status === 401 ? 'Your session expired. Reload Caldaver and sign in again.' : fallbackMessage) || 'Unable to complete mail request');
+          throw new Error(payload.message || (response.status === 401 ? 'Your session expired. Reload Caldaver and sign in again.' : fallbackMessage) || 'Unable to complete account request');
         }
 
         return payload;
       });
     }).catch(function(error) {
       if (error && error.name === 'AbortError') {
-        throw new Error((fallbackMessage || 'Mail request') + ' because the server did not respond in time.');
+        throw new Error((fallbackMessage || 'Account request') + ' because the server did not respond in time.');
       }
       throw error;
     }).finally(function() {
@@ -55,41 +73,230 @@
     });
   }
 
-  function openDialog() {
+  function accountType() {
+    var checked = $('#mail_account_form input[name="account_type"]:checked');
+    return checked ? checked.value : 'calendar';
+  }
+
+  function setRequired(input, required) {
+    if (!input) {
+      return;
+    }
+    input.required = !!required;
+    if (required) {
+      input.removeAttribute('disabled');
+    }
+  }
+
+  function updateFields() {
+    var type = accountType();
+    var isEmail = type === 'email';
+    $all('[data-account-field]').forEach(function(field) {
+      var scope = field.getAttribute('data-account-field');
+      var visible = scope === 'dav' ? !isEmail : isEmail;
+      field.hidden = !visible;
+      $all('input, select, textarea', field).forEach(function(input) {
+        input.disabled = !visible;
+      });
+    });
+    setRequired($('#mail_account_form input[name="server_url"]'), !isEmail);
+    setRequired($('#mail_account_form input[name="email_address"]'), isEmail);
+    setRequired($('#mail_account_form input[name="imap_host"]'), isEmail);
+    setRequired($('#mail_account_form input[name="imap_port"]'), isEmail);
+    setRequired($('#mail_account_form input[name="refresh_interval_minutes"]'), isEmail);
+    var homeSet = $('#mail_account_form input[name="home_set"]');
+    if (homeSet) {
+      homeSet.placeholder = type === 'carddav' ? '/addressbooks/user/' : '/calendars/user/';
+    }
+    var authMethod = $('#mail_account_form select[name="auth_method"]');
+    var password = $('#mail_account_form input[name="password"]');
+    if (password) {
+      password.required = type === 'email' || !authMethod || authMethod.value !== 'none';
+    }
+  }
+
+  function clearError() {
+    var error = $('#mail_account_error');
+    if (!error) {
+      return;
+    }
+    error.hidden = true;
+    error.textContent = '';
+  }
+
+  function openDialog(event) {
+    if (event) {
+      event.preventDefault();
+    }
+    lastFocused = document.activeElement;
     $('#mail_account_form').reset();
     $('#mail_account_form input[name="id"]').value = '';
-    $('#mail_account_error').hidden = true;
-    $('#mail_account_error').textContent = '';
+    clearError();
+    updateFields();
     $('#mail_account_dialog').hidden = false;
     $('#mail_account_form input[name="label"]').focus();
   }
 
   function closeDialog() {
     $('#mail_account_dialog').hidden = true;
+    if (lastFocused && typeof lastFocused.focus === 'function') {
+      lastFocused.focus();
+    }
+  }
+
+  function focusableDialogElements() {
+    return $all('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])', $('#mail_account_dialog'))
+      .filter(function(element) {
+        return !element.closest('[hidden]');
+      });
+  }
+
+  function trapFocus(event) {
+    if ($('#mail_account_dialog').hidden || event.key !== 'Tab') {
+      return;
+    }
+    var elements = focusableDialogElements();
+    if (!elements.length) {
+      return;
+    }
+    var first = elements[0];
+    var last = elements[elements.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  function accountIcon(type) {
+    type = accountTypeValue(type);
+    if (type === 'calendar') {
+      return 'fa-calendar';
+    }
+    if (type === 'carddav') {
+      return 'fa-book';
+    }
+    return 'fa-envelope';
+  }
+
+  function typeLabel(type) {
+    type = accountTypeValue(type);
+    if (type === 'calendar') {
+      return 'Calendar';
+    }
+    if (type === 'carddav') {
+      return 'Contacts';
+    }
+    return 'Email';
+  }
+
+  function accountTypeValue(accountOrType) {
+    if (!accountOrType) {
+      return 'email';
+    }
+    if (typeof accountOrType === 'string') {
+      return accountOrType;
+    }
+    return accountOrType.type || accountOrType.account_type || 'email';
+  }
+
+  function renderAccount(account) {
+    var type = accountTypeValue(account);
+    var row = document.createElement('article');
+    row.className = 'prefs-account-row';
+    row.setAttribute('data-account-type', type);
+    row.innerHTML =
+      '<div class="prefs-account-icon"><i class="fa ' + accountIcon(type) + '" aria-hidden="true"></i></div>' +
+      '<div class="prefs-account-main">' +
+      '<div class="prefs-account-title"><strong></strong><span></span></div>' +
+      '<div class="prefs-account-detail prefs-account-identifier"></div>' +
+      '<div class="prefs-account-detail prefs-account-server"></div>' +
+      '<div class="prefs-account-home"></div>' +
+      '<span class="prefs-account-warning" hidden>Password needs reset</span>' +
+      '<span class="prefs-account-warning prefs-account-last-error" hidden></span>' +
+      '</div>' +
+      '<div class="prefs-account-source"></div>';
+    row.querySelector('strong').textContent = account.label || typeLabel(type);
+    row.querySelector('.prefs-account-title span').textContent = typeLabel(type);
+    row.querySelector('.prefs-account-identifier').textContent = account.identifier || '';
+    row.querySelector('.prefs-account-server').textContent = account.server || '';
+    row.querySelector('.prefs-account-home').textContent = account.home_set || '';
+    row.querySelector('.prefs-account-source').textContent = account.source === 'session' ? 'Session' : 'Postgres';
+    row.querySelector('.prefs-account-warning').hidden = !account.password_needs_reset;
+    if (account.last_error) {
+      var lastError = row.querySelector('.prefs-account-last-error');
+      lastError.textContent = account.last_error;
+      lastError.hidden = false;
+    }
+    return row;
+  }
+
+  function renderAccounts(accounts) {
+    var list = $('#connected_accounts');
+    var empty = $('#connected_accounts_empty');
+    if (!list) {
+      return;
+    }
+    list.textContent = '';
+    (accounts || []).forEach(function(account) {
+      list.appendChild(renderAccount(account));
+    });
+    if (empty) {
+      empty.hidden = !!(accounts && accounts.length);
+    }
+  }
+
+  function loadAccounts() {
+    var list = $('#connected_accounts');
+    if (!list) {
+      return Promise.resolve();
+    }
+    return jsonFetch(accountsUrl, {}, 'Unable to load accounts')
+      .then(function(payload) {
+        renderAccounts(payload.data || []);
+      })
+      .catch(function(error) {
+        list.textContent = error.message;
+      });
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     var createButton = $('#mail_account_create');
-    if (!createButton) {
+    var dialog = $('#mail_account_dialog');
+    if (!createButton || !dialog) {
       return;
     }
 
+    loadAccounts();
     createButton.addEventListener('click', openDialog);
     $('#mail_account_cancel').addEventListener('click', closeDialog);
     $('#mail_account_cancel_icon').addEventListener('click', closeDialog);
+    $all('#mail_account_form input[name="account_type"]').forEach(function(input) {
+      input.addEventListener('change', updateFields);
+    });
+    $('#mail_account_form select[name="auth_method"]').addEventListener('change', updateFields);
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape' && !dialog.hidden) {
+        closeDialog();
+      }
+      trapFocus(event);
+    });
     $('#mail_account_form').addEventListener('submit', function(event) {
       event.preventDefault();
+      clearError();
       jsonFetch(
-        event.target.action,
+        event.target.action || accountSaveUrl,
         {
           method: 'POST',
           body: new FormData(event.target)
         },
-        'Unable to save mail account'
+        'Unable to save account'
       )
         .then(function() {
           closeDialog();
-          $('#mail_account_error').hidden = true;
+          return loadAccounts();
         })
         .catch(function(error) {
           $('#mail_account_error').textContent = error.message;
