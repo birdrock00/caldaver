@@ -8,6 +8,7 @@ gpu_mode="${CALDAVER_ANDROID_GPU_MODE:-host}"
 log_dir="${CALDAVER_ANDROID_EMULATOR_LOG_DIR:-$(pwd)/build/android-emulator}"
 log_file="$log_dir/$(date -u +%Y%m%dT%H%M%SZ)-${avd_name}.log"
 xvfb_screen="${CALDAVER_ANDROID_XVFB_SCREEN:-1280x1920x24}"
+avd_config="$HOME/.android/avd/${avd_name}.avd/config.ini"
 
 fail() {
   printf 'error: %s\n' "$*" >&2
@@ -16,6 +17,16 @@ fail() {
 
 [[ -x "$emulator" ]] || fail "Android emulator not found: $emulator"
 mkdir -p "$log_dir"
+
+if [[ -f "$avd_config" ]]; then
+  if grep -q '^hw\.keyboard=' "$avd_config"; then
+    sed -i 's/^hw\.keyboard=.*/hw.keyboard=yes/' "$avd_config"
+  else
+    printf '\nhw.keyboard=yes\n' >>"$avd_config"
+  fi
+else
+  printf 'warning: AVD config not found, hardware keyboard setting was not updated: %s\n' "$avd_config" >&2
+fi
 
 args=(
   -avd "$avd_name"

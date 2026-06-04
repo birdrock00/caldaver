@@ -103,6 +103,8 @@ test('Docker image runs the standalone Rust backend', () => {
   assert.match(storage, /CREATE TABLE IF NOT EXISTS mail_accounts/);
   assert.match(storage, /ALTER TABLE mail_accounts ALTER COLUMN id TYPE BIGINT/);
   assert.match(storage, /ALTER TABLE mail_message_cache ALTER COLUMN message TYPE JSONB USING message::jsonb/);
+  assert.match(storage, /uniq_mail_message_cache_owner_account_uid/);
+  assert.match(storage, /DROP NOT NULL/);
   assert.match(storage, /DELETE FROM mail_message_cache WHERE message IS NULL/);
   assert.match(storage, /SELECT id::BIGINT AS id/);
   assert.match(storage, /SELECT message::JSONB AS message[\s\S]*message IS NOT NULL/);
@@ -140,6 +142,10 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(appNav, /id="mail_nav_item"/);
   assert.match(appNav, /mail-nav-spinner/);
   assert.match(mail, /id="mail_accounts"/);
+  assert.match(mail, /id="mail_compose"/);
+  assert.match(mail, /id="mail_compose_screen"/);
+  assert.match(server, /id="mail_compose"/);
+  assert.match(server, /id="mail_compose_screen"/);
   assert.doesNotMatch(mail, /id="mail_account_create"/);
   assert.match(preferences, /class="prefs-section prefs-mail-section"[\s\S]*id="mail_account_create"/);
   assert.match(mailMessage, /id="mail_reader"/);
@@ -175,7 +181,15 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(mailJs, /function replaceMessages\(nextMessages\)/);
   assert.match(mailJs, /syncMessages\(\+\+messageRequestId, \{ quiet: true \}\);/);
   assert.match(mailJs, /if \(changed\) \{\s*renderMessages\(\);/);
+  assert.match(mailJs, /function openComposeScreen\(\)/);
+  assert.match(mailJs, /Sending is not configured for this account yet/);
+  assert.match(appJs, /insert_mobile_previous_events_row/);
+  assert.match(appJs, /text:\s*'Previous events'/);
+  assert.match(appJs, /fullCalendar\('prev'\)/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mobile-section-menu\s*\{[\s\S]*display:\s*block;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-mobile-compose-button[\s\S]*background:\s*#d93025;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-compose-screen/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mobile-calendar-previous-events/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.calendar-sidebar-section,[\s\S]*#sidebar #footer[\s\S]*display:\s*none;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.app-nav,[\s\S]*\.cards-sidebar \.app-nav,[\s\S]*\.mail-sidebar \.app-nav[\s\S]*display:\s*none;/);
   assert.match(less, /\.highlighted-unread/);
@@ -193,6 +207,52 @@ test('layout CSS keeps mobile pages scrollable and controls visible', () => {
   assert.match(less, /\.mail-shell\s*\{[\s\S]*height:\s*~"calc\(100dvh - 64px\)";/);
   assert.match(less, /\.mail-reader-message\s*\{[\s\S]*max-width:\s*none;/);
   assert.match(less, /\.mail-reader-html\s*\{[\s\S]*width:\s*100%;/);
+});
+
+test('mail compose preserves device draft, unavailable send, and accessibility contracts', () => {
+  const mail = read('web/templates/mail.html');
+  const mailJs = read('web/templates/parts/mailjs.html');
+  const less = read('assets/less/caldaver.less');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(mail, /id="mail_compose"[\s\S]*aria-label="Compose mail"[\s\S]*hidden/);
+  assert.match(server, /id="mail_compose"[\s\S]*aria-label="Compose mail"[\s\S]*hidden/);
+  assert.match(mail, /id="mail_compose_screen"[\s\S]*aria-label="Compose email"/);
+  assert.match(mail, /id="mail_compose_ccbcc"[\s\S]*aria-expanded="false"[\s\S]*aria-controls="mail_compose_cc mail_compose_bcc"/);
+  assert.match(mail, /id="mail_compose_send"[\s\S]*aria-label="Send"[\s\S]*aria-disabled="true"/);
+  assert.match(mail, /id="mail_compose_status"[\s\S]*aria-live="polite"[\s\S]*id="mail_compose_error"[\s\S]*aria-live="assertive"/);
+  assert.match(mailJs, /button\.hidden = !activeAccount\(\) \|\| composeScreenOpen\(\);/);
+  assert.match(mailJs, /return 'caldaver\.mail\.compose\.' \+ accountId;/);
+  assert.match(mailJs, /storage\.setItem\(composeDraftKey\(account\.id\), JSON\.stringify\(draft\)\);/);
+  assert.match(mailJs, /setComposeStatus\('Saved on this device'\);/);
+  assert.match(mailJs, /setComposeError\('Sending is not configured for this account yet\. Your draft is only saved on this device\.'\);/);
+  assert.match(mailJs, /event\.key === 'Escape'[\s\S]*closeComposeScreen\(\);/);
+  assert.match(mailJs, /event\.key === 'Enter' && \(event\.ctrlKey \|\| event\.metaKey\)[\s\S]*showComposeSendUnavailable\(\);/);
+  assert.match(mailJs, /window\.confirm\('Discard this draft\?'\)[\s\S]*clearComposeDraft\(account\);/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-mobile-compose-button\s*\{[\s\S]*position:\s*fixed;[\s\S]*color:\s*#fff;[\s\S]*background:\s*#d93025;/);
+});
+
+test('mail reply preserves thread buttons, per-message drafts, and target sizing contracts', () => {
+  const mailMessage = read('web/templates/mail_message.html');
+  const mailMessageJs = read('web/templates/parts/mailmessagejs.html');
+  const less = read('assets/less/caldaver.less');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(mailMessage, /class="mail-reader-reply-button"[\s\S]*data-uid="\{\{ uid \}\}"[\s\S]*aria-label="Reply to this message"/);
+  assert.match(server, /class="mail-reader-reply-button"[\s\S]*data-uid="\{uid\}"[\s\S]*aria-label="Reply to this message"/);
+  assert.match(mailMessageJs, /payload\.thread[\s\S]*payload\.messages[\s\S]*data\.thread[\s\S]*data\.messages/);
+  assert.match(mailMessageJs, /reply\.className = 'mail-reader-reply-button';[\s\S]*reply\.dataset\.uid = message\.uid;/);
+  assert.match(mailMessageJs, /reply\.id = 'mail_reader_reply';/);
+  assert.match(mailMessageJs, /openReplyComposer\(message\);/);
+  assert.match(mailMessageJs, /return 'caldaver\.mail\.reply\.' \+ accountId \+ '\.' \+ uid;/);
+  assert.match(mailMessageJs, /storage\.setItem\(replyDraftKey\(reader\.dataset\.accountId, currentReplyUid\), JSON\.stringify\(draft\)\);/);
+  assert.match(mailMessageJs, /return value \? 'Re: ' \+ value : 'Re:';/);
+  assert.match(mailMessageJs, /return '\\n\\n' \+ intro \+ '\\n' \+ quoted;/);
+  assert.match(mailMessageJs, /setReplyError\('Sending is not configured for this account yet\. Your reply draft is only saved on this device\.'\);/);
+  assert.match(mailMessageJs, /\(event\.ctrlKey \|\| event\.metaKey\) && event\.key === 'Enter'[\s\S]*showReplySendUnavailable\(\);/);
+  assert.match(mailMessageJs, /event\.key === 'Escape' && !\$\('#mail_reply_composer'\)\.hidden[\s\S]*closeReplyComposer\(\);/);
+  assert.match(less, /\.mail-reader-reply-button\s*\{[\s\S]*height:\s*40px;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-reader-reply-button\s*\{[\s\S]*min-width:\s*44px;[\s\S]*min-height:\s*44px;/);
 });
 
 test('contacts card dialing is native Android app only', () => {

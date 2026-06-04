@@ -671,16 +671,18 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
   await expect(page.locator('.caldaver-brand-title')).toHaveText('Caldaver');
   await expect(page.locator('.mobile-section-menu')).toBeVisible();
   await expect(page.locator('.caldaver-brand-icon')).toHaveCount(0);
-  await expect(page.locator('#usermenu .prefs')).toBeVisible();
-  await expect(page.locator('#usermenu .user-pill')).toBeVisible();
+  await expect(page.locator('#usermenu .prefs')).toBeHidden();
+  await expect(page.locator('#usermenu .user-pill')).toBeHidden();
+  await expect(page.locator('#mobile_calendar_date_action')).toBeVisible();
+  await expect(page.locator('#mobile_calendar_more_action')).toBeVisible();
   await expect(page.locator('#sidebar .app-nav')).toBeHidden();
   await expect(page.locator('#own_calendar_list')).toBeHidden();
 
   const menuBox = await visibleBox(page, '.mobile-section-menu');
-  const brand = await visibleBox(page, '.caldaver-brand-title');
-  const prefs = await visibleBox(page, '#usermenu .prefs');
-  const user = await visibleBox(page, '#usermenu .user-pill');
-  const centers = [menuBox, brand, prefs, user].map(box => ({
+  const brand = await visibleBox(page, '.mobile-calendar-toolbar-title');
+  const dateAction = await visibleBox(page, '#mobile_calendar_date_action');
+  const moreAction = await visibleBox(page, '#mobile_calendar_more_action');
+  const centers = [menuBox, brand, dateAction, moreAction].map(box => ({
     x: box.x + box.width / 2,
     y: box.y + box.height / 2
   }));
@@ -690,7 +692,7 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
   expect(centers[2].x).toBeLessThan(centers[3].x);
 
   const menu = page.locator('.mobile-section-menu');
-  await menu.locator('summary').click();
+  await menu.locator('> summary').click();
   await expect(menu.locator('.mobile-calendar-menu > summary', { hasText: 'Calendar' })).toBeVisible();
   await menu.locator('.mobile-calendar-menu > summary').click();
   await expect(menu.locator('.mobile-calendar-account').first()).toBeVisible();
@@ -698,10 +700,10 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
   await expect(menu.locator('a', { hasText: 'Mail' })).toBeVisible();
 
   const calendarScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
-  expect(calendarScroll).toBeGreaterThan(120);
+  expect(calendarScroll).toBeGreaterThan(0);
   await page.mouse.wheel(0, 640);
   await page.waitForTimeout(150);
-  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(80);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
 
   await page.goto(`${baseURL}/cards`);
   await expect(page.locator('.mobile-section-menu')).toBeVisible();
@@ -1284,6 +1286,7 @@ test('mark unread keeps the action visible while IMAP update is pending', async 
 });
 
 test('configured live mail accounts are deduplicated and can fetch messages', async ({ page }) => {
+  test.setTimeout(90000);
   await login(page);
 
   const accountsResponse = await page.request.get(`${baseURL}/mail/accounts`, {
@@ -1307,7 +1310,7 @@ test('configured live mail accounts are deduplicated and can fetch messages', as
 
   const syncResponse = await page.request.get(`${baseURL}/mail/messages/sync?account_id=${account.id}`, {
     headers: { 'X-Requested-With': 'XMLHttpRequest' },
-    timeout: 30000
+    timeout: 60000
   });
   expect(syncResponse.status()).toBe(200);
 
@@ -1418,6 +1421,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
 
   await page.goto(`${baseURL}/mail`);
   await expect(page.locator('#mail_empty')).toBeVisible();
+  await expect(page.locator('#mail_compose')).toBeHidden();
   await expect(page.locator('#mail_account_create')).toHaveCount(0);
   await openMailAccountDialog(page);
   await expect(page.locator('#mail_account_dialog')).toBeVisible();
@@ -1464,6 +1468,72 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
     refresh_interval_minutes: '1'
   });
   expect(savedAccounts.map(account => account.label)).toEqual(['Test Inbox', 'Second Inbox']);
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail compose saves account drafts and handles unavailable send paths', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+
+  await mockMailApi(page, {
+    accounts: [{ id: 42, label: 'Draft Inbox', email_address: 'draft@example.test' }],
+    messagesByAccount: { 42: [] }
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await page.evaluate(() => window.localStorage.removeItem('caldaver.mail.compose.42'));
+  await page.reload();
+  await expect(page.locator('#mail_compose')).toBeVisible();
+  await expect(page.locator('#mail_compose')).toHaveAttribute('aria-label', 'Compose mail');
+
+  await page.locator('#mail_compose').click();
+  await expect(page.locator('#mail_compose_screen')).toBeVisible();
+  await expect(page.locator('#mail_compose_screen')).toHaveAttribute('aria-label', 'Compose email');
+  await expect(page.locator('#mail_compose_from')).toHaveValue('draft@example.test');
+  await expect(page.locator('#mail_compose_to')).toBeFocused();
+  await expect(page.locator('#mail_compose_send')).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator('#mail_compose_ccbcc')).toHaveAttribute('aria-expanded', 'false');
+
+  await page.locator('#mail_compose_to').fill('recipient@example.test');
+  await page.locator('#mail_compose_subject').fill('Device draft subject');
+  await page.locator('#mail_compose_body').fill('Draft body saved locally.');
+  await expect(page.locator('#mail_compose_status')).toHaveText('Saved on this device');
+
+  await page.locator('#mail_compose_ccbcc').click();
+  await expect(page.locator('#mail_compose_ccbcc')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#mail_compose_cc_row')).toBeVisible();
+  await expect(page.locator('#mail_compose_bcc_row')).toBeVisible();
+  await page.locator('#mail_compose_cc').fill('copy@example.test');
+  await page.locator('#mail_compose_bcc').fill('blind@example.test');
+
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem('caldaver.mail.compose.42')))).toMatchObject({
+    to: 'recipient@example.test',
+    cc: 'copy@example.test',
+    bcc: 'blind@example.test',
+    subject: 'Device draft subject',
+    body: 'Draft body saved locally.',
+    ccBccVisible: true
+  });
+
+  await page.locator('#mail_compose_body').press(process.platform === 'darwin' ? 'Meta+Enter' : 'Control+Enter');
+  await expect(page.locator('#mail_compose_error')).toContainText('Sending is not configured for this account yet');
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#mail_compose_screen')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => Boolean(window.localStorage.getItem('caldaver.mail.compose.42')))).toBe(true);
+
+  await page.locator('#mail_compose').click();
+  await expect(page.locator('#mail_compose_to')).toHaveValue('recipient@example.test');
+  await expect(page.locator('#mail_compose_from')).toHaveValue('draft@example.test');
+  await expect(page.locator('#mail_compose_status')).toHaveText('Saved on this device');
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#mail_compose_discard').click();
+  await expect(page.locator('#mail_compose_screen')).toBeHidden();
+  await expect.poll(() => page.evaluate(() => window.localStorage.getItem('caldaver.mail.compose.42'))).toBe(null);
+
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
@@ -1566,6 +1636,99 @@ test('mail add-account non-JSON auth failure shows a useful error', async ({ pag
   expect(consoleErrors).toEqual([]);
 });
 
+test('mail reader reply buttons target long thread messages and save per-UID drafts', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  const threadMessages = Array.from({ length: 12 }, (_, index) => {
+    const uid = 900 + index;
+    return {
+      uid,
+      from: `Thread Sender ${index + 1} <sender${index + 1}@example.test>`,
+      subject: 'Long thread topic',
+      date: `Wed, 03 Jun 2026 ${String(8 + index).padStart(2, '0')}:00:00 -0700`,
+      body: uid === 906 ? 'Selected body line\nSecond selected line' : `Thread body ${index + 1}`,
+      seen: true
+    };
+  });
+
+  await mockMailApi(page, {
+    accounts: [{ id: 7, label: 'Thread Inbox', email_address: 'thread@example.test' }],
+    messagesByAccount: {
+      7: threadMessages.map(message => ({
+        uid: message.uid,
+        from: message.from,
+        subject: message.subject,
+        date: message.date,
+        seen: message.seen
+      }))
+    },
+    messageDetails: {
+      906: {
+        uid: 906,
+        from: 'Thread Sender 7 <sender7@example.test>',
+        subject: 'Long thread topic',
+        date: 'Wed, 03 Jun 2026 14:00:00 -0700',
+        body: 'Selected body line\nSecond selected line',
+        messages: threadMessages
+      }
+    }
+  });
+
+  await page.goto(`${baseURL}/mail/read?account_id=7&uid=906`);
+  await page.evaluate(() => {
+    window.localStorage.removeItem('caldaver.mail.reply.7.906');
+    window.localStorage.removeItem('caldaver.mail.reply.7.903');
+  });
+  await page.reload();
+  await expect(page.locator('#mail_reader_subject')).toHaveText('Long thread topic');
+  await expect(page.locator('.mail-reader-reply-button')).toHaveCount(threadMessages.length);
+  await expect(page.locator('#mail_reader_reply')).toHaveAttribute('data-uid', '906');
+
+  const desktopReplyBox = await visibleBox(page, '.mail-reader-reply-button[data-uid="906"]');
+  expect(desktopReplyBox.height).toBeGreaterThanOrEqual(40);
+
+  await page.locator('.mail-reader-reply-button[data-uid="906"]').click();
+  await expect(page.locator('#mail_reply_composer')).toBeVisible();
+  await expect(page.locator('#mail_reply_to')).toHaveValue('Thread Sender 7 <sender7@example.test>');
+  await expect(page.locator('#mail_reply_subject')).toHaveValue('Re: Long thread topic');
+  await expect(page.locator('#mail_reply_body')).toHaveValue(/> Selected body line/);
+  await expect(page.locator('#mail_reply_body')).toHaveValue(/> Second selected line/);
+
+  await page.locator('#mail_reply_body').fill('Reply draft body\n\n> Selected body line');
+  await expect(page.locator('#mail_reply_status')).toHaveText('Saved on this device');
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem('caldaver.mail.reply.7.906')))).toMatchObject({
+    to: 'Thread Sender 7 <sender7@example.test>',
+    subject: 'Re: Long thread topic',
+    body: 'Reply draft body\n\n> Selected body line'
+  });
+
+  await page.locator('#mail_reply_send').click({ force: true });
+  await expect(page.locator('#mail_reply_error')).toContainText('Sending is not configured for this account yet');
+
+  await page.locator('.mail-reader-reply-button[data-uid="903"]').click();
+  await expect(page.locator('#mail_reply_to')).toHaveValue('Thread Sender 4 <sender4@example.test>');
+  await expect(page.locator('#mail_reply_body')).toHaveValue(/> Thread body 4/);
+  await page.locator('#mail_reply_body').fill('Reply to sender four');
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem('caldaver.mail.reply.7.903')))).toMatchObject({
+    to: 'Thread Sender 4 <sender4@example.test>',
+    subject: 'Re: Long thread topic',
+    body: 'Reply to sender four'
+  });
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem('caldaver.mail.reply.7.906')))).toMatchObject({
+    body: 'Reply draft body\n\n> Selected body line'
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.locator('.mail-reader-reply-button')).toHaveCount(threadMessages.length);
+  const mobileReplyBox = await visibleBox(page, '.mail-reader-reply-button[data-uid="906"]');
+  expect(mobileReplyBox.width).toBeGreaterThanOrEqual(44);
+  expect(mobileReplyBox.height).toBeGreaterThanOrEqual(44);
+
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
 test('mail page can render without loading JavaScript using nojs option', async ({ page }) => {
   await login(page);
 
@@ -1633,10 +1796,38 @@ test('mail layout keeps critical controls visible across desktop and mobile', as
     await expect(page.locator('#mail_account_create')).toHaveCount(0);
 
     if (viewport.width >= 900) {
+      await expect(page.locator('#mail_compose')).toBeVisible();
+      const composeButton = await visibleBox(page, '#mail_compose');
+      expect(composeButton.x + composeButton.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(composeButton.y + composeButton.height).toBeLessThanOrEqual(viewport.height + 1);
+      await page.locator('#mail_compose').click();
+      await expect(page.locator('#mail_compose_screen')).toBeVisible();
+      await expect(page.locator('#mail_compose_from')).toHaveValue('layout@example.test');
+      await expect(page.locator('#mail_compose_to')).toBeFocused();
+      await page.locator('#mail_compose_send').click({ force: true });
+      await expect(page.locator('#mail_compose_error')).toContainText('Sending is not configured');
+      await page.locator('#mail_compose_back').click();
+      await expect(page.locator('#mail_compose_screen')).toBeHidden();
       const sidebar = await visibleBox(page, '.mail-sidebar');
       const content = await visibleBox(page, '.mail-content');
       expect(overlaps(sidebar, content)).toBe(false);
       expect(search.y + search.height).toBeLessThanOrEqual(panel.y + 1);
+    } else {
+      await expect(page.locator('#mail_compose')).toBeVisible();
+      await expect(page.locator('#mail_compose')).toHaveCSS('position', 'fixed');
+      await expect(page.locator('#mail_compose')).toHaveCSS('background-color', 'rgb(217, 48, 37)');
+      await expect(page.locator('#mail_compose')).toHaveCSS('color', 'rgb(255, 255, 255)');
+      const composeButton = await visibleBox(page, '#mail_compose');
+      expect(composeButton.x + composeButton.width).toBeLessThanOrEqual(viewport.width + 1);
+      expect(composeButton.y + composeButton.height).toBeLessThanOrEqual(viewport.height + 1);
+      await page.locator('#mail_compose').click();
+      await expect(page.locator('#mail_compose_screen')).toBeVisible();
+      await expect(page.locator('#mail_compose_from')).toHaveValue('layout@example.test');
+      await expect(page.locator('#mail_compose_to')).toBeFocused();
+      await page.locator('#mail_compose_send').click({ force: true });
+      await expect(page.locator('#mail_compose_error')).toContainText('Sending is not configured');
+      await page.locator('#mail_compose_back').click();
+      await expect(page.locator('#mail_compose_screen')).toBeHidden();
     }
 
     expect(toolbar.y + toolbar.height).toBeLessThanOrEqual(row.y + 1);

@@ -107,6 +107,32 @@ CREATE TABLE IF NOT EXISTS caldaver_local_contacts (
 	ALTER TABLE mail_accounts ALTER COLUMN refresh_interval_seconds TYPE BIGINT;
 	ALTER TABLE mail_message_cache ALTER COLUMN account_id TYPE BIGINT;
 	ALTER TABLE mail_message_cache ALTER COLUMN uid TYPE BIGINT;
+	DO $$
+	DECLARE
+	    legacy_column TEXT;
+	BEGIN
+	    FOREACH legacy_column IN ARRAY ARRAY['from_header', 'subject', 'date_header', 'attachments']
+	    LOOP
+	        IF EXISTS (
+	            SELECT 1 FROM information_schema.columns
+	            WHERE table_name = 'mail_message_cache'
+	              AND column_name = legacy_column
+	        ) THEN
+	            EXECUTE format('ALTER TABLE mail_message_cache ALTER COLUMN %I DROP NOT NULL', legacy_column);
+	        END IF;
+	    END LOOP;
+	END $$;
+
+	DO $$
+	BEGIN
+	    IF NOT EXISTS (
+	        SELECT 1 FROM pg_constraint
+	        WHERE conrelid = 'mail_message_cache'::regclass
+	          AND conname = 'uniq_mail_message_cache_owner_account_uid'
+	    ) THEN
+	        EXECUTE 'ALTER TABLE mail_message_cache ADD CONSTRAINT uniq_mail_message_cache_owner_account_uid UNIQUE (owner, account_id, uid)';
+	    END IF;
+	END $$;
 
 	DO $$
 	BEGIN
@@ -541,7 +567,8 @@ WHERE owner=$1 AND id=$2
             let uid = message.uid as i64;
             let value = serde_json::to_value(message)?;
             tx.execute(
-                "INSERT INTO mail_message_cache (owner, account_id, uid, message) VALUES ($1,$2,$3,$4)",
+                "INSERT INTO mail_message_cache (owner, account_id, uid, message) VALUES ($1,$2,$3,$4)
+                 ON CONFLICT (owner, account_id, uid) DO UPDATE SET message=EXCLUDED.message, updated_at=now()",
                 &[&owner, &account_id, &uid, &value],
             )
             .await?;
