@@ -5,13 +5,13 @@
        <i class="fa fa-bars"></i>
      </summary>
      <nav class="mobile-section-menu-list" aria-label="Application sections">
-       <details class="mobile-calendar-menu">
+       <details class="mobile-calendar-menu" data-calendar-href="{{ app.url_generator.generate('calendar') }}">
          <summary class="{% if active_section|default('calendar') == 'calendar' %}active{% endif %}">
            <i class="fa fa-calendar"></i>
            <span>{% trans %}labels.calendar{% endtrans %}</span>
            <i class="fa fa-caret-right mobile-calendar-menu-caret" aria-hidden="true"></i>
          </summary>
-         <div class="mobile-calendar-menu-calendars" aria-label="{% trans %}labels.calendars{% endtrans %}">
+         <div class="mobile-calendar-menu-calendars" aria-label="{% trans %}labels.calendars{% endtrans %}" data-calendars-url="{{ app.url_generator.generate('calendar') }}calendars">
            <span class="mobile-calendar-menu-empty">Loading calendars...</span>
          </div>
        </details>
@@ -73,3 +73,124 @@
    </ul>
   </div>
 </div>
+<script>
+(function() {
+  function mobileCalendarMenu() {
+    return document.querySelector('.mobile-calendar-menu');
+  }
+
+  function mobileCalendarList() {
+    return document.querySelector('.mobile-calendar-menu-calendars');
+  }
+
+  function setMobileCalendarMenuMessage(message) {
+    var list = mobileCalendarList();
+    if (!list) {
+      return;
+    }
+
+    list.innerHTML = '';
+    var empty = document.createElement('span');
+    empty.className = 'mobile-calendar-menu-empty';
+    empty.textContent = message;
+    list.appendChild(empty);
+  }
+
+  function renderMobileCalendarMenu(calendars) {
+    var list = mobileCalendarList();
+    if (!list) {
+      return;
+    }
+
+    list.innerHTML = '';
+    if (!calendars || calendars.length === 0) {
+      setMobileCalendarMenuMessage('No calendars found');
+      return;
+    }
+
+    calendars.forEach(function(calendar) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mobile-calendar-account';
+      button.dataset.calendarUrl = calendar.calendar || '';
+      button.setAttribute('aria-pressed', 'true');
+
+      var color = document.createElement('span');
+      color.className = 'mobile-calendar-account-color';
+      color.style.backgroundColor = calendar.color || '#3367d6';
+      button.appendChild(color);
+
+      var name = document.createElement('span');
+      name.className = 'mobile-calendar-account-name';
+      name.textContent = calendar.displayname || calendar.calendar || 'Calendar';
+      button.appendChild(name);
+
+      if (calendar.is_shared === true) {
+        var shared = document.createElement('i');
+        shared.className = 'fa fa-share mobile-calendar-account-shared';
+        shared.setAttribute('aria-hidden', 'true');
+        button.appendChild(shared);
+      }
+
+      list.appendChild(button);
+    });
+  }
+
+  function loadMobileCalendarMenu() {
+    var list = mobileCalendarList();
+    if (!list || list.dataset.loaded === 'true' || document.querySelector('#own_calendar_list, #shared_calendar_list')) {
+      return;
+    }
+
+    var calendarsUrl = list.dataset.calendarsUrl;
+    if (!calendarsUrl) {
+      return;
+    }
+
+    list.dataset.loaded = 'true';
+    fetch(calendarsUrl, {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Unable to load calendars');
+        }
+        return response.json();
+      })
+      .then(function(payload) {
+        renderMobileCalendarMenu(payload.data || []);
+      })
+      .catch(function() {
+        list.dataset.loaded = 'false';
+        setMobileCalendarMenuMessage('Unable to load calendars');
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var menu = mobileCalendarMenu();
+    if (!menu) {
+      return;
+    }
+
+    menu.addEventListener('toggle', function() {
+      if (menu.open) {
+        loadMobileCalendarMenu();
+      }
+    });
+
+    var sectionMenu = document.querySelector('.mobile-section-menu');
+    if (sectionMenu) {
+      sectionMenu.addEventListener('click', function(event) {
+        var account = event.target.closest && event.target.closest('.mobile-calendar-account');
+        if (!account || document.querySelector('#own_calendar_list, #shared_calendar_list')) {
+          return;
+        }
+
+        event.preventDefault();
+        window.location.href = menu.dataset.calendarHref || '/';
+      });
+    }
+  });
+})();
+</script>

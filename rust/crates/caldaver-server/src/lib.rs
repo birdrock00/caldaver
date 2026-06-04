@@ -20,9 +20,11 @@ use imap_backend::{
     ImapMailBackend, MailAccount, MailAccountPublic, MailBackend, MailBackendError, MailMessage,
     SealedPassword,
 };
+use base64::Engine;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
@@ -494,7 +496,7 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
         return Html(render_login(&state, Some("Required fields are missing"))).into_response();
     }
     let local_auth_enforced = !state.config.auth_username.is_empty();
-    if local_auth_enforced && (state.config.auth_username != user || state.config.auth_password != password) {
+    if local_auth_enforced && (state.config.auth_username != user || !verify_local_auth_password(&state.config, password)) {
         return Html(render_login(&state, Some("Invalid username or password"))).into_response();
     }
 
@@ -700,6 +702,112 @@ async fn preferences_save(State(state): State<AppState>, headers: HeaderMap, For
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
     Redirect::to("/").into_response()
+}
+
+fn verify_local_auth_password(config: &Config, password: &str) -> bool {
+    if !config.auth_password_hash.trim().is_empty() {
+        return verify_password_hash(&config.auth_password_hash, password);
+    }
+
+    constant_time_eq(config.auth_password.as_bytes(), password.as_bytes())
+}
+
+fn verify_password_hash(encoded: &str, password: &str) -> bool {
+    let parts = encoded.split('$').collect::<Vec<_>>();
+
+    if parts.len() != 4 || parts[0] != "pbkdf2-sha256" {
+        return false;
+    }
+
+    let Ok(iterations) = parts[1].parse::<u32>() else {
+        return false;
+    };
+
+    if iterations == 0 || iterations > 2_000_000 {
+        return false;
+    }
+
+    let Ok(salt) = base64::engine::general_purpose::STANDARD.decode(parts[2]) else {
+        return false;
+    };
+    let Ok(expected) = base64::engine::general_purpose::STANDARD.decode(parts[3]) else {
+        return false;
+    };
+
+    if salt.len() < 16 || expected.len() < 32 {
+        return false;
+    }
+
+    let actual = pbkdf2_sha256(password.as_bytes(), &salt, iterations, expected.len());
+    constant_time_eq(&actual, &expected)
+}
+
+fn pbkdf2_sha256(password: &[u8], salt: &[u8], iterations: u32, output_len: usize) -> Vec<u8> {
+    let mut output = Vec::with_capacity(output_len);
+    let mut block_index = 1u32;
+
+    while output.len() < output_len {
+        let mut block_input = Vec::with_capacity(salt.len() + 4);
+        block_input.extend_from_slice(salt);
+        block_input.extend_from_slice(&block_index.to_be_bytes());
+
+        let mut u = hmac_sha256(password, &block_input);
+        let mut block = u;
+
+        for _ in 1..iterations {
+            u = hmac_sha256(password, &u);
+            for (left, right) in block.iter_mut().zip(u.iter()) {
+                *left ^= *right;
+            }
+        }
+
+        output.extend_from_slice(&block);
+        block_index = block_index.saturating_add(1);
+    }
+
+    output.truncate(output_len);
+    output
+}
+
+fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
+    let mut normalized_key = [0u8; 64];
+
+    if key.len() > normalized_key.len() {
+        let digest = Sha256::digest(key);
+        normalized_key[..digest.len()].copy_from_slice(&digest);
+    } else {
+        normalized_key[..key.len()].copy_from_slice(key);
+    }
+
+    let mut inner_pad = [0x36u8; 64];
+    let mut outer_pad = [0x5cu8; 64];
+    for index in 0..normalized_key.len() {
+        inner_pad[index] ^= normalized_key[index];
+        outer_pad[index] ^= normalized_key[index];
+    }
+
+    let mut inner = Sha256::new();
+    inner.update(inner_pad);
+    inner.update(data);
+    let inner_digest = inner.finalize();
+
+    let mut outer = Sha256::new();
+    outer.update(outer_pad);
+    outer.update(inner_digest);
+    outer.finalize().into()
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    let mut diff = left.len() ^ right.len();
+    let max_len = left.len().max(right.len());
+
+    for index in 0..max_len {
+        let left_byte = left.get(index).copied().unwrap_or(0);
+        let right_byte = right.get(index).copied().unwrap_or(0);
+        diff |= usize::from(left_byte ^ right_byte);
+    }
+
+    diff == 0
 }
 
 async fn calendars_list(State(state): State<AppState>, headers: HeaderMap) -> Response {
@@ -2678,16 +2786,17 @@ fn layout(state: &AppState, body_class: &str, content: &str, bottom: &str) -> St
 
 fn navbar(state: &AppState, session: &Session, active: &str) -> String {
     format!(
-        r#"<div class="navbar navbar-default caldaver-topbar" role="navigation"><div class="container-fluid"><details class="mobile-section-menu"><summary aria-label="Sections"><i class="fa fa-bars"></i></summary><nav class="mobile-section-menu-list" aria-label="Application sections">{mobile_links}</nav></details><div class="navbar-header"><button class="topbar-menu" type="button" aria-label="Menu"><i class="fa fa-bars"></i></button><span class="navbar-brand"><span class="caldaver-brand-title">{title}</span><span class="mobile-calendar-toolbar-title" aria-hidden="true"><span id="mobile_calendar_toolbar_date"></span><span id="mobile_calendar_toolbar_day"></span></span></span></div><p class="navbar-text navbar-right" id="loading"><img src="/img/loading.gif" alt=""></p><ul class="nav navbar-nav navbar-right topbar-actions" id="usermenu"><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_date_action" title="Choose date" aria-label="Choose date"><i class="fa fa-calendar"></i></button></li><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_more_action" title="More" aria-label="More"><i class="fa fa-ellipsis-v"></i></button></li><li><a class="prefs" href="/preferences"><i title="Preferences" class="fa fa-lg fa-wrench"></i></a></li><li class="user-menu"><details class="user-menu-dropdown"><summary class="user-pill" aria-label="User menu"><span class="user-pill-label">{displayname}</span><i class="fa fa-caret-down" aria-hidden="true"></i></summary><nav class="user-menu-list" aria-label="User menu"><a class="user-menu-item user-menu-logout" href="/logout"><i class="fa fa-power-off" aria-hidden="true"></i><span>Log out</span></a></nav></details></li></ul></div></div>"#,
+        r#"<div class="navbar navbar-default caldaver-topbar" role="navigation"><div class="container-fluid"><details class="mobile-section-menu"><summary aria-label="Sections"><i class="fa fa-bars"></i></summary><nav class="mobile-section-menu-list" aria-label="Application sections">{mobile_links}</nav></details><div class="navbar-header"><button class="topbar-menu" type="button" aria-label="Menu"><i class="fa fa-bars"></i></button><span class="navbar-brand"><span class="caldaver-brand-title">{title}</span><span class="mobile-calendar-toolbar-title" aria-hidden="true"><span id="mobile_calendar_toolbar_date"></span><span id="mobile_calendar_toolbar_day"></span></span></span></div><p class="navbar-text navbar-right" id="loading"><img src="/img/loading.gif" alt=""></p><ul class="nav navbar-nav navbar-right topbar-actions" id="usermenu"><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_date_action" title="Choose date" aria-label="Choose date"><i class="fa fa-calendar"></i></button></li><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_more_action" title="More" aria-label="More"><i class="fa fa-ellipsis-v"></i></button></li><li><a class="prefs" href="/preferences"><i title="Preferences" class="fa fa-lg fa-wrench"></i></a></li><li class="user-menu"><details class="user-menu-dropdown"><summary class="user-pill" aria-label="User menu"><span class="user-pill-label">{displayname}</span><i class="fa fa-caret-down" aria-hidden="true"></i></summary><nav class="user-menu-list" aria-label="User menu"><a class="user-menu-item user-menu-logout" href="/logout"><i class="fa fa-power-off" aria-hidden="true"></i><span>Log out</span></a></nav></details></li></ul></div></div>{mobile_calendar_script}"#,
         title = escape(&state.config.title),
         displayname = escape(&session.displayname),
-        mobile_links = mobile_links(active)
+        mobile_links = mobile_links(active),
+        mobile_calendar_script = mobile_calendar_menu_script()
     )
 }
 
 fn mobile_links(active: &str) -> String {
     let calendar = format!(
-        r#"<details class="mobile-calendar-menu"><summary class="{active}"><i class="fa fa-calendar"></i><span>Calendar</span><i class="fa fa-caret-right mobile-calendar-menu-caret" aria-hidden="true"></i></summary><div class="mobile-calendar-menu-calendars" aria-label="Calendars"><span class="mobile-calendar-menu-empty">Loading calendars...</span></div></details>"#,
+        r#"<details class="mobile-calendar-menu" data-calendar-href="/"><summary class="{active}"><i class="fa fa-calendar"></i><span>Calendar</span><i class="fa fa-caret-right mobile-calendar-menu-caret" aria-hidden="true"></i></summary><div class="mobile-calendar-menu-calendars" aria-label="Calendars" data-calendars-url="/calendars"><span class="mobile-calendar-menu-empty">Loading calendars...</span></div></details>"#,
         active = if active == "calendar" { "active" } else { "" }
     );
     let section_links = [
@@ -2703,6 +2812,130 @@ fn mobile_links(active: &str) -> String {
     })
     .collect::<String>();
     format!("{calendar}{section_links}")
+}
+
+fn mobile_calendar_menu_script() -> &'static str {
+    r#"<script>
+(function() {
+  function mobileCalendarMenu() {
+    return document.querySelector('.mobile-calendar-menu');
+  }
+
+  function mobileCalendarList() {
+    return document.querySelector('.mobile-calendar-menu-calendars');
+  }
+
+  function setMobileCalendarMenuMessage(message) {
+    var list = mobileCalendarList();
+    if (!list) {
+      return;
+    }
+
+    list.innerHTML = '';
+    var empty = document.createElement('span');
+    empty.className = 'mobile-calendar-menu-empty';
+    empty.textContent = message;
+    list.appendChild(empty);
+  }
+
+  function renderMobileCalendarMenu(calendars) {
+    var list = mobileCalendarList();
+    if (!list) {
+      return;
+    }
+
+    list.innerHTML = '';
+    if (!calendars || calendars.length === 0) {
+      setMobileCalendarMenuMessage('No calendars found');
+      return;
+    }
+
+    calendars.forEach(function(calendar) {
+      var button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mobile-calendar-account';
+      button.dataset.calendarUrl = calendar.calendar || '';
+      button.setAttribute('aria-pressed', 'true');
+
+      var color = document.createElement('span');
+      color.className = 'mobile-calendar-account-color';
+      color.style.backgroundColor = calendar.color || '#3367d6';
+      button.appendChild(color);
+
+      var name = document.createElement('span');
+      name.className = 'mobile-calendar-account-name';
+      name.textContent = calendar.displayname || calendar.calendar || 'Calendar';
+      button.appendChild(name);
+
+      if (calendar.is_shared === true) {
+        var shared = document.createElement('i');
+        shared.className = 'fa fa-share mobile-calendar-account-shared';
+        shared.setAttribute('aria-hidden', 'true');
+        button.appendChild(shared);
+      }
+
+      list.appendChild(button);
+    });
+  }
+
+  function loadMobileCalendarMenu() {
+    var list = mobileCalendarList();
+    if (!list || list.dataset.loaded === 'true' || document.querySelector('#own_calendar_list, #shared_calendar_list')) {
+      return;
+    }
+
+    var calendarsUrl = list.dataset.calendarsUrl;
+    if (!calendarsUrl) {
+      return;
+    }
+
+    list.dataset.loaded = 'true';
+    fetch(calendarsUrl, {
+      credentials: 'same-origin',
+      headers: { 'Accept': 'application/json' }
+    })
+      .then(function(response) {
+        if (!response.ok) {
+          throw new Error('Unable to load calendars');
+        }
+        return response.json();
+      })
+      .then(function(payload) {
+        renderMobileCalendarMenu(payload.data || []);
+      })
+      .catch(function() {
+        list.dataset.loaded = 'false';
+        setMobileCalendarMenuMessage('Unable to load calendars');
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var menu = mobileCalendarMenu();
+    if (!menu) {
+      return;
+    }
+
+    menu.addEventListener('toggle', function() {
+      if (menu.open) {
+        loadMobileCalendarMenu();
+      }
+    });
+
+    var sectionMenu = document.querySelector('.mobile-section-menu');
+    if (sectionMenu) {
+      sectionMenu.addEventListener('click', function(event) {
+        var account = event.target.closest && event.target.closest('.mobile-calendar-account');
+        if (!account || document.querySelector('#own_calendar_list, #shared_calendar_list')) {
+          return;
+        }
+
+        event.preventDefault();
+        window.location.href = menu.dataset.calendarHref || '/';
+      });
+    }
+  });
+})();
+</script>"#
 }
 
 fn appnav(active: &str) -> String {
@@ -2849,6 +3082,7 @@ mod tests {
     use axum::body::Body;
     use axum::http::Request;
     use axum::http::Method;
+    use base64::Engine;
     use std::sync::Mutex;
     use tower::ServiceExt;
 
@@ -2906,6 +3140,63 @@ mod tests {
         fn mark_seen(&self, _account: &MailAccount, uid: u64, seen: bool) -> Result<(), MailBackendError> {
             self.seen_updates.lock().unwrap().push((uid, seen));
             Ok(())
+        }
+    }
+
+    fn test_auth_config(password: &str, password_hash: &str) -> Config {
+        let mut config = Config::for_tests("postgres://localhost/caldaver_test".to_string());
+        config.auth_username = "local-user".to_string();
+        config.auth_password = password.to_string();
+        config.auth_password_hash = password_hash.to_string();
+        config
+    }
+
+    fn encoded_test_hash(password: &str) -> String {
+        let salt = b"0123456789abcdef";
+        let iterations = 2;
+        let digest = pbkdf2_sha256(password.as_bytes(), salt, iterations, 32);
+        format!(
+            "pbkdf2-sha256${iterations}${}${}",
+            base64::engine::general_purpose::STANDARD.encode(salt),
+            base64::engine::general_purpose::STANDARD.encode(digest)
+        )
+    }
+
+    #[test]
+    fn local_auth_accepts_pbkdf2_sha256_password_hash() {
+        let config = test_auth_config("", &encoded_test_hash("correct horse battery staple"));
+
+        assert!(verify_local_auth_password(&config, "correct horse battery staple"));
+        assert!(!verify_local_auth_password(&config, "wrong password"));
+    }
+
+    #[test]
+    fn local_auth_hash_takes_precedence_over_legacy_plaintext_password() {
+        let config = test_auth_config("legacy-plaintext", &encoded_test_hash("hash-password"));
+
+        assert!(verify_local_auth_password(&config, "hash-password"));
+        assert!(!verify_local_auth_password(&config, "legacy-plaintext"));
+    }
+
+    #[test]
+    fn local_auth_plaintext_password_still_works_without_hash() {
+        let config = test_auth_config("legacy-plaintext", "");
+
+        assert!(verify_local_auth_password(&config, "legacy-plaintext"));
+        assert!(!verify_local_auth_password(&config, "wrong-password"));
+    }
+
+    #[test]
+    fn local_auth_rejects_malformed_password_hashes() {
+        for encoded in [
+            "",
+            "sha256$2$MDEyMzQ1Njc4OWFiY2RlZg==$bad",
+            "pbkdf2-sha256$0$MDEyMzQ1Njc4OWFiY2RlZg==$bad",
+            "pbkdf2-sha256$2000001$MDEyMzQ1Njc4OWFiY2RlZg==$bad",
+            "pbkdf2-sha256$2$short$bad",
+        ] {
+            let config = test_auth_config("", encoded);
+            assert!(!verify_local_auth_password(&config, "anything"));
         }
     }
 
