@@ -327,6 +327,59 @@ async function mockCardsApi(page, count = 36) {
   });
 }
 
+async function mockCalendarsApi(page, options = {}) {
+  const calendars = options.calendars === undefined ? [
+    {
+      displayname: 'Work Calendar',
+      calendar: '/calendars/example/work/',
+      color: '#2f80ed',
+      is_shared: false,
+      calendar_timezone: 'America/Los_Angeles'
+    },
+    {
+      displayname: 'Shared Calendar',
+      calendar: '/calendars/example/shared/',
+      color: '#27ae60',
+      is_shared: true,
+      calendar_timezone: 'America/Los_Angeles'
+    }
+  ] : options.calendars;
+  const status = options.status || 200;
+  const calendarRequests = options.calendarRequests || [];
+
+  await page.route('**/calendars', async route => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== '/calendars' || route.request().method() !== 'GET') {
+      return route.fallback();
+    }
+    calendarRequests.push(url.pathname);
+
+    if (status >= 400) {
+      return route.fulfill({
+        status,
+        contentType: 'application/json',
+        body: JSON.stringify({ result: 'ERROR', message: 'Mock calendar load failed' })
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: calendars })
+    });
+  });
+
+  await page.route('**/events?**', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
+  return { calendarRequests };
+}
+
 function captureConsoleErrors(page) {
   const consoleErrors = [];
   page.on('console', message => {
@@ -345,6 +398,30 @@ async function visibleBox(page, selector) {
   const box = await page.locator(selector).first().boundingBox();
   expect(box, `${selector} should have a visible bounding box`).toBeTruthy();
   return box;
+}
+
+async function mobileCalendarMenuSnapshot(page) {
+  return page.evaluate(() => {
+    const menu = document.querySelector('.mobile-calendar-menu-calendars');
+    const rows = [...document.querySelectorAll('.mobile-calendar-menu-calendars .mobile-calendar-account')]
+      .map(row => row.textContent.trim().replace(/\s+/g, ' '));
+    const empty = document.querySelector('.mobile-calendar-menu-calendars .mobile-calendar-menu-empty');
+    return {
+      text: menu ? menu.textContent.trim().replace(/\s+/g, ' ') : '',
+      rows,
+      emptyText: empty ? empty.textContent.trim().replace(/\s+/g, ' ') : '',
+      hasMenu: !!menu
+    };
+  });
+}
+
+async function expectMobileCalendarMenuSettled(page) {
+  await expect.poll(() => mobileCalendarMenuSnapshot(page), {
+    message: 'mobile calendar account menu should not remain stuck at Loading calendars...'
+  }).toEqual(expect.objectContaining({
+    hasMenu: true,
+    text: expect.not.stringMatching(/Loading calendars/i)
+  }));
 }
 
 function overlaps(a, b) {
@@ -781,11 +858,78 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
   await expect(page.locator('.contacts-nav-item.active')).toBeVisible();
   await expect(page.locator('#contacts_rows .contact-row')).toHaveCount(42);
 
+  const contactsMenu = page.locator('.mobile-section-menu');
+  await contactsMenu.locator('> summary').click();
+  await contactsMenu.locator('.mobile-calendar-menu > summary').click();
+  await expect(contactsMenu.locator('.mobile-calendar-menu-empty')).toHaveCount(0);
+  await expect(contactsMenu.locator('.mobile-calendar-open')).toHaveCount(0);
+  await expect(contactsMenu.locator('.mobile-calendar-account')).toHaveCount(2);
+  await expect(contactsMenu.locator('.mobile-calendar-account', { hasText: 'Work Calendar' })).toBeVisible();
+
   const contactsScroll = await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight);
   expect(contactsScroll).toBeGreaterThan(120);
   await page.mouse.wheel(0, 640);
   await page.waitForTimeout(150);
   expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(80);
+});
+
+test('mobile calendar account menu renders account rows on calendar page', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCalendarsApi(page);
+
+  await login(page);
+  await page.goto(`${baseURL}/`);
+  await expectMobileCalendarMenuSettled(page);
+
+  const menu = page.locator('.mobile-section-menu');
+  await menu.locator('> summary').click();
+  await menu.locator('.mobile-calendar-menu > summary').click();
+
+  await expect(menu.locator('.mobile-calendar-account')).toHaveCount(2);
+  await expect(menu.locator('.mobile-calendar-account', { hasText: 'Work Calendar' })).toBeVisible();
+  await expect(menu.locator('.mobile-calendar-account', { hasText: 'Shared Calendar' })).toBeVisible();
+});
+
+test('mobile calendar account menu is not left loading on contacts page', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCalendarsApi(page);
+  await mockCardsApi(page, 3);
+
+  await login(page);
+  await page.goto(`${baseURL}/cards`);
+  await expect(page.locator('.mobile-section-menu')).toBeVisible();
+
+  const menu = page.locator('.mobile-section-menu');
+  await menu.locator('> summary').click();
+  await menu.locator('.mobile-calendar-menu > summary').click();
+  await expectMobileCalendarMenuSettled(page);
+
+  const snapshot = await mobileCalendarMenuSnapshot(page);
+  expect(snapshot.rows).toEqual(['Work Calendar', 'Shared Calendar']);
+});
+
+test('mobile calendar account menu shows meaningful empty and error states', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCalendarsApi(page, { calendars: [] });
+
+  await login(page);
+  await page.goto(`${baseURL}/`);
+  await expectMobileCalendarMenuSettled(page);
+  await expect.poll(() => mobileCalendarMenuSnapshot(page)).toEqual(expect.objectContaining({
+    emptyText: expect.stringMatching(/No calendars/i)
+  }));
+});
+
+test('mobile calendar account menu shows meaningful load failure state', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockCalendarsApi(page, { status: 500 });
+
+  await login(page);
+  await page.goto(`${baseURL}/`);
+  await expectMobileCalendarMenuSettled(page);
+  await expect.poll(() => mobileCalendarMenuSnapshot(page)).toEqual(expect.objectContaining({
+    emptyText: expect.stringMatching(/Unable to load calendars/i)
+  }));
 });
 
 test('desktop layout keeps side navigation after mobile changes', async ({ page }) => {

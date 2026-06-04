@@ -252,16 +252,12 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view latest >/dev/null 2>&1; then
-            gh release edit latest \
-              --title "CalDaver latest" \
-              --notes-file "${{ steps.notes.outputs.notes_file }}" \
-              --latest
-          else
-            gh release create latest \
-              --title "CalDaver latest" \
-              --notes-file "${{ steps.notes.outputs.notes_file }}" \
-              --latest
+            gh release delete latest --yes
           fi
+          gh release create latest \
+            --title "CalDaver latest" \
+            --notes-file "${{ steps.notes.outputs.notes_file }}" \
+            --latest
           assets="$(gh release view latest --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$' || true)"
           while IFS= read -r asset; do
             [ -n "$asset" ] || continue
