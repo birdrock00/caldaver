@@ -32,7 +32,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Self, ConfigError> {
-        let caldav_server = required_env("CALDAVER_CALDAV_SERVER")?;
+        let caldav_server = env::var("CALDAVER_CALDAV_SERVER").unwrap_or_default();
         let database_url = database_url()?;
         let csrf_secret = required_env("CALDAVER_CSRF_SECRET")?;
         Ok(Self {

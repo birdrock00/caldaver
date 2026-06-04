@@ -78,6 +78,30 @@
     return checked ? checked.value : 'calendar';
   }
 
+  function accountStoredId(account) {
+    return account && account.source !== 'session' ? String(account.id || '') : '';
+  }
+
+  function setAccountType(type) {
+    var input = $('#mail_account_form input[name="account_type"][value="' + type + '"]');
+    if (input) {
+      input.checked = true;
+    }
+  }
+
+  function setInputValue(name, value) {
+    var input = $('#mail_account_form [name="' + name + '"]');
+    if (input) {
+      input.value = value == null ? '' : String(value);
+    }
+  }
+
+  function setEditTypeLock(locked) {
+    $all('#mail_account_form input[name="account_type"]').forEach(function(input) {
+      input.disabled = !!locked && !input.checked;
+    });
+  }
+
   function setRequired(input, required) {
     if (!input) {
       return;
@@ -111,7 +135,9 @@
     var authMethod = $('#mail_account_form select[name="auth_method"]');
     var password = $('#mail_account_form input[name="password"]');
     if (password) {
-      password.required = type === 'email' || !authMethod || authMethod.value !== 'none';
+      var id = $('#mail_account_form input[name="id"]');
+      var editingStoredAccount = !!(id && id.value);
+      password.required = !editingStoredAccount && (type === 'email' || !authMethod || authMethod.value !== 'none');
     }
   }
 
@@ -124,13 +150,34 @@
     error.textContent = '';
   }
 
-  function openDialog(event) {
+  function openDialog(event, account) {
     if (event) {
       event.preventDefault();
     }
     lastFocused = document.activeElement;
     $('#mail_account_form').reset();
-    $('#mail_account_form input[name="id"]').value = '';
+    $('#mail_account_dialog_title').textContent = account ? 'Edit account' : 'Add account';
+    setEditTypeLock(false);
+    $('#mail_account_form input[name="id"]').value = accountStoredId(account);
+    if (account) {
+      var type = accountTypeValue(account);
+      setAccountType(type);
+      setInputValue('label', account.label || typeLabel(type));
+      setInputValue('username', account.username || account.identifier || '');
+      setInputValue('password', '');
+      if (type === 'email') {
+        setInputValue('email_address', account.email_address || account.identifier || '');
+        setInputValue('imap_host', account.imap_host || '');
+        setInputValue('imap_port', account.imap_port || '993');
+        setInputValue('encryption', account.encryption || 'ssl');
+        setInputValue('refresh_interval_minutes', Math.max(1, Math.round(Number(account.refresh_interval_seconds || 60) / 60)));
+      } else {
+        setInputValue('server_url', account.server || '');
+        setInputValue('auth_method', account.auth_method || 'basic');
+        setInputValue('home_set', account.home_set || '');
+      }
+      setEditTypeLock(true);
+    }
     clearError();
     updateFields();
     $('#mail_account_dialog').hidden = false;
@@ -217,7 +264,7 @@
       '<span class="prefs-account-warning" hidden>Password needs reset</span>' +
       '<span class="prefs-account-warning prefs-account-last-error" hidden></span>' +
       '</div>' +
-      '<div class="prefs-account-source"></div>';
+      '<div class="prefs-account-actions"><span class="prefs-account-source"></span><button type="button" class="prefs-account-edit btn btn-default" aria-label="Edit account"><i class="fa fa-pencil" aria-hidden="true"></i><span>Edit</span></button></div>';
     row.querySelector('strong').textContent = account.label || typeLabel(type);
     row.querySelector('.prefs-account-title span').textContent = typeLabel(type);
     row.querySelector('.prefs-account-identifier').textContent = account.identifier || '';
@@ -230,6 +277,9 @@
       lastError.textContent = account.last_error;
       lastError.hidden = false;
     }
+    row.querySelector('.prefs-account-edit').addEventListener('click', function(event) {
+      openDialog(event, account);
+    });
     return row;
   }
 

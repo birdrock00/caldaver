@@ -1456,7 +1456,36 @@ test('preferences add-account dialog posts expected email fields through unified
     });
   });
   await page.route('**/accounts/save', async route => {
-    postedForms.push(parsePostedForm(route.request()));
+    const form = parsePostedForm(route.request());
+    postedForms.push(form);
+    if (form.id) {
+      const account = savedAccounts.find(candidate => String(candidate.id) === String(form.id));
+      if (!account) {
+        return route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ message: 'Account not found' })
+        });
+      }
+      account.label = form.label;
+      account.identifier = form.email_address;
+      account.email_address = form.email_address;
+      account.imap_host = form.imap_host;
+      account.imap_port = Number(form.imap_port);
+      account.server = `${form.imap_host}:${form.imap_port}`;
+      account.encryption = form.encryption;
+      account.username = form.username;
+      account.refresh_interval_seconds = Number(form.refresh_interval_minutes) * 60;
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          result: 'SUCCESS',
+          data: account
+        })
+      });
+    }
     const fixtures = [
       {
         label: 'Test Inbox',
@@ -1478,6 +1507,12 @@ test('preferences add-account dialog posts expected email fields through unified
       label: fixture.label,
       identifier: fixture.email_address,
       server: `${fixture.imap_host}:993`,
+      email_address: fixture.email_address,
+      imap_host: fixture.imap_host,
+      imap_port: 993,
+      encryption: 'ssl',
+      username: fixture.username,
+      refresh_interval_seconds: 60,
       home_set: 'IMAP',
       enabled: true,
       source: 'postgres',
@@ -1551,6 +1586,232 @@ test('preferences add-account dialog posts expected email fields through unified
   });
   expect(savedAccounts.map(account => account.label)).toEqual(['Test Inbox', 'Second Inbox']);
   await expect(page.locator('#connected_accounts .prefs-account-row')).toHaveCount(2);
+  await page.locator('#connected_accounts .prefs-account-row').filter({ hasText: 'Test Inbox' }).locator('.prefs-account-edit').click();
+  await expect(page.locator('#mail_account_dialog_title')).toHaveText('Edit account');
+  await expect(page.locator('#mail_account_form input[name="account_type"][value="email"]')).toBeChecked();
+  await expect(page.locator('#mail_account_form input[name="id"]')).toHaveValue('99');
+  await expect(page.locator('#mail_account_form input[name="label"]')).toHaveValue('Test Inbox');
+  await expect(page.locator('#mail_account_form input[name="email_address"]')).toHaveValue('test@example.com');
+  await expect(page.locator('#mail_account_form input[name="imap_host"]')).toHaveValue('imap.example.test');
+  await expect(page.locator('#mail_account_form input[name="username"]')).toHaveValue('test@example.com');
+  await expect(page.locator('#mail_account_form input[name="password"]')).toHaveValue('');
+  await expect(page.locator('#mail_account_form input[name="password"]')).not.toHaveAttribute('required', '');
+  await page.locator('#mail_account_form input[name="label"]').fill('Edited Inbox');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+
+  await expect(page.locator('#mail_account_dialog')).toBeHidden();
+  expect(postedForms).toHaveLength(3);
+  expect(postedForms[2]).toMatchObject({
+    id: '99',
+    account_type: 'email',
+    label: 'Edited Inbox',
+    email_address: 'test@example.com',
+    imap_host: 'imap.example.test',
+    imap_port: '993',
+    encryption: 'ssl',
+    username: 'test@example.com',
+    password: '',
+    refresh_interval_minutes: '1'
+  });
+  expect(savedAccounts.map(account => account.label)).toEqual(['Edited Inbox', 'Second Inbox']);
+  await expect(page.locator('#connected_accounts .prefs-account-row').filter({ hasText: 'Edited Inbox' })).toHaveCount(1);
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('preferences edit-account buttons populate public values and keep credentials blank', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  const savedForms = [];
+  const connectedAccounts = [
+    {
+      type: 'calendar',
+      id: 'cal-1',
+      label: 'Primary Calendar',
+      identifier: 'cal-user@example.test',
+      server: 'https://dav.example.test/caldav/',
+      auth_method: 'basic',
+      home_set: '/calendars/cal-user/',
+      enabled: true,
+      source: 'postgres',
+      password_needs_reset: false,
+      last_error: ''
+    },
+    {
+      type: 'carddav',
+      id: 'card-1',
+      label: 'Team Contacts',
+      identifier: 'cards@example.test',
+      server: 'https://dav.example.test/carddav/',
+      auth_method: 'bearer',
+      home_set: '/addressbooks/cards/',
+      enabled: true,
+      source: 'postgres',
+      password_needs_reset: false,
+      last_error: ''
+    },
+    {
+      type: 'email',
+      id: 'mail-1',
+      label: 'Ops Inbox',
+      identifier: 'ops@example.test',
+      email_address: 'ops@example.test',
+      server: 'imap.example.test:993',
+      imap_host: 'imap.example.test',
+      imap_port: 993,
+      encryption: 'ssl',
+      username: 'ops@example.test',
+      refresh_interval_minutes: 5,
+      home_set: 'IMAP',
+      enabled: true,
+      source: 'postgres',
+      password_needs_reset: false,
+      last_error: ''
+    }
+  ];
+
+  await mockMailApi(page, { accounts: [], skipAccountSaveRoute: true });
+  await page.route('**/accounts', async route => {
+    if (new URL(route.request().url()).pathname !== '/accounts') {
+      return route.fallback();
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: connectedAccounts })
+    });
+  });
+  await page.route('**/accounts/save', async route => {
+    const form = parsePostedForm(route.request());
+    savedForms.push(form);
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ result: 'SUCCESS', data: connectedAccounts.find(account => String(account.id) === String(form.id)) || connectedAccounts[0] })
+    });
+  });
+
+  await page.goto(`${baseURL}/preferences`);
+  await expect(page.locator('#connected_accounts .prefs-account-row')).toHaveCount(3);
+  await expect(page.locator('.prefs-account-edit')).toHaveCount(3);
+
+  await page.locator('.prefs-account-row', { hasText: 'Primary Calendar' }).locator('.prefs-account-edit').click();
+  await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await expect(page.locator('#mail_account_dialog_title')).toHaveText(/Edit account/);
+  await expect(page.locator('#mail_account_form input[name="id"]')).toHaveValue('cal-1');
+  await expect(page.locator('#mail_account_form input[name="account_type"][value="calendar"]')).toBeChecked();
+  await expect(page.locator('#mail_account_form input[name="label"]')).toHaveValue('Primary Calendar');
+  await expect(page.locator('#mail_account_form input[name="server_url"]')).toHaveValue('https://dav.example.test/caldav/');
+  await expect(page.locator('#mail_account_form select[name="auth_method"]')).toHaveValue('basic');
+  await expect(page.locator('#mail_account_form input[name="username"]')).toHaveValue('cal-user@example.test');
+  await expect(page.locator('#mail_account_form input[name="home_set"]')).toHaveValue('/calendars/cal-user/');
+  await expect(page.locator('#mail_account_form input[name="password"]')).toHaveValue('');
+  await expect(page.locator('#mail_account_form input[name="password"]')).not.toHaveAttribute('required', '');
+  await page.locator('#mail_account_form input[name="label"]').fill('Primary Calendar Updated');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+  await expect(page.locator('#mail_account_dialog')).toBeHidden();
+
+  await page.locator('.prefs-account-row', { hasText: 'Ops Inbox' }).locator('.prefs-account-edit').click();
+  await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await expect(page.locator('#mail_account_form input[name="account_type"][value="email"]')).toBeChecked();
+  await expect(page.locator('#mail_account_form input[name="label"]')).toHaveValue('Ops Inbox');
+  await expect(page.locator('#mail_account_form input[name="email_address"]')).toHaveValue('ops@example.test');
+  await expect(page.locator('#mail_account_form input[name="imap_host"]')).toHaveValue('imap.example.test');
+  await expect(page.locator('#mail_account_form input[name="imap_port"]')).toHaveValue('993');
+  await expect(page.locator('#mail_account_form select[name="encryption"]')).toHaveValue('ssl');
+  await expect(page.locator('#mail_account_form input[name="username"]')).toHaveValue('ops@example.test');
+  await expect(page.locator('#mail_account_form input[name="refresh_interval_minutes"]')).toHaveValue('5');
+  await expect(page.locator('#mail_account_form input[name="password"]')).toHaveValue('');
+  await expect(page.locator('#mail_account_form input[name="password"]')).not.toHaveAttribute('required', '');
+  await page.locator('#mail_account_form button[type="submit"]').click();
+
+  expect(savedForms).toHaveLength(2);
+  expect(savedForms[0]).toMatchObject({
+    id: 'cal-1',
+    account_type: 'calendar',
+    label: 'Primary Calendar Updated',
+    password: ''
+  });
+  expect(savedForms[1]).toMatchObject({
+    id: 'mail-1',
+    account_type: 'email',
+    label: 'Ops Inbox',
+    password: ''
+  });
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('preferences edit-account remains usable with long values on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 780 });
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+  const longLabel = 'Calendar account with a very long production operations label that should wrap cleanly';
+  const longServer = 'https://dav.example.test/very/long/path/for/a/calendar/server/that/should/not/break/mobile/preferences/';
+
+  await mockMailApi(page, { accounts: [], skipAccountSaveRoute: true });
+  await page.route('**/accounts', async route => {
+    if (new URL(route.request().url()).pathname !== '/accounts') {
+      return route.fallback();
+    }
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: [{
+          type: 'calendar',
+          id: 'long-cal',
+          label: longLabel,
+          identifier: 'long-calendar-user@example.test',
+          server: longServer,
+          auth_method: 'basic',
+          home_set: '/calendars/long-calendar-user/',
+          enabled: true,
+          source: 'postgres',
+          password_needs_reset: false,
+          last_error: ''
+        }]
+      })
+    });
+  });
+
+  await page.goto(`${baseURL}/preferences`);
+  const row = page.locator('.prefs-account-row', { hasText: longLabel });
+  await expect(row).toBeVisible();
+  await expect(row.locator('.prefs-account-edit')).toBeVisible();
+  await expect(row).toContainText(longServer);
+  await expect(row).toHaveJSProperty('scrollLeft', 0);
+  const rowFitsViewport = await row.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return rect.left >= 0 && rect.right <= window.innerWidth;
+  });
+  expect(rowFitsViewport).toBe(true);
+
+  await row.locator('.prefs-account-edit').click();
+  await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await expect(page.locator('#mail_account_form input[name="server_url"]')).toHaveValue(longServer);
+  const dialogPanelIsUsable = await page.locator('#mail_account_dialog .contact-dialog-panel').evaluate(element => {
+    const style = window.getComputedStyle(element);
+    return element.getBoundingClientRect().height <= window.innerHeight && ['auto', 'scroll'].includes(style.overflowY);
+  });
+  expect(dialogPanelIsUsable).toBe(true);
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('mail inbox never exposes preferences account edit controls', async ({ page }) => {
+  const pageErrors = await login(page);
+  const consoleErrors = captureConsoleErrors(page);
+
+  await mockMailApi(page, {
+    accounts: [{ id: 12, label: 'Inbox Only', email_address: 'inbox@example.test', imap_host: 'imap.example.test' }],
+    messagesByAccount: { 12: [] }
+  });
+
+  await page.goto(`${baseURL}/mail`);
+  await expect(page.locator('#mail_accounts')).toBeVisible();
+  await expect(page.locator('#mail_account_create')).toHaveCount(0);
+  await expect(page.locator('.prefs-account-edit')).toHaveCount(0);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });

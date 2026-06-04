@@ -28,6 +28,16 @@ pub(crate) struct DavAccount {
     pub last_error: String,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct SessionDavCredentials {
+    pub owner: String,
+    pub dav_username: String,
+    pub dav_password: String,
+    pub principal_url: String,
+    pub calendar_home_set: String,
+    pub addressbook_home_set: String,
+}
+
 impl Storage {
     pub async fn connect(database_url: &str, secret: impl Into<String>) -> Result<Self, StorageError> {
         if !database_url.starts_with("postgres://") && !database_url.starts_with("postgresql://") {
@@ -215,7 +225,7 @@ ON dav_accounts (owner, account_type, lower(server_url), lower(username));
         let client = self.pool.get().await?;
         let expires_at = now_secs() + lifetime.as_secs() as i64;
         let preferences = serde_json::to_value(&session.preferences)?;
-        let dav_password_secret = self.seal(&session.dav_password);
+        let dav_password_secret = String::new();
         client
             .execute(
                 r#"
@@ -298,6 +308,41 @@ WHERE id = $1
             .execute("DELETE FROM caldaver_sessions WHERE id = $1", &[&id])
             .await?;
         Ok(())
+    }
+
+    pub async fn session_dav_credentials(&self) -> Result<Vec<SessionDavCredentials>, StorageError> {
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                r#"
+SELECT DISTINCT ON (username)
+       username, dav_username, dav_password_secret, principal_url, calendar_home_set, addressbook_home_set
+FROM caldaver_sessions
+WHERE expires_at > $1 AND dav_username <> '' AND dav_password_secret <> ''
+ORDER BY username, updated_at DESC
+"#,
+                &[&now_secs()],
+            )
+            .await?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| {
+                let dav_password = self.open(&row.get::<_, String>("dav_password_secret"));
+                if dav_password.is_empty() {
+                    return None;
+                }
+                Some(SessionDavCredentials {
+                    owner: row.get("username"),
+                    dav_username: row.get("dav_username"),
+                    dav_password,
+                    principal_url: row.get("principal_url"),
+                    calendar_home_set: row.get("calendar_home_set"),
+                    addressbook_home_set: row.get("addressbook_home_set"),
+                })
+            })
+            .collect())
     }
 
     pub async fn save_preferences(&self, username: &str, preferences: &Preferences) -> Result<(), StorageError> {
@@ -607,6 +652,25 @@ LIMIT 1
             .map(|row| self.dav_account_from_row(row)))
     }
 
+    pub async fn dav_account_by_id(&self, owner: &str, id: u64) -> Result<Option<DavAccount>, StorageError> {
+        let id = id as i64;
+        Ok(self
+            .pool
+            .get()
+            .await?
+            .query_opt(
+                r#"
+SELECT id::BIGINT AS id, account_type, label, server_url, auth_method, username,
+       credential_secret, principal_url, home_set, enabled, last_error
+FROM dav_accounts
+WHERE owner = $1 AND id = $2 AND enabled = TRUE
+"#,
+                &[&owner, &id],
+            )
+            .await?
+            .map(|row| self.dav_account_from_row(row)))
+    }
+
     pub async fn save_dav_account(&self, owner: &str, account: &DavAccount) -> Result<DavAccount, StorageError> {
         let client = self.pool.get().await?;
         let credential_secret = self.seal_mail_password(&account.credential_sealed);
@@ -800,23 +864,6 @@ WHERE owner=$1 AND account_id=$2 AND uid=$3
             )
             .await?;
         Ok(())
-    }
-
-    fn seal(&self, value: &str) -> String {
-        if value.is_empty() {
-            return String::new();
-        }
-        let key = self.secret.as_bytes();
-        if key.is_empty() {
-            return BASE64.encode(value.as_bytes());
-        }
-        let sealed: Vec<u8> = value
-            .as_bytes()
-            .iter()
-            .enumerate()
-            .map(|(index, byte)| byte ^ key[index % key.len()])
-            .collect();
-        BASE64.encode(sealed)
     }
 
     fn open(&self, value: &str) -> String {
@@ -1049,7 +1096,7 @@ mod tests {
             .unwrap();
         let loaded = storage.session(&session_id).await.unwrap().unwrap();
         assert_eq!(loaded.username, owner);
-        assert_eq!(loaded.dav_password, "dav-password");
+        assert_eq!(loaded.dav_password, "");
         storage.delete_session(&session_id).await.unwrap();
         assert!(storage.session(&session_id).await.unwrap().is_none());
 
