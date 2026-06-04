@@ -11,6 +11,8 @@ use std::env;
 use std::fmt;
 
 const INBOX_LIMIT: usize = 100;
+const MAIL_PASSWORD_KEY_ENV: &str = "CALDAVER_MAIL_PASSWORD_KEY";
+const MIN_MAIL_PASSWORD_KEY_BYTES: usize = 32;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct MailAccount {
@@ -160,24 +162,39 @@ impl SealedPassword {
 }
 
 fn password_key() -> Result<[u8; 32], MailBackendError> {
-    let secret = env::var("CALDAVER_MAIL_PASSWORD_KEY")
-        .ok()
-        .filter(|value| !value.is_empty())
-        .or_else(|| {
-            env::var("CALDAVER_AUTH_PASSWORD")
-                .ok()
-                .filter(|value| !value.is_empty())
-                .map(|value| format!("auth:{value}"))
-        });
-    #[cfg(test)]
-    let secret = secret.or_else(|| Some("caldaver-test-mail-password-key".to_string()));
-    let secret = secret.ok_or_else(|| {
+    let secret = env::var(MAIL_PASSWORD_KEY_ENV).ok();
+    derive_password_key(secret.as_deref())
+}
+
+fn derive_password_key(secret: Option<&str>) -> Result<[u8; 32], MailBackendError> {
+    let secret = secret.map(str::trim).filter(|value| !value.is_empty()).ok_or_else(|| {
         MailBackendError::Crypto(
-            "CALDAVER_MAIL_PASSWORD_KEY or CALDAVER_AUTH_PASSWORD must be set to store mail passwords"
-                .to_string(),
+            "CALDAVER_MAIL_PASSWORD_KEY is required to encrypt stored account credentials".to_string(),
         )
     })?;
+    if secret.as_bytes().len() < MIN_MAIL_PASSWORD_KEY_BYTES {
+        return Err(MailBackendError::Crypto(format!(
+            "CALDAVER_MAIL_PASSWORD_KEY must be at least {MIN_MAIL_PASSWORD_KEY_BYTES} bytes"
+        )));
+    }
     Ok(Sha256::digest(secret.as_bytes()).into())
+}
+
+pub(crate) fn validate_password_key_config() -> Result<(), MailBackendError> {
+    password_key().map(|_| ())
+}
+
+#[cfg(test)]
+pub(crate) fn install_test_password_key() {
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+    INIT.call_once(|| unsafe {
+        env::set_var(
+            MAIL_PASSWORD_KEY_ENV,
+            "caldaver-test-mail-password-key-000000000000",
+        );
+    });
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -608,11 +625,23 @@ mod tests {
 
     #[test]
     fn sealed_password_round_trips_without_serializing_plaintext() {
+        install_test_password_key();
         let sealed = SealedPassword::seal("mail-secret").unwrap();
         let json = serde_json::to_string(&sealed).unwrap();
 
         assert_eq!(sealed.reveal().unwrap(), "mail-secret");
         assert!(!json.contains("mail-secret"));
+    }
+
+    #[test]
+    fn password_key_requires_dedicated_strong_secret() {
+        let missing = derive_password_key(None).unwrap_err();
+        assert!(missing.to_string().contains("CALDAVER_MAIL_PASSWORD_KEY is required"));
+
+        let weak = derive_password_key(Some("short-secret")).unwrap_err();
+        assert!(weak.to_string().contains("at least 32 bytes"));
+
+        assert!(derive_password_key(Some("0123456789abcdef0123456789abcdef")).is_ok());
     }
 
     #[test]
