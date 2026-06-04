@@ -12,6 +12,22 @@ pub struct Storage {
     secret: String,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct DavAccount {
+    pub id: u64,
+    pub account_type: String,
+    pub label: String,
+    pub server_url: String,
+    pub auth_method: String,
+    pub username: String,
+    pub credential_sealed: SealedPassword,
+    pub credential_needs_reset: bool,
+    pub principal_url: String,
+    pub home_set: String,
+    pub enabled: bool,
+    pub last_error: String,
+}
+
 impl Storage {
     pub async fn connect(database_url: &str, secret: impl Into<String>) -> Result<Self, StorageError> {
         if !database_url.starts_with("postgres://") && !database_url.starts_with("postgresql://") {
@@ -75,6 +91,23 @@ CREATE TABLE IF NOT EXISTS mail_accounts (
     PRIMARY KEY(owner, id)
 );
 
+CREATE TABLE IF NOT EXISTS dav_accounts (
+    owner TEXT NOT NULL,
+    id BIGSERIAL,
+    account_type TEXT NOT NULL CHECK (account_type IN ('calendar', 'carddav')),
+    label TEXT NOT NULL,
+    server_url TEXT NOT NULL,
+    auth_method TEXT NOT NULL DEFAULT 'basic',
+    username TEXT NOT NULL DEFAULT '',
+    credential_secret TEXT NOT NULL DEFAULT '',
+    principal_url TEXT NOT NULL DEFAULT '',
+    home_set TEXT NOT NULL DEFAULT '',
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    last_error TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY(owner, id)
+);
+
 CREATE TABLE IF NOT EXISTS mail_message_cache (
     owner TEXT NOT NULL,
     account_id BIGINT NOT NULL,
@@ -101,6 +134,8 @@ CREATE TABLE IF NOT EXISTS caldaver_local_contacts (
 );
 
 	ALTER TABLE mail_accounts ADD COLUMN IF NOT EXISTS password_secret TEXT NOT NULL DEFAULT '';
+	ALTER TABLE mail_accounts ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
+	ALTER TABLE mail_accounts ADD COLUMN IF NOT EXISTS last_error TEXT NOT NULL DEFAULT '';
 	ALTER TABLE mail_message_cache ADD COLUMN IF NOT EXISTS message JSONB;
 	ALTER TABLE mail_accounts ALTER COLUMN id TYPE BIGINT;
 	ALTER TABLE mail_accounts ALTER COLUMN imap_port TYPE INTEGER;
@@ -162,6 +197,9 @@ BEGIN
         EXECUTE 'UPDATE mail_accounts SET password_secret = password_encrypted WHERE password_secret = '''' AND password_encrypted IS NOT NULL';
     END IF;
 END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_dav_accounts_owner_type_server_user
+ON dav_accounts (owner, account_type, lower(server_url), lower(username));
 "#,
             )
             .await?;
@@ -395,7 +433,7 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             .get()
             .await?
             .query(
-	                "SELECT id::BIGINT AS id, label, email_address, imap_host, imap_port::INTEGER AS imap_port, encryption, username, password_secret, refresh_interval_seconds::BIGINT AS refresh_interval_seconds FROM mail_accounts WHERE owner = $1 ORDER BY id",
+	                "SELECT id::BIGINT AS id, label, email_address, imap_host, imap_port::INTEGER AS imap_port, encryption, username, password_secret, refresh_interval_seconds::BIGINT AS refresh_interval_seconds FROM mail_accounts WHERE owner = $1 AND enabled = TRUE ORDER BY id",
                 &[&owner],
             )
             .await?;
@@ -427,7 +465,7 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             .get()
             .await?
             .query_opt(
-	                "SELECT id::BIGINT AS id, label, email_address, imap_host, imap_port::INTEGER AS imap_port, encryption, username, password_secret, refresh_interval_seconds::BIGINT AS refresh_interval_seconds FROM mail_accounts WHERE owner = $1 AND id = $2",
+	                "SELECT id::BIGINT AS id, label, email_address, imap_host, imap_port::INTEGER AS imap_port, encryption, username, password_secret, refresh_interval_seconds::BIGINT AS refresh_interval_seconds FROM mail_accounts WHERE owner = $1 AND id = $2 AND enabled = TRUE",
                 &[&owner, &id_i64],
             )
             .await?
@@ -528,6 +566,145 @@ WHERE owner=$1 AND id=$2
         saved.id = row.get::<_, i64>("id") as u64;
         saved.password_needs_reset = false;
         Ok(saved)
+    }
+
+    pub async fn dav_accounts(&self, owner: &str) -> Result<Vec<DavAccount>, StorageError> {
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                r#"
+SELECT id::BIGINT AS id, account_type, label, server_url, auth_method, username,
+       credential_secret, principal_url, home_set, enabled, last_error
+FROM dav_accounts
+WHERE owner = $1 AND enabled = TRUE
+ORDER BY account_type, id
+"#,
+                &[&owner],
+            )
+            .await?;
+        Ok(rows.into_iter().map(|row| self.dav_account_from_row(row)).collect())
+    }
+
+    pub async fn dav_account(&self, owner: &str, account_type: &str) -> Result<Option<DavAccount>, StorageError> {
+        Ok(self
+            .pool
+            .get()
+            .await?
+            .query_opt(
+                r#"
+SELECT id::BIGINT AS id, account_type, label, server_url, auth_method, username,
+       credential_secret, principal_url, home_set, enabled, last_error
+FROM dav_accounts
+WHERE owner = $1 AND account_type = $2 AND enabled = TRUE
+ORDER BY id
+LIMIT 1
+"#,
+                &[&owner, &account_type],
+            )
+            .await?
+            .map(|row| self.dav_account_from_row(row)))
+    }
+
+    pub async fn save_dav_account(&self, owner: &str, account: &DavAccount) -> Result<DavAccount, StorageError> {
+        let client = self.pool.get().await?;
+        let credential_secret = self.seal_mail_password(&account.credential_sealed);
+        let id = if account.id == 0 {
+            client
+                .query_opt(
+                    r#"
+SELECT id::BIGINT AS id
+FROM dav_accounts
+WHERE owner = $1 AND account_type = $2 AND lower(server_url) = lower($3) AND username = $4
+ORDER BY id
+LIMIT 1
+"#,
+                    &[&owner, &account.account_type, &account.server_url, &account.username],
+                )
+                .await?
+                .map(|row| row.get::<_, i64>("id") as u64)
+                .unwrap_or(0)
+        } else {
+            account.id
+        };
+        let row = if id == 0 {
+            client
+                .query_one(
+                    r#"
+INSERT INTO dav_accounts
+(owner, account_type, label, server_url, auth_method, username, credential_secret, principal_url, home_set, enabled, last_error)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+RETURNING id::BIGINT AS id
+"#,
+                    &[
+                        &owner,
+                        &account.account_type,
+                        &account.label,
+                        &account.server_url,
+                        &account.auth_method,
+                        &account.username,
+                        &credential_secret,
+                        &account.principal_url,
+                        &account.home_set,
+                        &account.enabled,
+                        &account.last_error,
+                    ],
+                )
+                .await?
+        } else {
+            let id = id as i64;
+            client
+                .query_opt(
+                    r#"
+UPDATE dav_accounts SET
+account_type=$3, label=$4, server_url=$5, auth_method=$6, username=$7,
+credential_secret = CASE WHEN $8 = '' THEN credential_secret ELSE $8 END,
+principal_url=$9, home_set=$10, enabled=$11, last_error=$12, updated_at=now()
+WHERE owner=$1 AND id=$2
+RETURNING id::BIGINT AS id
+"#,
+                    &[
+                        &owner,
+                        &id,
+                        &account.account_type,
+                        &account.label,
+                        &account.server_url,
+                        &account.auth_method,
+                        &account.username,
+                        &credential_secret,
+                        &account.principal_url,
+                        &account.home_set,
+                        &account.enabled,
+                        &account.last_error,
+                    ],
+                )
+                .await?
+                .ok_or(StorageError::NotFound)?
+        };
+        let mut saved = account.clone();
+        saved.id = row.get::<_, i64>("id") as u64;
+        saved.credential_needs_reset = false;
+        Ok(saved)
+    }
+
+    fn dav_account_from_row(&self, row: tokio_postgres::Row) -> DavAccount {
+        let (credential_sealed, credential_needs_reset) =
+            self.open_mail_password(&row.get::<_, String>("credential_secret"));
+        DavAccount {
+            id: row.get::<_, i64>("id") as u64,
+            account_type: row.get("account_type"),
+            label: row.get("label"),
+            server_url: row.get("server_url"),
+            auth_method: row.get("auth_method"),
+            username: row.get("username"),
+            credential_sealed,
+            credential_needs_reset,
+            principal_url: row.get("principal_url"),
+            home_set: row.get("home_set"),
+            enabled: row.get("enabled"),
+            last_error: row.get("last_error"),
+        }
     }
 
     pub async fn cached_messages(&self, owner: &str, account_id: u64) -> Result<Vec<MailMessage>, StorageError> {
@@ -821,6 +998,23 @@ mod tests {
         }
     }
 
+    fn test_dav_account(account_type: &str, owner: &str, password: &str) -> DavAccount {
+        DavAccount {
+            id: 0,
+            account_type: account_type.to_string(),
+            label: format!("{account_type} account"),
+            server_url: format!("https://dav.example.test/{owner}/{account_type}/"),
+            auth_method: "basic".to_string(),
+            username: format!("{owner}@example.test"),
+            credential_sealed: SealedPassword::seal(password).unwrap(),
+            credential_needs_reset: false,
+            principal_url: format!("/principals/{owner}/"),
+            home_set: format!("/{account_type}/{owner}/"),
+            enabled: true,
+            last_error: String::new(),
+        }
+    }
+
     fn test_message(uid: u64, seen: bool) -> MailMessage {
         MailMessage {
             uid,
@@ -930,5 +1124,56 @@ mod tests {
             storage.save_mail_account(&owner, &missing).await,
             Err(StorageError::NotFound)
         ));
+    }
+
+    #[tokio::test]
+    async fn postgres_round_trips_dav_accounts_with_sealed_credentials() {
+        let Some(storage) = test_storage().await else { return; };
+        let owner = unique_name("dav-account");
+        let saved = storage
+            .save_dav_account(&owner, &test_dav_account("calendar", &owner, "dav-token"))
+            .await
+            .unwrap();
+        assert!(saved.id > 0);
+
+        let client = storage.pool.get().await.unwrap();
+        let raw_secret: String = client
+            .query_one(
+                "SELECT credential_secret FROM dav_accounts WHERE owner = $1 AND id = $2",
+                &[&owner, &(saved.id as i64)],
+            )
+            .await
+            .unwrap()
+            .get("credential_secret");
+        assert!(!raw_secret.contains("dav-token"));
+        assert!(serde_json::from_str::<SealedPassword>(&raw_secret).is_ok());
+
+        let loaded = storage
+            .dav_account(&owner, "calendar")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(loaded.credential_sealed.reveal().unwrap(), "dav-token");
+        assert_eq!(loaded.home_set, format!("/calendar/{owner}/"));
+
+        let mut renamed = loaded.clone();
+        renamed.label = "Renamed calendar".to_string();
+        renamed.credential_sealed = SealedPassword::default();
+        let renamed = storage.save_dav_account(&owner, &renamed).await.unwrap();
+        assert_eq!(renamed.id, saved.id);
+        let loaded = storage
+            .dav_account(&owner, "calendar")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(loaded.label, "Renamed calendar");
+        assert_eq!(loaded.credential_sealed.reveal().unwrap(), "dav-token");
+
+        let mut disabled = test_dav_account("carddav", &owner, "card-token");
+        disabled.enabled = false;
+        storage.save_dav_account(&owner, &disabled).await.unwrap();
+        assert!(storage.dav_account(&owner, "carddav").await.unwrap().is_none());
+        assert_eq!(storage.dav_accounts(&owner).await.unwrap().len(), 1);
+        assert!(storage.dav_accounts(&unique_name("other-owner")).await.unwrap().is_empty());
     }
 }

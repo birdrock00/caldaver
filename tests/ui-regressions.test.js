@@ -56,6 +56,8 @@ test('Rust server exposes the web route surface', () => {
     'route("/cards/delete", post(cards_delete))',
     'route("/mail", get(mail_page))',
     'route("/mail/read", get(mail_read_page))',
+    'route("/accounts", get(accounts))',
+    'route("/accounts/save", post(account_save))',
     'route("/mail/accounts", get(mail_accounts))',
     'route("/mail/accounts/save", post(mail_account_save))',
     'route("/mail/messages", get(mail_messages))',
@@ -101,6 +103,10 @@ test('Docker image runs the standalone Rust backend', () => {
   assert.match(storage, /Caldaver Rust backend requires a Postgres database URL/);
   assert.match(storage, /CREATE TABLE IF NOT EXISTS caldaver_sessions/);
   assert.match(storage, /CREATE TABLE IF NOT EXISTS mail_accounts/);
+  assert.match(storage, /CREATE TABLE IF NOT EXISTS dav_accounts/);
+  assert.match(storage, /credential_secret TEXT NOT NULL DEFAULT ''/);
+  assert.match(storage, /ALTER TABLE mail_accounts ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE/);
+  assert.match(storage, /CREATE UNIQUE INDEX IF NOT EXISTS uniq_dav_accounts_owner_type_server_user/);
   assert.match(storage, /ALTER TABLE mail_accounts ALTER COLUMN id TYPE BIGINT/);
   assert.match(storage, /ALTER TABLE mail_message_cache ALTER COLUMN message TYPE JSONB USING message::jsonb/);
   assert.match(storage, /uniq_mail_message_cache_owner_account_uid/);
@@ -147,7 +153,9 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(server, /id="mail_compose"/);
   assert.match(server, /id="mail_compose_screen"/);
   assert.doesNotMatch(mail, /id="mail_account_create"/);
-  assert.match(preferences, /class="prefs-section prefs-mail-section"[\s\S]*id="mail_account_create"/);
+  assert.match(preferences, /class="prefs-section prefs-accounts-section"[\s\S]*id="mail_account_create"/);
+  assert.match(preferences, /id="connected_accounts"/);
+  assert.match(preferences, /id="mail_account_form" action="\/accounts\/save"/);
   assert.match(mailMessage, /id="mail_reader"/);
   assert.match(mailMessage, /data-navigation-url/);
   assert.match(mailMessage, /data-unread-url/);
@@ -193,6 +201,142 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.calendar-sidebar-section,[\s\S]*#sidebar #footer[\s\S]*display:\s*none;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.app-nav,[\s\S]*\.cards-sidebar \.app-nav,[\s\S]*\.mail-sidebar \.app-nav[\s\S]*display:\s*none;/);
   assert.match(less, /\.highlighted-unread/);
+});
+
+test('preferences account section exposes calendar contacts and email account management', () => {
+  const preferences = read('web/templates/preferences.html');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(preferences, /<legend>Accounts<\/legend>/);
+  assert.match(preferences, /Calendar, contacts, and email accounts available to Caldaver/);
+  assert.match(preferences, /id="connected_accounts" class="prefs-account-list" aria-live="polite"/);
+  assert.match(preferences, /id="connected_accounts_empty"[\s\S]*No accounts are configured/);
+  assert.match(server, /fn preferences_accounts_section\(accounts: &\[ConnectedAccountPublic\]\)/);
+  assert.match(server, /accounts\.iter\(\)[\s\S]*\.map\(account_row_html\)/);
+});
+
+test('unified account dialog supports the three account types', () => {
+  const preferences = read('web/templates/preferences.html');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  for (const type of ['calendar', 'carddav', 'email']) {
+    assert.match(preferences, new RegExp(`name="account_type" value="${type}"`));
+    assert.match(server, new RegExp(`name="account_type" value="${type}"`));
+  }
+  assert.match(preferences, /data-account-field="dav"[\s\S]*DAV server URL/);
+  assert.match(preferences, /data-account-field="email"[\s\S]*labels\.imaphost/);
+  assert.match(server, /<span>Password or token<\/span>/);
+});
+
+test('account dialog has accessibility and mobile-safe contracts', () => {
+  const preferences = read('web/templates/preferences.html');
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+  const less = read('assets/less/caldaver.less');
+
+  assert.match(preferences, /role="dialog" aria-modal="true" aria-labelledby="mail_account_dialog_title"/);
+  assert.match(preferences, /id="mail_account_error" class="mail-error" aria-live="assertive"/);
+  assert.match(mailAccountJs, /function trapFocus\(event\)/);
+  assert.match(mailAccountJs, /event\.key === 'Escape'/);
+  assert.match(mailAccountJs, /lastFocused\.focus\(\)/);
+  assert.match(less, /\.account-dialog[\s\S]*\.contact-dialog-footer[\s\S]*position:\s*sticky;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.account-dialog[\s\S]*width:\s*100vw;[\s\S]*height:\s*100dvh;[\s\S]*\.contact-dialog-header[\s\S]*position:\s*sticky;/);
+});
+
+test('account JavaScript loads and saves through unified accounts endpoints', () => {
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(mailAccountJs, /var accountsUrl = '\/accounts';/);
+  assert.match(mailAccountJs, /var accountSaveUrl = '\/accounts\/save';/);
+  assert.match(mailAccountJs, /function loadAccounts\(\)[\s\S]*jsonFetch\(accountsUrl/);
+  assert.match(mailAccountJs, /event\.target\.action/);
+  assert.match(read('web/templates/preferences.html'), /action="\/accounts\/save"/);
+  assert.match(mailAccountJs, /new FormData\(event\.target\)/);
+  assert.match(server, /async fn accounts\(State\(state\): State<AppState>, headers: HeaderMap\) -> Response/);
+  assert.match(server, /async fn account_save\(/);
+});
+
+test('account JavaScript switches required fields by account type', () => {
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+
+  assert.match(mailAccountJs, /function updateFields\(\)/);
+  assert.match(mailAccountJs, /var visible = scope === 'dav' \? !isEmail : isEmail;/);
+  assert.match(mailAccountJs, /input\.disabled = !visible;/);
+  assert.match(mailAccountJs, /setRequired\(\$\(.*server_url.*\), !isEmail\)/);
+  assert.match(mailAccountJs, /setRequired\(\$\(.*email_address.*\), isEmail\)/);
+});
+
+test('account API aggregates session DAV fallback and stored accounts without secrets', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(server, /struct ConnectedAccountPublic/);
+  const publicStruct = server.match(/struct ConnectedAccountPublic \{[\s\S]*?\n\}/)[0];
+  assert.doesNotMatch(publicStruct, /credential_secret/);
+  assert.doesNotMatch(publicStruct, /credential_sealed/);
+  assert.match(server, /session_fallback_accounts\(state: &AppState, session: &Session\)/);
+  assert.match(server, /connected_account_from_dav/);
+  assert.match(server, /connected_account_from_mail/);
+  assert.match(server, /state\.storage\.dav_account\(&session\.username, "calendar"\)\.await/);
+  assert.match(server, /state\.storage\.dav_account\(&session\.username, "carddav"\)\.await/);
+  assert.match(server, /caldav_client_for_request\(&state, &session\)\.await/);
+  assert.match(server, /carddav_client_for_request\(&state, &session\)\.await/);
+});
+
+test('DAV accounts are stored in Postgres with sealed credentials', () => {
+  const storage = read('rust/crates/caldaver-server/src/storage.rs');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(storage, /pub\(crate\) struct DavAccount/);
+  assert.match(storage, /credential_sealed: SealedPassword/);
+  assert.match(storage, /self\.seal_mail_password\(&account\.credential_sealed\)/);
+  assert.match(storage, /self\.open_mail_password\(&row\.get::<_, String>\("credential_secret"\)\)/);
+  assert.match(server, /SealedPassword::seal\(&form\.get\("password"\)\.cloned\(\)\.unwrap_or_default\(\)\)/);
+});
+
+test('DAV account save validates account type auth method and URLs', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(server, /account_type != "calendar" && account_type != "carddav"/);
+  assert.match(server, /matches!\(auth_method\.as_str\(\), "basic" \| "bearer" \| "none"\)/);
+  assert.match(server, /fn validated_dav_server_url\(value: &str\) -> Result<String, Response>/);
+  assert.match(server, /url\.username\(\)\.is_empty\(\) \|\| url\.password\(\)\.is_some\(\)/);
+  assert.match(server, /host\.eq_ignore_ascii_case\("localhost"\)/);
+  assert.match(server, /\.to_socket_addrs\(\)/);
+  assert.match(server, /blocked_ipv4\(ip\)/);
+  assert.match(server, /blocked_ipv6\(ip\)/);
+});
+
+test('email account creation remains backwards compatible through old and new routes', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+
+  assert.match(server, /route\("\/mail\/accounts\/save", post\(mail_account_save\)\)/);
+  assert.match(server, /Some\("email"\) => match persist_mail_account_from_form/);
+  assert.match(server, /mail_account_save[\s\S]*persist_mail_account_from_form\(&state, &session\.username, &form\)/);
+  assert.match(mailAccountJs, /name="account_type"/);
+  assert.doesNotMatch(mailAccountJs, /\/mail\/accounts\/save/);
+});
+
+test('account list styling is responsive and avoids nested cards', () => {
+  const less = read('assets/less/caldaver.less');
+
+  assert.match(less, /\.prefs-account-list\s*\{[\s\S]*display:\s*grid;/);
+  assert.match(less, /\.prefs-account-row\s*\{[\s\S]*grid-template-columns:\s*40px minmax\(0, 1fr\) auto;/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.prefs-account-row\s*\{[\s\S]*grid-template-columns:\s*36px minmax\(0, 1fr\);/);
+  assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.prefs-mail-account-create\s*\{[\s\S]*width:\s*100%;/);
+  assert.doesNotMatch(less, /\.prefs-accounts-section[\s\S]*\.prefs-account-row[\s\S]*box-shadow/);
+});
+
+test('account public rows include status and source metadata', () => {
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+  const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
+
+  assert.match(server, /source: "session"\.to_string\(\)/);
+  assert.match(server, /source: "postgres"\.to_string\(\)/);
+  assert.match(server, /password_needs_reset: account\.credential_needs_reset/);
+  assert.match(server, /last_error: account\.last_error\.clone\(\)/);
+  assert.match(mailAccountJs, /account\.source === 'session' \? 'Session' : 'Postgres'/);
+  assert.match(mailAccountJs, /account\.password_needs_reset/);
 });
 
 test('layout CSS keeps mobile pages scrollable and controls visible', () => {
