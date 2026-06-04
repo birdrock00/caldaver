@@ -9,6 +9,10 @@
   <aside class="mail-sidebar">
     {% include 'parts/sidebrand.html' %}
     {% include 'parts/appnav.html' %}
+    <button type="button" id="mail_compose" class="mail-mobile-compose-button" aria-label="Compose mail" hidden>
+      <i class="fa fa-pencil" aria-hidden="true"></i>
+      <span>Compose</span>
+    </button>
     <nav id="mail_accounts" class="mail-accounts" aria-label="Mail accounts"></nav>
   </aside>
 
@@ -32,6 +36,62 @@
       <div id="mail_no_messages" class="mail-empty" hidden>{% trans %}labels.nomessages{% endtrans %}</div>
       <div id="mail_error" class="mail-error" hidden></div>
       <div id="mail_rows" class="mail-rows"></div>
+    </section>
+    <section id="mail_compose_screen" class="mail-compose-screen" hidden aria-label="Compose email">
+      <div class="mail-compose-toolbar">
+        <button type="button" id="mail_compose_back" aria-label="Back">
+          <i class="fa fa-arrow-left" aria-hidden="true"></i>
+        </button>
+        <h1>New message</h1>
+        <button type="button" id="mail_compose_send" aria-label="Send" aria-disabled="true">
+          <i class="fa fa-send" aria-hidden="true"></i>
+        </button>
+      </div>
+      <form id="mail_compose_form" class="mail-compose-form">
+        <div class="mail-compose-fields">
+          <label class="mail-compose-from">
+            <span>From</span>
+            <input id="mail_compose_from" type="email" readonly aria-label="From">
+          </label>
+          <label>
+            <span>To</span>
+            <input id="mail_compose_to" type="email" autocomplete="email">
+            <button type="button" id="mail_compose_ccbcc" class="mail-compose-ccbcc" aria-expanded="false" aria-controls="mail_compose_cc mail_compose_bcc">Cc/Bcc</button>
+          </label>
+          <label id="mail_compose_cc_row" hidden>
+            <span>Cc</span>
+            <input id="mail_compose_cc" type="email" autocomplete="email" multiple>
+          </label>
+          <label id="mail_compose_bcc_row" hidden>
+            <span>Bcc</span>
+            <input id="mail_compose_bcc" type="email" autocomplete="email" multiple>
+          </label>
+          <label>
+            <span>Subject</span>
+            <input id="mail_compose_subject" type="text" autocomplete="off">
+          </label>
+        </div>
+        <label class="mail-compose-body-label">
+          <span>Message</span>
+          <textarea id="mail_compose_body" rows="12" aria-label="Message"></textarea>
+        </label>
+        <div class="mail-compose-footer">
+          <button type="button" class="mail-compose-unavailable-action" aria-label="Formatting options unavailable" aria-disabled="true" disabled>
+            <i class="fa fa-font" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="mail-compose-unavailable-action" aria-label="Attach file unavailable" aria-disabled="true" disabled>
+            <i class="fa fa-paperclip" aria-hidden="true"></i>
+          </button>
+          <button type="button" class="mail-compose-unavailable-action" aria-label="More compose actions unavailable" aria-disabled="true" disabled>
+            <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+          </button>
+          <button type="button" id="mail_compose_discard" class="mail-compose-discard" aria-label="Discard draft">
+            <i class="fa fa-trash" aria-hidden="true"></i>
+          </button>
+        </div>
+        <div id="mail_compose_status" class="mail-compose-status" aria-live="polite"></div>
+        <div id="mail_compose_error" class="mail-error mail-compose-error" aria-live="assertive" hidden></div>
+      </form>
     </section>
   </main>
 </div>

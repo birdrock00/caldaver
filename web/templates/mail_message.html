@@ -48,23 +48,64 @@
       <div id="mail_reader_error" class="mail-error" hidden></div>
       <article id="mail_reader_message" class="mail-reader-message" hidden>
         <h1 id="mail_reader_subject"></h1>
-        <div class="mail-reader-meta">
-          <div class="mail-reader-avatar" aria-hidden="true"></div>
-          <div>
-            <strong id="mail_reader_from"></strong>
-            <span id="mail_reader_date"></span>
-          </div>
+        <div id="mail_reader_thread" class="mail-reader-thread">
+          <section class="mail-thread-message" data-uid="{{ uid }}">
+            <div class="mail-reader-message-header">
+              <div class="mail-reader-meta">
+                <div class="mail-reader-avatar" aria-hidden="true"></div>
+                <div>
+                  <strong id="mail_reader_from"></strong>
+                  <span id="mail_reader_date"></span>
+                </div>
+              </div>
+              <button type="button" id="mail_reader_reply" class="mail-reader-reply-button" data-uid="{{ uid }}" aria-label="Reply to this message">
+                <i class="fa fa-reply" aria-hidden="true"></i><span>Reply</span>
+              </button>
+            </div>
+            <pre id="mail_reader_body"></pre>
+            <iframe
+              id="mail_reader_html"
+              class="mail-reader-html"
+              sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              referrerpolicy="no-referrer"
+              title="{% trans %}labels.mail{% endtrans %}"
+              hidden
+            ></iframe>
+            <div id="mail_reader_attachments" class="mail-attachments" data-testid="mail-attachments"></div>
+          </section>
         </div>
-        <pre id="mail_reader_body"></pre>
-        <iframe
-          id="mail_reader_html"
-          class="mail-reader-html"
-          sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-          referrerpolicy="no-referrer"
-          title="{% trans %}labels.mail{% endtrans %}"
-          hidden
-        ></iframe>
-        <div id="mail_reader_attachments" class="mail-attachments" data-testid="mail-attachments"></div>
+        <section id="mail_reply_composer" class="mail-reply-composer" hidden aria-label="Reply draft">
+          <div class="mail-reply-composer-header">
+            <h2>Reply</h2>
+            <button type="button" id="mail_reply_close" aria-label="Close reply draft">
+              <i class="fa fa-times" aria-hidden="true"></i>
+            </button>
+          </div>
+          <form id="mail_reply_form" class="mail-reply-form">
+            <label>
+              <span>To</span>
+              <input id="mail_reply_to" type="email" autocomplete="email">
+            </label>
+            <label>
+              <span>Subject</span>
+              <input id="mail_reply_subject" type="text" autocomplete="off">
+            </label>
+            <label class="mail-reply-body-label">
+              <span>Message</span>
+              <textarea id="mail_reply_body" rows="12" aria-label="Reply message"></textarea>
+            </label>
+            <div class="mail-reply-actions">
+              <button type="button" id="mail_reply_send" class="mail-reply-send" aria-disabled="true">
+                <i class="fa fa-send" aria-hidden="true"></i><span>Send</span>
+              </button>
+              <button type="button" id="mail_reply_discard" class="mail-reply-discard">
+                <i class="fa fa-trash" aria-hidden="true"></i><span>Discard</span>
+              </button>
+            </div>
+            <div id="mail_reply_status" class="mail-reply-status" aria-live="polite"></div>
+            <div id="mail_reply_error" class="mail-error mail-reply-error" aria-live="assertive" hidden></div>
+          </form>
+        </section>
       </article>
       <div id="mail_reader_loading" class="mail-empty">{% trans %}labels.mail_loading{% endtrans %}</div>
     </section>
