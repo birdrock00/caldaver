@@ -166,11 +166,12 @@
       setInputValue('username', account.username || account.identifier || '');
       setInputValue('password', '');
       if (type === 'email') {
+        var refreshMinutes = account.refresh_interval_minutes || Math.max(1, Math.round(Number(account.refresh_interval_seconds || 60) / 60));
         setInputValue('email_address', account.email_address || account.identifier || '');
         setInputValue('imap_host', account.imap_host || '');
         setInputValue('imap_port', account.imap_port || '993');
         setInputValue('encryption', account.encryption || 'ssl');
-        setInputValue('refresh_interval_minutes', Math.max(1, Math.round(Number(account.refresh_interval_seconds || 60) / 60)));
+        setInputValue('refresh_interval_minutes', refreshMinutes);
       } else {
         setInputValue('server_url', account.server || '');
         setInputValue('auth_method', account.auth_method || 'basic');
