@@ -6,7 +6,7 @@ mod storage;
 
 use crate::caldav_backend::{CalDavAuth, CalDavClient, CalDavConfig, CalDavError};
 use crate::config::Config;
-use crate::storage::{DavAccount, Storage};
+use crate::storage::{DavAccount, SessionDavCredentials, Storage};
 use axum::extract::{Form, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Redirect, Response};
@@ -136,6 +136,13 @@ struct ConnectedAccountPublic {
     label: String,
     identifier: String,
     server: String,
+    auth_method: String,
+    username: String,
+    email_address: String,
+    imap_host: String,
+    imap_port: u16,
+    encryption: String,
+    refresh_interval_seconds: u64,
     home_set: String,
     enabled: bool,
     source: String,
@@ -172,11 +179,219 @@ impl AppState {
     async fn from_env() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let config = Config::from_env()?;
         let storage = Storage::connect(&config.database_url, config.csrf_secret.clone()).await?;
+        if let Err(error) = bootstrap_postgres_accounts(&config, &storage).await {
+            tracing::warn!(%error, "Postgres account bootstrap did not complete cleanly");
+        }
         Ok(Self {
             config,
             storage,
             mail_backend: Arc::new(ImapMailBackend),
         })
+    }
+}
+
+async fn bootstrap_postgres_accounts(config: &Config, storage: &Storage) -> Result<(), String> {
+    let mut migrated = 0usize;
+    let mut errors = Vec::new();
+
+    match bootstrap_env_dav_accounts(config, storage).await {
+        Ok(count) => migrated += count,
+        Err(error) => errors.push(error),
+    }
+    match bootstrap_session_dav_accounts(config, storage).await {
+        Ok(count) => migrated += count,
+        Err(error) => errors.push(error),
+    }
+
+    if migrated > 0 {
+        tracing::info!(migrated, "bootstrapped DAV account credentials into Postgres");
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors.join("; "))
+    }
+}
+
+async fn bootstrap_env_dav_accounts(config: &Config, storage: &Storage) -> Result<usize, String> {
+    if config.caldav_server.trim().is_empty()
+        || config.caldav_username.trim().is_empty()
+        || config.caldav_password.trim().is_empty()
+    {
+        return Ok(0);
+    }
+    let owner = config
+        .auth_username
+        .trim()
+        .strip_prefix('/')
+        .unwrap_or(config.auth_username.trim())
+        .trim_matches('/')
+        .to_string();
+    let owner = if owner.is_empty() {
+        config.caldav_username.trim().trim_matches('/').to_string()
+    } else {
+        owner
+    };
+    if owner.is_empty() {
+        return Ok(0);
+    }
+
+    let dav_username = config.caldav_username.trim().to_string();
+    let dav_password = config.caldav_password.clone();
+    bootstrap_dav_accounts(
+        storage,
+        &owner,
+        &dav_username,
+        &dav_password,
+        BootstrapDavHomes::default(),
+        config,
+        "Migrated calendar account",
+        "Migrated contacts account",
+    )
+    .await
+}
+
+async fn bootstrap_session_dav_accounts(config: &Config, storage: &Storage) -> Result<usize, String> {
+    let credentials = storage
+        .session_dav_credentials()
+        .await
+        .map_err(|error| format!("failed to load session DAV credentials from Postgres: {error}"))?;
+    let mut migrated = 0usize;
+    let mut errors = Vec::new();
+    for credential in credentials {
+        match bootstrap_dav_accounts_from_session(config, storage, &credential).await {
+            Ok(count) => migrated += count,
+            Err(error) => errors.push(error),
+        }
+    }
+    if errors.is_empty() {
+        Ok(migrated)
+    } else {
+        Err(errors.join("; "))
+    }
+}
+
+async fn bootstrap_dav_accounts_from_session(
+    config: &Config,
+    storage: &Storage,
+    credentials: &SessionDavCredentials,
+) -> Result<usize, String> {
+    bootstrap_dav_accounts(
+        storage,
+        &credentials.owner,
+        &credentials.dav_username,
+        &credentials.dav_password,
+        BootstrapDavHomes {
+            principal_url: credentials.principal_url.clone(),
+            calendar_home_set: credentials.calendar_home_set.clone(),
+            addressbook_home_set: credentials.addressbook_home_set.clone(),
+        },
+        config,
+        "Migrated calendar login",
+        "Migrated contacts login",
+    )
+    .await
+}
+
+#[derive(Default)]
+struct BootstrapDavHomes {
+    principal_url: String,
+    calendar_home_set: String,
+    addressbook_home_set: String,
+}
+
+async fn bootstrap_dav_accounts(
+    storage: &Storage,
+    owner: &str,
+    dav_username: &str,
+    dav_password: &str,
+    homes: BootstrapDavHomes,
+    config: &Config,
+    calendar_label: &str,
+    carddav_label: &str,
+) -> Result<usize, String> {
+    let auth_method = normalized_dav_auth_method(&config.caldav_auth_method);
+    if auth_method != "none" && dav_password.is_empty() {
+        return Ok(0);
+    }
+    let mut migrated = 0usize;
+    migrated += save_missing_bootstrap_dav_account(
+        storage,
+        owner,
+        "calendar",
+        calendar_label,
+        &substitute_dav_username(&config.caldav_server, dav_username),
+        &auth_method,
+        dav_username,
+        dav_password,
+        &homes.principal_url,
+        &homes.calendar_home_set,
+    )
+    .await? as usize;
+    migrated += save_missing_bootstrap_dav_account(
+        storage,
+        owner,
+        "carddav",
+        carddav_label,
+        &substitute_dav_username(&config.carddav_server, dav_username),
+        &auth_method,
+        dav_username,
+        dav_password,
+        &homes.principal_url,
+        &homes.addressbook_home_set,
+    )
+    .await? as usize;
+    Ok(migrated)
+}
+
+async fn save_missing_bootstrap_dav_account(
+    storage: &Storage,
+    owner: &str,
+    account_type: &str,
+    label: &str,
+    server_url: &str,
+    auth_method: &str,
+    username: &str,
+    password: &str,
+    principal_url: &str,
+    home_set: &str,
+) -> Result<bool, String> {
+    if storage
+        .dav_account(owner, account_type)
+        .await
+        .map_err(|error| format!("failed to check stored {account_type} account for {owner}: {error}"))?
+        .is_some()
+    {
+        return Ok(false);
+    }
+    let credential_sealed = SealedPassword::seal(password)
+        .map_err(|error| format!("failed to seal {account_type} credential for {owner}: {error}"))?;
+    let account = DavAccount {
+        id: 0,
+        account_type: account_type.to_string(),
+        label: label.to_string(),
+        server_url: server_url.to_string(),
+        auth_method: auth_method.to_string(),
+        username: username.to_string(),
+        credential_sealed,
+        credential_needs_reset: false,
+        principal_url: principal_url.to_string(),
+        home_set: home_set.to_string(),
+        enabled: true,
+        last_error: String::new(),
+    };
+    storage
+        .save_dav_account(owner, &account)
+        .await
+        .map_err(|error| format!("failed to bootstrap stored {account_type} account for {owner}: {error}"))?;
+    Ok(true)
+}
+
+fn normalized_dav_auth_method(value: &str) -> String {
+    match value.to_ascii_lowercase().as_str() {
+        "none" => "none".to_string(),
+        "bearer" => "bearer".to_string(),
+        _ => "basic".to_string(),
     }
 }
 
@@ -277,9 +492,8 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
     if user.is_empty() || password.is_empty() {
         return Html(render_login(&state, Some("Required fields are missing"))).into_response();
     }
-    if !state.config.auth_username.is_empty()
-        && (state.config.auth_username != user || state.config.auth_password != password)
-    {
+    let local_auth_enforced = !state.config.auth_username.is_empty();
+    if local_auth_enforced && (state.config.auth_username != user || state.config.auth_password != password) {
         return Html(render_login(&state, Some("Invalid username or password"))).into_response();
     }
 
@@ -310,28 +524,60 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
         calendar_home_set: String::new(),
         addressbook_home_set: String::new(),
     };
+    if !local_auth_enforced {
+        session.dav_username = user.to_string();
+        session.dav_password = password.to_string();
+    }
 
-    match caldav_client_for_session(&state.config, &session) {
-        Ok(client) => match client.login().await {
-            Ok(dav_session) => {
-                session.principal_url = dav_session.principal_url;
-                session.calendar_home_set = dav_session.calendar_home_set;
-                if let Ok(carddav) = carddav_client_for_session(&state.config, &session) {
-                    if let Ok(addressbook_home_set) = carddav.discover_addressbook_home_set().await {
-                        session.addressbook_home_set = addressbook_home_set;
+    let has_stored_calendar = state
+        .storage
+        .dav_account(&session.username, "calendar")
+        .await
+        .ok()
+        .flatten()
+        .is_some();
+    let should_validate_dav_login = !local_auth_enforced;
+    let should_bootstrap_dav_login =
+        !has_stored_calendar && !state.config.caldav_server.trim().is_empty() && !session.dav_password.trim().is_empty();
+    if should_validate_dav_login || should_bootstrap_dav_login {
+        if state.config.caldav_server.trim().is_empty() {
+            return Html(render_login(&state, Some("Invalid username or password"))).into_response();
+        }
+        match discover_login_dav_homes(&state.config, &session).await {
+            Ok(homes) => {
+                if !has_stored_calendar {
+                    let session_credentials = SessionDavCredentials {
+                        owner: session.username.clone(),
+                        dav_username: session.dav_username.clone(),
+                        dav_password: session.dav_password.clone(),
+                        principal_url: homes.principal_url.clone(),
+                        calendar_home_set: homes.calendar_home_set.clone(),
+                        addressbook_home_set: homes.addressbook_home_set.clone(),
+                    };
+                    if let Err(error) =
+                        bootstrap_dav_accounts_from_session(&state.config, &state.storage, &session_credentials).await
+                    {
+                        tracing::warn!(%error, user = %session.username, "failed to bootstrap DAV login credentials into Postgres");
                     }
                 }
             }
             Err(error) => {
-                tracing::warn!(%error, user = %session.username, "CalDAV login failed");
-                return Html(render_login(&state, Some("Invalid username or password"))).into_response();
+                tracing::warn!(%error, user = %session.username, "legacy DAV login bootstrap failed");
+                if should_validate_dav_login {
+                    return Html(render_login(&state, Some("Invalid username or password"))).into_response();
+                }
             }
-        },
-        Err(error) => {
-            tracing::error!(%error, "failed to initialize CalDAV client");
-            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
         }
     }
+    if let Ok(Some(account)) = state.storage.dav_account(&session.username, "calendar").await {
+        session.dav_username = account.username;
+        session.principal_url = account.principal_url;
+        session.calendar_home_set = account.home_set;
+    }
+    if let Ok(Some(account)) = state.storage.dav_account(&session.username, "carddav").await {
+        session.addressbook_home_set = account.home_set;
+    }
+    session.dav_password.clear();
     if let Err(error) = state
         .storage
         .insert_session(&id, &session, state.config.session_lifetime)
@@ -410,7 +656,7 @@ async fn preferences_page(State(state): State<AppState>, headers: HeaderMap) -> 
         Ok(accounts) => accounts,
         Err(error) => {
             tracing::error!(%error, "failed to load connected accounts for preferences render");
-            session_fallback_accounts(&state, &session)
+            Vec::new()
         }
     };
     html_response(render_preferences(&state, &session, &accounts)).into_response()
@@ -1069,70 +1315,11 @@ async fn connected_accounts(
 ) -> Result<Vec<ConnectedAccountPublic>, crate::storage::StorageError> {
     let dav_accounts = state.storage.dav_accounts(&session.username).await?;
     let mail_accounts = state.storage.mail_accounts(&session.username).await?;
-    let has_calendar = dav_accounts.iter().any(|account| account.account_type == "calendar");
-    let has_carddav = dav_accounts.iter().any(|account| account.account_type == "carddav");
 
     let mut accounts = Vec::new();
-    if !has_calendar {
-        accounts.push(ConnectedAccountPublic {
-            account_type: "calendar".to_string(),
-            id: "session-calendar".to_string(),
-            label: "Current login".to_string(),
-            identifier: session.dav_username.clone(),
-            server: substitute_dav_username(&state.config.caldav_server, &session.dav_username),
-            home_set: session.calendar_home_set.clone(),
-            enabled: true,
-            source: "session".to_string(),
-            password_needs_reset: false,
-            last_error: String::new(),
-        });
-    }
-    if !has_carddav {
-        accounts.push(ConnectedAccountPublic {
-            account_type: "carddav".to_string(),
-            id: "session-carddav".to_string(),
-            label: "Current login".to_string(),
-            identifier: session.dav_username.clone(),
-            server: substitute_dav_username(&state.config.carddav_server, &session.dav_username),
-            home_set: session.addressbook_home_set.clone(),
-            enabled: true,
-            source: "session".to_string(),
-            password_needs_reset: false,
-            last_error: String::new(),
-        });
-    }
     accounts.extend(dav_accounts.iter().map(connected_account_from_dav));
     accounts.extend(mail_accounts.iter().map(connected_account_from_mail));
     Ok(accounts)
-}
-
-fn session_fallback_accounts(state: &AppState, session: &Session) -> Vec<ConnectedAccountPublic> {
-    vec![
-        ConnectedAccountPublic {
-            account_type: "calendar".to_string(),
-            id: "session-calendar".to_string(),
-            label: "Current login".to_string(),
-            identifier: session.dav_username.clone(),
-            server: substitute_dav_username(&state.config.caldav_server, &session.dav_username),
-            home_set: session.calendar_home_set.clone(),
-            enabled: true,
-            source: "session".to_string(),
-            password_needs_reset: false,
-            last_error: String::new(),
-        },
-        ConnectedAccountPublic {
-            account_type: "carddav".to_string(),
-            id: "session-carddav".to_string(),
-            label: "Current login".to_string(),
-            identifier: session.dav_username.clone(),
-            server: substitute_dav_username(&state.config.carddav_server, &session.dav_username),
-            home_set: session.addressbook_home_set.clone(),
-            enabled: true,
-            source: "session".to_string(),
-            password_needs_reset: false,
-            last_error: String::new(),
-        },
-    ]
 }
 
 fn connected_account_from_dav(account: &DavAccount) -> ConnectedAccountPublic {
@@ -1142,6 +1329,13 @@ fn connected_account_from_dav(account: &DavAccount) -> ConnectedAccountPublic {
         label: account.label.clone(),
         identifier: account.username.clone(),
         server: account.server_url.clone(),
+        auth_method: account.auth_method.clone(),
+        username: account.username.clone(),
+        email_address: String::new(),
+        imap_host: String::new(),
+        imap_port: 993,
+        encryption: "ssl".to_string(),
+        refresh_interval_seconds: 60,
         home_set: account.home_set.clone(),
         enabled: account.enabled,
         source: "postgres".to_string(),
@@ -1157,6 +1351,13 @@ fn connected_account_from_mail(account: &MailAccount) -> ConnectedAccountPublic 
         label: account.label.clone(),
         identifier: account.email_address.clone(),
         server: format!("{}:{}", account.imap_host, account.imap_port),
+        auth_method: String::new(),
+        username: account.username.clone(),
+        email_address: account.email_address.clone(),
+        imap_host: account.imap_host.clone(),
+        imap_port: account.imap_port,
+        encryption: account.encryption.clone(),
+        refresh_interval_seconds: account.refresh_interval_seconds,
         home_set: "IMAP".to_string(),
         enabled: true,
         source: "postgres".to_string(),
@@ -1182,6 +1383,21 @@ async fn persist_mail_account_from_form(
             "A password is required for new mail accounts",
         ));
     }
+    let password_sealed = if id != 0 && form.get("password").is_none_or(|value| value.trim().is_empty()) {
+        match state.storage.mail_account(owner, id).await {
+            Ok(Some(existing)) => existing.password_sealed,
+            Ok(None) => return Err(json_error(StatusCode::NOT_FOUND, "Mail account not found")),
+            Err(error) => {
+                tracing::error!(%error, "failed to load existing mail account from Postgres");
+                return Err(json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save mail account"));
+            }
+        }
+    } else {
+        match SealedPassword::seal(&form.get("password").cloned().unwrap_or_default()) {
+            Ok(password) => password,
+            Err(error) => return Err(mail_backend_response(error)),
+        }
+    };
     let account = MailAccount {
         id,
         label: limited_field(form, "label", 120),
@@ -1190,10 +1406,7 @@ async fn persist_mail_account_from_form(
         imap_port: form.get("imap_port").and_then(|v| v.parse().ok()).unwrap_or(993),
         encryption: limited_field_default(form, "encryption", 16, "ssl"),
         username: limited_field(form, "username", 254),
-        password_sealed: match SealedPassword::seal(&form.get("password").cloned().unwrap_or_default()) {
-            Ok(password) => password,
-            Err(error) => return Err(mail_backend_response(error)),
-        },
+        password_sealed,
         password_needs_reset: false,
         refresh_interval_seconds: form
             .get("refresh_interval_minutes")
@@ -1241,9 +1454,21 @@ async fn persist_dav_account_from_form(
     if !home_set.is_empty() && !home_set.starts_with('/') {
         return Err(json_error(StatusCode::BAD_REQUEST, "Home set must start with /"));
     }
-    let credential_sealed = match SealedPassword::seal(&form.get("password").cloned().unwrap_or_default()) {
-        Ok(password) => password,
-        Err(error) => return Err(mail_backend_response(error)),
+    let credential_sealed = if id != 0 && form.get("password").is_none_or(|value| value.trim().is_empty()) {
+        match state.storage.dav_account_by_id(owner, id).await {
+            Ok(Some(existing)) if existing.account_type == account_type => existing.credential_sealed,
+            Ok(Some(_)) => return Err(json_error(StatusCode::BAD_REQUEST, "Account type cannot be changed")),
+            Ok(None) => return Err(json_error(StatusCode::NOT_FOUND, "Account not found")),
+            Err(error) => {
+                tracing::error!(%error, "failed to load existing DAV account from Postgres");
+                return Err(json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save account"));
+            }
+        }
+    } else {
+        match SealedPassword::seal(&form.get("password").cloned().unwrap_or_default()) {
+            Ok(password) => password,
+            Err(error) => return Err(mail_backend_response(error)),
+        }
     };
     let account = DavAccount {
         id,
@@ -1736,12 +1961,18 @@ async fn caldav_client_for_request(
             };
             return Ok((client, home_set));
         }
-        Ok(None) => {}
+        Ok(None) => {
+            return Err(CalDavError::InvalidBaseUrl(
+                "No CalDAV account is saved in Postgres".to_string(),
+            ));
+        }
         Err(error) => {
-            tracing::warn!(%error, user = %session.username, "failed to load stored CalDAV account; falling back to session credentials");
+            tracing::warn!(%error, user = %session.username, "failed to load stored CalDAV account");
+            return Err(CalDavError::InvalidBaseUrl(
+                "Unable to load saved CalDAV account from Postgres".to_string(),
+            ));
         }
     }
-    caldav_client_for_session(&state.config, session).map(|client| (client, session.calendar_home_set.clone()))
 }
 
 async fn carddav_client_for_request(
@@ -1761,13 +1992,18 @@ async fn carddav_client_for_request(
             };
             return Ok((client, home_set));
         }
-        Ok(None) => {}
+        Ok(None) => {
+            return Err(carddav_backend::CardDavError::InvalidBaseUrl(
+                "No CardDAV account is saved in Postgres".to_string(),
+            ));
+        }
         Err(error) => {
-            tracing::warn!(%error, user = %session.username, "failed to load stored CardDAV account; falling back to session credentials");
+            tracing::warn!(%error, user = %session.username, "failed to load stored CardDAV account");
+            return Err(carddav_backend::CardDavError::InvalidBaseUrl(
+                "Unable to load saved CardDAV account from Postgres".to_string(),
+            ));
         }
     }
-    carddav_client_for_session(&state.config, session)
-        .map(|client| (client, session.addressbook_home_set.clone()))
 }
 
 fn dav_auth_for_account(account: &DavAccount) -> Result<CalDavAuth, String> {
@@ -1782,6 +2018,20 @@ fn dav_auth_for_account(account: &DavAccount) -> Result<CalDavAuth, String> {
             username: account.username.clone(),
             password: credential,
         },
+    })
+}
+
+async fn discover_login_dav_homes(config: &Config, session: &Session) -> Result<BootstrapDavHomes, CalDavError> {
+    let client = caldav_client_for_session(config, session)?;
+    let dav_session = client.login().await?;
+    let addressbook_home_set = match carddav_client_for_session(config, session) {
+        Ok(carddav) => carddav.discover_addressbook_home_set().await.unwrap_or_default(),
+        Err(_) => String::new(),
+    };
+    Ok(BootstrapDavHomes {
+        principal_url: dav_session.principal_url,
+        calendar_home_set: dav_session.calendar_home_set,
+        addressbook_home_set,
     })
 }
 
@@ -2540,7 +2790,7 @@ fn contact_dialog(csrf: &str) -> String {
 
 fn account_dialog(csrf: &str) -> String {
     format!(
-        r#"<div id="mail_account_dialog" class="contact-dialog account-dialog" role="dialog" aria-modal="true" aria-labelledby="mail_account_dialog_title" hidden><form id="mail_account_form" action="/accounts/save" method="post"><input type="hidden" name="_token" value="{csrf}"><input type="hidden" name="id" value=""><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2 id="mail_account_dialog_title">Add account</h2><button type="button" id="mail_account_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><fieldset class="account-type-chooser" aria-label="Account type"><label><input type="radio" name="account_type" value="calendar" checked> <span>Calendar</span></label><label><input type="radio" name="account_type" value="carddav"> <span>Contacts</span></label><label><input type="radio" name="account_type" value="email"> <span>Email</span></label></fieldset><div class="account-common-fields"><label><span>Account name</span><input required name="label" type="text" autocomplete="organization"></label><label data-account-field="dav"><span>DAV server URL</span><input name="server_url" type="url" inputmode="url" autocomplete="url" placeholder="https://dav.example.com/"></label><label data-account-field="dav"><span>Auth method</span><select name="auth_method"><option value="basic">Basic password</option><option value="bearer">Bearer token</option><option value="none">None</option></select></label><label data-account-field="email"><span>Email address</span><input name="email_address" type="email" autocomplete="email"></label><label data-account-field="email"><span>IMAP host</span><input name="imap_host" type="text" autocomplete="off"></label><label data-account-field="email"><span>IMAP port</span><input name="imap_port" type="number" min="1" max="65535" value="993"></label><label data-account-field="email"><span>Encryption</span><select name="encryption"><option value="ssl">SSL</option><option value="tls">STARTTLS</option><option value="none">None</option></select></label><label><span>User name</span><input required name="username" type="text" autocomplete="username"></label><label><span>Password or token</span><input name="password" type="password" autocomplete="current-password"></label><label data-account-field="dav"><span>Home set</span><input name="home_set" type="text" autocomplete="off" placeholder="/calendars/user/"></label><label data-account-field="email"><span>Auto refresh minutes</span><input name="refresh_interval_minutes" type="number" min="1" max="1440" value="1"></label></div><div id="mail_account_error" class="mail-error" aria-live="assertive" hidden></div><div class="contact-dialog-footer"><button type="button" id="mail_account_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
+        r#"<div id="mail_account_dialog" class="contact-dialog account-dialog" role="dialog" aria-modal="true" aria-labelledby="mail_account_dialog_title" hidden><form id="mail_account_form" action="/accounts/save" method="post"><input type="hidden" name="_token" value="{csrf}"><input type="hidden" name="id" value=""><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2 id="mail_account_dialog_title">Add account</h2><button type="button" id="mail_account_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><fieldset class="account-type-chooser" aria-label="Account type"><label><input type="radio" name="account_type" value="calendar" checked> <span>Calendar</span></label><label><input type="radio" name="account_type" value="carddav"> <span>Contacts</span></label><label><input type="radio" name="account_type" value="email"> <span>Email</span></label></fieldset><div class="account-common-fields"><label><span>Account name</span><input required name="label" type="text" autocomplete="organization"></label><label data-account-field="dav"><span>DAV server URL</span><input name="server_url" type="url" inputmode="url" autocomplete="url" placeholder="https://dav.example.com/"></label><label data-account-field="dav"><span>Auth method</span><select name="auth_method"><option value="basic">Basic password</option><option value="bearer">Bearer token</option><option value="none">None</option></select></label><label data-account-field="email"><span>Email address</span><input name="email_address" type="email" autocomplete="email"></label><label data-account-field="email"><span>IMAP host</span><input name="imap_host" type="text" autocomplete="off"></label><label data-account-field="email"><span>IMAP port</span><input name="imap_port" type="number" min="1" max="65535" value="993"></label><label data-account-field="email"><span>Encryption</span><select name="encryption"><option value="ssl">SSL</option><option value="tls">STARTTLS</option><option value="none">None</option></select></label><label><span>User name</span><input required name="username" type="text" autocomplete="username"></label><label><span>Password or token</span><input name="password" type="password" autocomplete="current-password"><small class="account-credential-help">Saved credentials are never shown. Leave this blank when editing to keep the current credential.</small></label><label data-account-field="dav"><span>Home set</span><input name="home_set" type="text" autocomplete="off" placeholder="/calendars/user/"></label><label data-account-field="email"><span>Auto refresh minutes</span><input name="refresh_interval_minutes" type="number" min="1" max="1440" value="1"></label></div><div id="mail_account_error" class="mail-error" aria-live="assertive" hidden></div><div class="contact-dialog-footer"><button type="button" id="mail_account_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
     )
 }
 
