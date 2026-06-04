@@ -898,8 +898,14 @@ WHERE owner=$1 AND account_id=$2 AND uid=$3
             return (SealedPassword::default(), true);
         }
 
-        if let Ok(password) = serde_json::from_str(value) {
-            return (password, false);
+        if let Ok(password) = serde_json::from_str::<SealedPassword>(value) {
+            if password.is_empty() {
+                return (SealedPassword::default(), true);
+            }
+            if password.reveal().is_ok() {
+                return (password, false);
+            }
+            return (SealedPassword::default(), true);
         }
 
         let password = {
@@ -975,6 +981,7 @@ mod tests {
     use uuid::Uuid;
 
     async fn test_storage() -> Option<Storage> {
+        crate::imap_backend::install_test_password_key();
         let database_url = std::env::var("CALDAVER_TEST_DATABASE_URL").ok()?;
         Storage::connect(&database_url, "storage-test-secret").await.ok()
     }
@@ -1031,6 +1038,7 @@ mod tests {
     }
 
     fn test_account() -> MailAccount {
+        crate::imap_backend::install_test_password_key();
         MailAccount {
             id: 0,
             label: "Inbox".to_string(),
@@ -1046,6 +1054,7 @@ mod tests {
     }
 
     fn test_dav_account(account_type: &str, owner: &str, password: &str) -> DavAccount {
+        crate::imap_backend::install_test_password_key();
         DavAccount {
             id: 0,
             account_type: account_type.to_string(),
