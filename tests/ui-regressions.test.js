@@ -179,6 +179,9 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(server, /data-navigation-url="\/mail\/message\/navigation"/);
   assert.doesNotMatch(mailMessage, /compose-button[\s\S]*labels\.inbox/);
   assert.match(mailMessageJs, /function setupSwipeNavigation\(\)/);
+  assert.match(mailMessageJs, /function setupHtmlFrameSwipeNavigation\(htmlFrame\)/);
+  assert.match(mailMessageJs, /bindSwipeNavigationTarget\(htmlFrame\.contentWindow\.document, htmlFrame\)/);
+  assert.match(mailMessageJs, /setupHtmlFrameSwipeNavigation\(htmlFrame\)/);
   assert.match(mailMessageJs, /function messageNavigationState\(messages, uid\)/);
   assert.match(mailMessageJs, /function loadMessageNavigation\(reader\)/);
   assert.match(mailMessageJs, /function updateMessageNavButtons\(\)/);
@@ -201,8 +204,13 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(mailJs, /function openComposeScreen\(\)/);
   assert.match(mailJs, /Sending is not configured for this account yet/);
   assert.match(appJs, /insert_mobile_previous_events_row/);
+  assert.match(appJs, /show_mobile_previous_events/);
+  assert.match(appJs, /function mobile_previous_events_step_days\(\)/);
+  assert.match(appJs, /visibleRange:\s*calendar_list_visible_range/);
+  assert.match(appJs, /mobile_calendar_previous_event_days \+= mobile_previous_events_step_days\(\)/);
+  assert.match(appJs, /fullCalendar\('gotoDate', current_date\)/);
+  assert.doesNotMatch(appJs, /fullCalendar\('prev'\)/);
   assert.match(appJs, /text:\s*'Previous events'/);
-  assert.match(appJs, /fullCalendar\('prev'\)/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mobile-section-menu\s*\{[\s\S]*display:\s*block;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-mobile-compose-button[\s\S]*background:\s*#d93025;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*\.mail-compose-screen/);
@@ -525,6 +533,31 @@ test('layout CSS keeps mobile pages scrollable and controls visible', () => {
   assert.match(less, /\.mail-shell\s*\{[\s\S]*height:\s*~"calc\(100dvh - 64px\)";/);
   assert.match(less, /\.mail-reader-message\s*\{[\s\S]*max-width:\s*none;/);
   assert.match(less, /\.mail-reader-html\s*\{[\s\S]*width:\s*100%;/);
+});
+
+test('mobile previous-events control preserves future calendar scrolling', () => {
+  const appJs = read('assets/js/app/app.js');
+  const handler = sourceBetween(
+    appJs,
+    /var bind_mobile_previous_events_control = function bind_mobile_previous_events_control/,
+    /var show_calendar_datepicker = function show_calendar_datepicker/
+  );
+
+  assert.doesNotMatch(
+    handler,
+    /fullCalendar\('prev'\)/,
+    'Previous events must not replace the current upcoming list window with an older FullCalendar page'
+  );
+  assert.doesNotMatch(
+    handler,
+    /mobile_previous_events_target_date|subtract\(mobile_previous_events_step_days\(\)/,
+    'Previous events must not move the calendar anchor backward and drop future events from the rendered range'
+  );
+  assert.match(handler, /mobile_calendar_previous_event_days \+= mobile_previous_events_step_days\(\)/);
+  assert.match(handler, /fullCalendar\('gotoDate', current_date\)/);
+  assert.match(appJs, /var calendar_list_visible_range = function calendar_list_visible_range/);
+  assert.match(appJs, /end:\s*start\.clone\(\)\.add\(duration_days \+ mobile_calendar_previous_event_days, 'days'\)/);
+  assert.match(appJs, /mobile_calendar_previous_event_days = 0;\s*\n\s*\$\(('#calendar_view'|"#calendar_view")\)\.fullCalendar\('gotoDate', d\)/);
 });
 
 test('mail compose preserves device draft, unavailable send, and accessibility contracts', () => {

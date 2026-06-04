@@ -757,6 +757,11 @@ describe('Caldaver Android WebView mail reader gestures', function () {
     await waitForDocument();
   });
 
+  afterEach(async function () {
+    await browser.url(baseURL);
+    await waitForDocument();
+  });
+
   it('navigates newer and older messages with horizontal swipes', async function () {
     const scriptSource = mailMessageScriptSource();
 
@@ -777,6 +782,7 @@ describe('Caldaver Android WebView mail reader gestures', function () {
               data-account-id="1"
               data-uid="802"
               data-message-url="/mail/message"
+              data-navigation-url="/mail/message/navigation"
               data-messages-url="/mail/messages"
               data-read-url="#mail-read"
               data-unread-url="/mail/message/unread"
@@ -785,16 +791,25 @@ describe('Caldaver Android WebView mail reader gestures', function () {
               data-csrf-token="token">
               <button type="button" id="mail_reader_refresh"></button>
               <button type="button" id="mail_reader_unread" hidden></button>
+              <button type="button" id="mail_reader_previous" disabled></button>
+              <button type="button" id="mail_reader_next" disabled></button>
               <div id="mail_reader_error" hidden></div>
               <article id="mail_reader_message" hidden>
                 <h1 id="mail_reader_subject"></h1>
-                <strong id="mail_reader_from"></strong>
-                <span id="mail_reader_date"></span>
-                <div class="mail-reader-avatar"></div>
-                <pre id="mail_reader_body"></pre>
-                <iframe id="mail_reader_html" hidden></iframe>
-                <div id="mail_reader_attachments"></div>
+                <div id="mail_reader_thread"></div>
               </article>
+              <section id="mail_reply_composer" hidden>
+                <button type="button" id="mail_reply_close"></button>
+                <form id="mail_reply_form">
+                  <input id="mail_reply_to">
+                  <input id="mail_reply_subject">
+                  <textarea id="mail_reply_body"></textarea>
+                  <button type="button" id="mail_reply_send"></button>
+                  <button type="button" id="mail_reply_discard"></button>
+                </form>
+                <div id="mail_reply_status"></div>
+                <div id="mail_reply_error" hidden></div>
+              </section>
               <div id="mail_reader_loading"></div>
             </section>
           </body>
@@ -811,11 +826,26 @@ describe('Caldaver Android WebView mail reader gestures', function () {
         802: { uid: 802, from: 'Current', subject: 'Current message', date: 'earlier', body: 'Current body' },
         803: { uid: 803, from: 'Older', subject: 'Older message', date: 'oldest', body: 'Older body' }
       };
+      window.__mailNavigationRequests = [];
       window.fetch = url => {
         const requestUrl = String(url);
-        const payload = requestUrl.indexOf('/mail/messages') !== -1
-          ? { data: inbox }
-          : { data: details[new URL(requestUrl, window.location.href).searchParams.get('uid')] };
+        const parsedUrl = new URL(requestUrl, window.location.href);
+        let payload;
+        if (requestUrl.indexOf('/mail/message/navigation') !== -1) {
+          const uid = parsedUrl.searchParams.get('uid');
+          window.__mailNavigationRequests.push(uid);
+          const index = inbox.findIndex(message => String(message.uid) === String(uid));
+          payload = {
+            data: {
+              previous: index > 0 ? inbox[index - 1].uid : null,
+              next: index !== -1 && index < inbox.length - 1 ? inbox[index + 1].uid : null
+            }
+          };
+        } else if (requestUrl.indexOf('/mail/messages') !== -1) {
+          payload = { data: [] };
+        } else {
+          payload = { data: details[parsedUrl.searchParams.get('uid')] };
+        }
         return Promise.resolve({
           ok: true,
           text: () => Promise.resolve(JSON.stringify(payload))
@@ -837,27 +867,41 @@ describe('Caldaver Android WebView mail reader gestures', function () {
     async function swipe(fromX, toX) {
       await browser.execute((startX, endX) => {
         const element = document.querySelector('#mail_reader_message');
-        const mouseOptions = clientX => ({
-          bubbles: true,
-          cancelable: true,
-          button: 0,
-          buttons: 1,
+        const touch = clientX => ({
+          identifier: 1,
+          target: element,
           clientX,
-          clientY: 220
+          clientY: 220,
+          pageX: clientX,
+          pageY: 220,
+          screenX: clientX,
+          screenY: 220
         });
-        element.dispatchEvent(new MouseEvent('mousedown', mouseOptions(startX)));
-        element.dispatchEvent(new MouseEvent('mouseup', mouseOptions(endX)));
+        const start = new Event('touchstart', { bubbles: true, cancelable: true });
+        Object.defineProperty(start, 'touches', { value: [touch(startX)] });
+        Object.defineProperty(start, 'changedTouches', { value: [touch(startX)] });
+        element.dispatchEvent(start);
+
+        const end = new Event('touchend', { bubbles: true, cancelable: true });
+        Object.defineProperty(end, 'touches', { value: [] });
+        Object.defineProperty(end, 'changedTouches', { value: [touch(endX)] });
+        element.dispatchEvent(end);
       }, fromX, toX);
     }
 
+    await browser.waitUntil(async () => {
+      return browser.execute(() => !document.querySelector('#mail_reader_previous').disabled && !document.querySelector('#mail_reader_next').disabled);
+    }, { timeoutMsg: 'Swipe fixture did not enable both mail navigation buttons' });
     await swipe(60, 320);
     await browser.waitUntil(async () => {
       return browser.execute(() => (window.__mailNavigationTarget || '').indexOf('uid=801') !== -1);
     }, { timeoutMsg: 'Right swipe did not navigate to the newer message' });
+    assert.deepEqual(await browser.execute(() => window.__mailNavigationRequests), ['802']);
 
     await browser.execute(source => {
       document.querySelector('#mail_reader').dataset.uid = '802';
       window.__mailNavigationTarget = '';
+      window.__mailNavigationRequests = [];
       const script = document.createElement('script');
       script.textContent = source;
       document.body.appendChild(script);
@@ -868,5 +912,6 @@ describe('Caldaver Android WebView mail reader gestures', function () {
     await browser.waitUntil(async () => {
       return browser.execute(() => (window.__mailNavigationTarget || '').indexOf('uid=803') !== -1);
     }, { timeoutMsg: 'Left swipe did not navigate to the older message' });
+    assert.deepEqual(await browser.execute(() => window.__mailNavigationRequests), ['802']);
   });
 });

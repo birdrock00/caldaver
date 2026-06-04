@@ -21,6 +21,7 @@
 var dustbase = {};
 var event_details_popup;
 var mobile_viewport_query = '(max-width: 900px)';
+var mobile_calendar_previous_event_days = 0;
 
 var is_mobile_viewport = function is_mobile_viewport() {
   if (window.matchMedia !== undefined) {
@@ -62,6 +63,26 @@ var calendar_list_duration_days = function calendar_list_duration_days() {
   }
 
   return preferred_days || 7;
+};
+
+var mobile_previous_events_step_days = function mobile_previous_events_step_days() {
+  return Math.min(14, Math.max(7, Math.floor(calendar_list_duration_days() / 8)));
+};
+
+var calendar_list_visible_range = function calendar_list_visible_range(current_date) {
+  var start = moment.isMoment(current_date) ? current_date.clone() : moment(current_date);
+  var duration_days = calendar_list_duration_days();
+
+  start.startOf('day');
+
+  if (is_mobile_viewport()) {
+    start.subtract(mobile_calendar_previous_event_days, 'days');
+  }
+
+  return {
+    start: start,
+    end: start.clone().add(duration_days + mobile_calendar_previous_event_days, 'days')
+  };
 };
 
 var default_calendar_timezone = 'America/Los_Angeles';
@@ -187,7 +208,8 @@ $(document).ready(function() {
     views: {
       customizable_list: {
         type: 'list',
-        duration: { days: calendar_list_duration_days() },
+        visibleRange: calendar_list_visible_range,
+        dateIncrement: { days: calendar_list_duration_days() },
         listDayFormat: 'dddd',
         listDayAltFormat: 'MMMM D'
       }
@@ -576,9 +598,20 @@ var bind_mobile_previous_events_control = function bind_mobile_previous_events_c
     }
 
     e.preventDefault();
-    $('#calendar_view').fullCalendar('prev');
-    window.scrollTo(0, 0);
+    show_mobile_previous_events();
   });
+};
+
+var show_mobile_previous_events = function show_mobile_previous_events() {
+  var $calendar = $('#calendar_view');
+  var current_date = $calendar.fullCalendar('getDate');
+
+  if (!current_date || !moment.isMoment(current_date)) {
+    return;
+  }
+
+  mobile_calendar_previous_event_days += mobile_previous_events_step_days();
+  $calendar.fullCalendar('gotoDate', current_date);
 };
 
 var show_calendar_datepicker = function show_calendar_datepicker() {
@@ -645,6 +678,7 @@ var goto_datepicker_selection = function goto_datepicker_selection($datepicker) 
   var d = $datepicker.datepicker('getDate');
 
   if (d) {
+    mobile_calendar_previous_event_days = 0;
     $('#calendar_view').fullCalendar('gotoDate', d);
   }
 };
