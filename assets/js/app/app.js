@@ -219,6 +219,10 @@ $(document).ready(function() {
     eventClick: event_click_callback,
     viewRender: function(view, element) {
       sync_mobile_calendar_chrome(view);
+      insert_mobile_previous_events_row(view);
+    },
+    eventAfterAllRender: function(view) {
+      insert_mobile_previous_events_row(view);
     },
 
     // Add new event by dragging. Click also triggers this event,
@@ -482,6 +486,99 @@ var sync_mobile_calendar_chrome = function sync_mobile_calendar_chrome(view) {
 
   $('#mobile_calendar_toolbar_date').text(date.format('MMMM D, YYYY'));
   $('#mobile_calendar_toolbar_day').text(date.format('dddd'));
+};
+
+var insert_mobile_previous_events_row = function insert_mobile_previous_events_row(view) {
+  var $calendar = $('#calendar_view');
+  var current_view = view || $calendar.fullCalendar('getView');
+
+  $calendar.find('.mobile-calendar-previous-events').remove();
+
+  if (!is_mobile_viewport() || current_view === undefined || current_view.name !== 'customizable_list') {
+    return;
+  }
+
+  var $table_body = $calendar.find('.fc-list-table tbody').first();
+
+  if ($table_body.length === 0) {
+    var $empty_list = $calendar.find('.fc-list-empty-wrap2').first();
+
+    if ($empty_list.length > 0) {
+      var $empty_control = $('<div/>', {
+        'class': 'mobile-calendar-previous-events mobile-calendar-previous-events-empty',
+        role: 'button',
+        tabindex: '0',
+        'aria-label': 'Show previous events'
+      })
+        .append($('<span/>', {
+          'class': 'mobile-calendar-previous-events-icon'
+        }).append($('<i/>', {
+          'class': 'fa fa-chevron-up',
+          'aria-hidden': 'true'
+        })))
+        .append($('<span/>', {
+          'class': 'mobile-calendar-previous-events-title',
+          text: 'Previous events'
+        }))
+        .append($('<span/>', {
+          'class': 'mobile-calendar-previous-events-subtitle',
+          text: 'Tap to show older events'
+        }));
+
+      bind_mobile_previous_events_control($empty_control);
+      $empty_list.prepend($empty_control);
+    }
+
+    return;
+  }
+
+  var $row = $('<tr/>', {
+    'class': 'fc-list-item mobile-calendar-previous-events',
+    role: 'button',
+    tabindex: '0',
+    'aria-label': 'Show previous events'
+  });
+
+  $('<td/>', {
+    'class': 'fc-list-item-marker'
+  })
+    .append($('<span/>', {
+      'class': 'fc-event-dot mobile-calendar-previous-events-icon'
+    }).append($('<i/>', {
+      'class': 'fa fa-chevron-up',
+      'aria-hidden': 'true'
+    })))
+    .appendTo($row);
+
+  $('<td/>', {
+    'class': 'fc-list-item-title'
+  })
+    .append($('<a/>', {
+      href: '#',
+      text: 'Previous events'
+    }))
+    .appendTo($row);
+
+  $('<td/>', {
+    'class': 'fc-list-item-time',
+    text: 'Tap to show older events'
+  }).appendTo($row);
+
+  bind_mobile_previous_events_control($row);
+
+  $table_body.prepend($row);
+};
+
+var bind_mobile_previous_events_control = function bind_mobile_previous_events_control($control) {
+  $control.on('click keydown', function(e) {
+    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') {
+      return;
+    }
+
+    e.preventDefault();
+    $('#calendar_view').fullCalendar('prev');
+    window.scrollTo(0, 0);
+  });
 };
 
 var show_calendar_datepicker = function show_calendar_datepicker() {

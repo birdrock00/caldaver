@@ -202,6 +202,7 @@
     $('#mail_error').hidden = !error;
     $('#mail_no_messages').hidden = loading || error || !account || count > 0;
     $('#mail_empty').hidden = accounts.length > 0 || error || loading;
+    renderComposeButton();
   }
 
   function setMailStatus(status, message) {
@@ -249,6 +250,286 @@
     });
   }
 
+  function ensureComposeControls() {
+    if ($('#mail_compose')) {
+      return;
+    }
+
+    var sidebar = document.querySelector('.mail-sidebar');
+    var content = document.querySelector('.mail-content');
+    if (!sidebar || !content) {
+      return;
+    }
+
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.id = 'mail_compose';
+    button.className = 'mail-mobile-compose-button';
+    button.setAttribute('aria-label', 'Compose mail');
+    button.hidden = true;
+    button.innerHTML = '<i class="fa fa-pencil" aria-hidden="true"></i><span>Compose</span>';
+    sidebar.insertBefore(button, $('#mail_accounts') || null);
+
+    var screen = document.createElement('section');
+    screen.id = 'mail_compose_screen';
+    screen.className = 'mail-compose-screen';
+    screen.hidden = true;
+    screen.setAttribute('aria-label', 'Compose email');
+    screen.innerHTML = '<div class="mail-compose-toolbar">' +
+      '<button type="button" id="mail_compose_back" aria-label="Back"><i class="fa fa-arrow-left" aria-hidden="true"></i></button>' +
+      '<h1>New message</h1>' +
+      '<button type="button" id="mail_compose_send" aria-label="Send" aria-disabled="true"><i class="fa fa-send" aria-hidden="true"></i></button>' +
+      '</div>' +
+      '<form id="mail_compose_form" class="mail-compose-form">' +
+      '<div class="mail-compose-fields">' +
+      '<label class="mail-compose-from"><span>From</span><input id="mail_compose_from" type="email" readonly aria-label="From"></label>' +
+      '<label><span>To</span><input id="mail_compose_to" type="email" autocomplete="email"><button type="button" id="mail_compose_ccbcc" class="mail-compose-ccbcc" aria-expanded="false" aria-controls="mail_compose_cc mail_compose_bcc">Cc/Bcc</button></label>' +
+      '<label id="mail_compose_cc_row" hidden><span>Cc</span><input id="mail_compose_cc" type="email" autocomplete="email" multiple></label>' +
+      '<label id="mail_compose_bcc_row" hidden><span>Bcc</span><input id="mail_compose_bcc" type="email" autocomplete="email" multiple></label>' +
+      '<label><span>Subject</span><input id="mail_compose_subject" type="text" autocomplete="off"></label>' +
+      '</div>' +
+      '<label class="mail-compose-body-label"><span>Message</span><textarea id="mail_compose_body" rows="12" aria-label="Message"></textarea></label>' +
+      '<div class="mail-compose-footer">' +
+      '<button type="button" class="mail-compose-unavailable-action" aria-label="Formatting options unavailable" aria-disabled="true" disabled><i class="fa fa-font" aria-hidden="true"></i></button>' +
+      '<button type="button" class="mail-compose-unavailable-action" aria-label="Attach file unavailable" aria-disabled="true" disabled><i class="fa fa-paperclip" aria-hidden="true"></i></button>' +
+      '<button type="button" class="mail-compose-unavailable-action" aria-label="More compose actions unavailable" aria-disabled="true" disabled><i class="fa fa-ellipsis-v" aria-hidden="true"></i></button>' +
+      '<button type="button" id="mail_compose_discard" class="mail-compose-discard" aria-label="Discard draft"><i class="fa fa-trash" aria-hidden="true"></i></button>' +
+      '</div>' +
+      '<div id="mail_compose_status" class="mail-compose-status" aria-live="polite"></div>' +
+      '<div id="mail_compose_error" class="mail-error mail-compose-error" aria-live="assertive" hidden></div>' +
+      '</form>';
+    content.appendChild(screen);
+  }
+
+  function composeScreenOpen() {
+    var screen = $('#mail_compose_screen');
+    return !!(screen && !screen.hidden);
+  }
+
+  function renderComposeButton() {
+    var button = $('#mail_compose');
+    if (!button) {
+      return;
+    }
+
+    button.hidden = !activeAccount() || composeScreenOpen();
+  }
+
+  function composeDraftKey(accountId) {
+    return 'caldaver.mail.compose.' + accountId;
+  }
+
+  function composeStorage() {
+    try {
+      return window.localStorage || null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function composeFields() {
+    return {
+      from: $('#mail_compose_from'),
+      to: $('#mail_compose_to'),
+      cc: $('#mail_compose_cc'),
+      bcc: $('#mail_compose_bcc'),
+      subject: $('#mail_compose_subject'),
+      body: $('#mail_compose_body')
+    };
+  }
+
+  function composeDraftValue() {
+    var fields = composeFields();
+    return {
+      to: fields.to ? fields.to.value : '',
+      cc: fields.cc ? fields.cc.value : '',
+      bcc: fields.bcc ? fields.bcc.value : '',
+      subject: fields.subject ? fields.subject.value : '',
+      body: fields.body ? fields.body.value : '',
+      ccBccVisible: !!($('#mail_compose_cc_row') && !$('#mail_compose_cc_row').hidden)
+    };
+  }
+
+  function composeDraftHasContent(draft) {
+    return !!(draft && (
+      (draft.to || '').trim() ||
+      (draft.cc || '').trim() ||
+      (draft.bcc || '').trim() ||
+      (draft.subject || '').trim() ||
+      (draft.body || '').trim()
+    ));
+  }
+
+  function setComposeStatus(message) {
+    var status = $('#mail_compose_status');
+    if (status) {
+      status.textContent = message || '';
+    }
+  }
+
+  function setComposeError(message) {
+    var error = $('#mail_compose_error');
+    if (!error) {
+      return;
+    }
+
+    error.textContent = message || '';
+    error.hidden = !message;
+  }
+
+  function setCcBccVisible(visible) {
+    var ccRow = $('#mail_compose_cc_row');
+    var bccRow = $('#mail_compose_bcc_row');
+    var toggle = $('#mail_compose_ccbcc');
+    if (!ccRow || !bccRow || !toggle) {
+      return;
+    }
+
+    ccRow.hidden = !visible;
+    bccRow.hidden = !visible;
+    toggle.setAttribute('aria-expanded', visible ? 'true' : 'false');
+  }
+
+  function saveComposeDraft(showStatus) {
+    var account = activeAccount();
+    var storage = composeStorage();
+    if (!account || !storage) {
+      return;
+    }
+
+    var draft = composeDraftValue();
+    try {
+      if (composeDraftHasContent(draft)) {
+        storage.setItem(composeDraftKey(account.id), JSON.stringify(draft));
+      } else {
+        storage.removeItem(composeDraftKey(account.id));
+      }
+      if (showStatus) {
+        setComposeStatus('Saved on this device');
+      }
+    } catch (error) {
+      setComposeStatus('Draft could not be saved on this device.');
+    }
+  }
+
+  function loadComposeDraft(account) {
+    var storage = composeStorage();
+    if (!account || !storage) {
+      return null;
+    }
+
+    try {
+      var raw = storage.getItem(composeDraftKey(account.id));
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function clearComposeDraft(account) {
+    var storage = composeStorage();
+    if (!account || !storage) {
+      return;
+    }
+
+    try {
+      storage.removeItem(composeDraftKey(account.id));
+    } catch (error) {
+      return;
+    }
+  }
+
+  function resetComposeFields() {
+    var fields = composeFields();
+    ['to', 'cc', 'bcc', 'subject', 'body'].forEach(function(name) {
+      if (fields[name]) {
+        fields[name].value = '';
+      }
+    });
+    setCcBccVisible(false);
+    setComposeStatus('');
+    setComposeError('');
+  }
+
+  function restoreComposeDraft(account) {
+    var fields = composeFields();
+    var draft = loadComposeDraft(account);
+    resetComposeFields();
+
+    if (!draft) {
+      return;
+    }
+
+    fields.to.value = draft.to || '';
+    fields.cc.value = draft.cc || '';
+    fields.bcc.value = draft.bcc || '';
+    fields.subject.value = draft.subject || '';
+    fields.body.value = draft.body || '';
+    setCcBccVisible(!!(draft.ccBccVisible || draft.cc || draft.bcc));
+    if (composeDraftHasContent(draft)) {
+      setComposeStatus('Saved on this device');
+    }
+  }
+
+  function openComposeScreen() {
+    var account = activeAccount();
+    var screen = $('#mail_compose_screen');
+    if (!account || !screen) {
+      return;
+    }
+
+    $('#mail_compose_from').value = account.email_address || account.label || '';
+    restoreComposeDraft(account);
+    screen.hidden = false;
+    document.body.classList.add('mail-compose-open');
+    renderComposeButton();
+    window.setTimeout(function() {
+      $('#mail_compose_to').focus();
+    }, 0);
+  }
+
+  function closeComposeScreen() {
+    var screen = $('#mail_compose_screen');
+    if (!screen) {
+      return;
+    }
+
+    saveComposeDraft(false);
+    screen.hidden = true;
+    document.body.classList.remove('mail-compose-open');
+    renderComposeButton();
+  }
+
+  function showComposeSendUnavailable() {
+    saveComposeDraft(true);
+    setComposeError('Sending is not configured for this account yet. Your draft is only saved on this device.');
+  }
+
+  function discardComposeDraft() {
+    var account = activeAccount();
+    if (!account || !window.confirm('Discard this draft?')) {
+      return;
+    }
+
+    clearComposeDraft(account);
+    resetComposeFields();
+    closeComposeScreen();
+  }
+
+  function bindComposeDraftAutosave() {
+    ['#mail_compose_to', '#mail_compose_cc', '#mail_compose_bcc', '#mail_compose_subject', '#mail_compose_body'].forEach(function(selector) {
+      var field = $(selector);
+      if (!field) {
+        return;
+      }
+
+      field.addEventListener('input', function() {
+        setComposeError('');
+        saveComposeDraft(true);
+      });
+    });
+  }
+
   function refreshIntervalMs(account) {
     return Math.max(60, Number(account && account.refresh_interval_seconds || 60)) * 1000;
   }
@@ -270,8 +551,17 @@
   }
 
   function selectAccount(accountId, syncAfterLoad, scrollAfterSelect) {
+    if (composeScreenOpen()) {
+      saveComposeDraft(false);
+    }
     activeAccountId = accountId;
     renderAccounts();
+    renderComposeButton();
+    if (composeScreenOpen()) {
+      var account = activeAccount();
+      $('#mail_compose_from').value = account ? (account.email_address || account.label || '') : '';
+      restoreComposeDraft(account);
+    }
     scheduleAutoRefresh();
     if (scrollAfterSelect) {
       scrollMailContentIntoView();
@@ -439,12 +729,46 @@
   }
 
   document.addEventListener('DOMContentLoaded', function() {
+    ensureComposeControls();
     readMailQuery();
     setMailStatus('loading', 'Loading cached mail...');
     $('#mail_refresh').addEventListener('click', function() {
       syncMessages(++messageRequestId);
     });
     $('#mail_search').addEventListener('input', renderMessages);
+    $('#mail_compose').addEventListener('click', openComposeScreen);
+    $('#mail_compose_back').addEventListener('click', closeComposeScreen);
+    $('#mail_compose_send').addEventListener('click', showComposeSendUnavailable);
+    $('#mail_compose_ccbcc').addEventListener('click', function() {
+      setCcBccVisible(true);
+      saveComposeDraft(true);
+      window.setTimeout(function() {
+        $('#mail_compose_cc').focus();
+      }, 0);
+    });
+    $('#mail_compose_discard').addEventListener('click', discardComposeDraft);
+    bindComposeDraftAutosave();
+    $('#mail_compose_form').addEventListener('submit', function(event) {
+      event.preventDefault();
+      showComposeSendUnavailable();
+    });
+    document.addEventListener('keydown', function(event) {
+      if (!composeScreenOpen()) {
+        return;
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeComposeScreen();
+        return;
+      }
+
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        showComposeSendUnavailable();
+      }
+    });
+    window.addEventListener('resize', renderComposeButton);
     $('#mail_nav_item').addEventListener('click', function(event) {
       event.preventDefault();
       syncMessages(++messageRequestId);
