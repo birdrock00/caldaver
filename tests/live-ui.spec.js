@@ -114,8 +114,60 @@ async function mockMailApi(page, options = {}) {
     });
   });
 
+  await page.route('**/accounts', async route => {
+    if (accountStatus >= 400) {
+      return route.fulfill({
+        status: accountStatus,
+        contentType: 'application/json',
+        body: JSON.stringify({ result: 'ERROR', message: 'Mock account load failed' })
+      });
+    }
+
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        data: [
+          {
+            type: 'calendar',
+            id: 'session-calendar',
+            label: 'Current login',
+            identifier: 'demo',
+            server: 'https://example.test/dav/',
+            home_set: '/calendars/demo/',
+            enabled: true,
+            source: 'session',
+            password_needs_reset: false
+          },
+          {
+            type: 'carddav',
+            id: 'session-carddav',
+            label: 'Current login',
+            identifier: 'demo',
+            server: 'https://example.test/dav/',
+            home_set: '/addressbooks/demo/',
+            enabled: true,
+            source: 'session',
+            password_needs_reset: false
+          },
+          ...accounts.map(account => ({
+            type: 'email',
+            id: String(account.id),
+            label: account.label,
+            identifier: account.email_address,
+            server: account.imap_host || '',
+            home_set: 'IMAP',
+            enabled: true,
+            source: 'postgres',
+            password_needs_reset: !!account.password_needs_reset
+          }))
+        ]
+      })
+    });
+  });
+
   if (!options.skipAccountSaveRoute) {
-    await page.route('**/mail/accounts/save', async route => {
+    const accountSaveHandler = async route => {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -133,7 +185,9 @@ async function mockMailApi(page, options = {}) {
           }
         })
       });
-    });
+    };
+    await page.route('**/mail/accounts/save', accountSaveHandler);
+    await page.route('**/accounts/save', accountSaveHandler);
   }
 
   await page.route('**/mail/messages/sync?**', async route => {
@@ -233,6 +287,12 @@ async function mockMailApi(page, options = {}) {
 async function openMailAccountDialog(page) {
   await page.goto(`${baseURL}/preferences`);
   await page.locator('#mail_account_create').click();
+}
+
+async function chooseEmailAccountType(page) {
+  await page.locator('#mail_account_form input[name="account_type"][value="email"]').check();
+  await expect(page.locator('#mail_account_form input[name="email_address"]')).toBeVisible();
+  await expect(page.locator('#mail_account_form input[name="server_url"]')).toBeHidden();
 }
 
 async function mockCardsApi(page, count = 36) {
@@ -1374,13 +1434,20 @@ test('mail account tab switching ignores stale message responses', async ({ page
   expect(consoleErrors).toEqual([]);
 });
 
-test('mail add-account dialog posts expected fields and supports multiple saved accounts', async ({ page }) => {
+test('preferences add-account dialog posts expected email fields through unified accounts endpoint', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
   const savedAccounts = [];
   const postedForms = [];
   await mockMailApi(page, { accounts: [], skipAccountSaveRoute: true });
-  await page.route('**/mail/accounts/save', async route => {
+  await page.route('**/accounts', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: savedAccounts })
+    });
+  });
+  await page.route('**/accounts/save', async route => {
     postedForms.push(parsePostedForm(route.request()));
     const fixtures = [
       {
@@ -1398,14 +1465,16 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
     ];
     const fixture = fixtures[savedAccounts.length];
     const account = {
+      type: 'email',
       id: 99 + savedAccounts.length,
       label: fixture.label,
-      email_address: fixture.email_address,
-      imap_host: fixture.imap_host,
-      imap_port: 993,
-      encryption: 'ssl',
-      username: fixture.username,
-      refresh_interval_seconds: 60
+      identifier: fixture.email_address,
+      server: `${fixture.imap_host}:993`,
+      home_set: 'IMAP',
+      enabled: true,
+      source: 'postgres',
+      password_needs_reset: false,
+      last_error: ''
     };
     savedAccounts.push(account);
 
@@ -1425,6 +1494,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await expect(page.locator('#mail_account_create')).toHaveCount(0);
   await openMailAccountDialog(page);
   await expect(page.locator('#mail_account_dialog')).toBeVisible();
+  await chooseEmailAccountType(page);
   await expect(page.locator('#mail_account_form input[name="imap_port"]')).toHaveValue('993');
   await expect(page.locator('#mail_account_form select[name="encryption"]')).toHaveValue('ssl');
   await expect(page.locator('#mail_account_form input[name="refresh_interval_minutes"]')).toHaveValue('1');
@@ -1437,7 +1507,9 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await page.locator('#mail_account_form button[type="submit"]').click();
 
   await expect(page.locator('#mail_account_dialog')).toBeHidden();
+  await expect(page.locator('#connected_accounts .prefs-account-row')).toHaveCount(1);
   await openMailAccountDialog(page);
+  await chooseEmailAccountType(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Second Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('second@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap2.example.test');
@@ -1448,6 +1520,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
   await expect(page.locator('#mail_account_dialog')).toBeHidden();
   expect(postedForms).toHaveLength(2);
   expect(postedForms[0]).toMatchObject({
+    account_type: 'email',
     label: 'Test Inbox',
     email_address: 'test@example.com',
     imap_host: 'imap.example.test',
@@ -1458,6 +1531,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
     refresh_interval_minutes: '1'
   });
   expect(postedForms[1]).toMatchObject({
+    account_type: 'email',
     label: 'Second Inbox',
     email_address: 'second@example.com',
     imap_host: 'imap2.example.test',
@@ -1468,6 +1542,7 @@ test('mail add-account dialog posts expected fields and supports multiple saved 
     refresh_interval_minutes: '1'
   });
   expect(savedAccounts.map(account => account.label)).toEqual(['Test Inbox', 'Second Inbox']);
+  await expect(page.locator('#connected_accounts .prefs-account-row')).toHaveCount(2);
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
@@ -1538,18 +1613,26 @@ test('mail compose saves account drafts and handles unavailable send paths', asy
   expect(consoleErrors).toEqual([]);
 });
 
-test('mail add-account stalled backend response times out visibly', async ({ page }) => {
+test('preferences add-account stalled backend response times out visibly', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
   await mockMailApi(page, { accounts: [], skipAccountSaveRoute: true });
+  await page.route('**/accounts', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: [] })
+    });
+  });
 
   await page.goto(`${baseURL}/mail`);
   await openMailAccountDialog(page);
+  await chooseEmailAccountType(page);
   await page.evaluate(() => {
     const originalFetch = window.fetch.bind(window);
     window.CALDAVER_MAIL_REQUEST_TIMEOUT_MS = 250;
     window.fetch = function(url, options) {
-      if (String(url).indexOf('/mail/accounts/save') === -1) {
+      if (String(url).indexOf('/accounts/save') === -1) {
         return originalFetch(url, options);
       }
 
@@ -1576,11 +1659,18 @@ test('mail add-account stalled backend response times out visibly', async ({ pag
   expect(consoleErrors).toEqual([]);
 });
 
-test('mail add-account save failure stays visible in the dialog', async ({ page }) => {
+test('preferences add-account save failure stays visible in the dialog', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
   await mockMailApi(page, { accounts: [] });
-  await page.route('**/mail/accounts/save', async route => {
+  await page.route('**/accounts', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: [] })
+    });
+  });
+  await page.route('**/accounts/save', async route => {
     return route.fulfill({
       status: 400,
       contentType: 'application/json',
@@ -1590,6 +1680,7 @@ test('mail add-account save failure stays visible in the dialog', async ({ page 
 
   await page.goto(`${baseURL}/mail`);
   await openMailAccountDialog(page);
+  await chooseEmailAccountType(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Bad Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('bad@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');
@@ -1604,12 +1695,19 @@ test('mail add-account save failure stays visible in the dialog', async ({ page 
   expect(consoleErrors).toEqual([]);
 });
 
-test('mail add-account non-JSON auth failure shows a useful error', async ({ page }) => {
+test('preferences add-account non-JSON auth failure shows a useful error', async ({ page }) => {
   const pageErrors = await login(page);
   const consoleErrors = captureConsoleErrors(page);
   let requestedWith = '';
   await mockMailApi(page, { accounts: [] });
-  await page.route('**/mail/accounts/save', async route => {
+  await page.route('**/accounts', async route => {
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ data: [] })
+    });
+  });
+  await page.route('**/accounts/save', async route => {
     requestedWith = route.request().headers()['x-requested-with'] || '';
     return route.fulfill({
       status: 401,
@@ -1620,6 +1718,7 @@ test('mail add-account non-JSON auth failure shows a useful error', async ({ pag
 
   await page.goto(`${baseURL}/mail`);
   await openMailAccountDialog(page);
+  await chooseEmailAccountType(page);
   await page.locator('#mail_account_form input[name="label"]').fill('Expired Inbox');
   await page.locator('#mail_account_form input[name="email_address"]').fill('expired@example.com');
   await page.locator('#mail_account_form input[name="imap_host"]').fill('imap.example.com');

@@ -400,6 +400,114 @@ div.preferences-container {
   padding: 6px 12px 6px 0;
 }
 
+.prefs-accounts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+
+  p {
+    margin: 0;
+    color: #5f6368;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+}
+
+.prefs-account-list {
+  display: grid;
+  gap: 10px;
+}
+
+.prefs-account-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  min-height: 80px;
+  padding: 14px;
+  background: #f8fafd;
+  border: 1px solid #e1e5ea;
+  border-radius: 8px;
+}
+
+.prefs-account-icon {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  color: #0b57d0;
+  background: #e8f0fe;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.prefs-account-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+
+  strong {
+    min-width: 0;
+    color: #202124;
+    font-size: 15px;
+    overflow-wrap: anywhere;
+  }
+
+  span {
+    color: #5f6368;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+}
+
+.prefs-account-detail,
+.prefs-account-home {
+  min-width: 0;
+  margin-top: 3px;
+  color: #5f6368;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.prefs-account-home:empty {
+  display: none;
+}
+
+.prefs-account-source {
+  align-self: start;
+  padding: 4px 8px;
+  color: #137333;
+  background: #e6f4ea;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.prefs-account-warning {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 3px 8px;
+  color: #a50e0e;
+  background: #fce8e6;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.prefs-account-empty {
+  padding: 18px;
+  color: #5f6368;
+  background: #f8fafd;
+  border: 1px dashed #dadce0;
+  border-radius: 8px;
+  text-align: center;
+}
+
 .nav-tabs {
     margin-bottom: 15px;
 }
@@ -2738,6 +2846,47 @@ body.mail-compose-open .mail-compose-screen {
   }
 }
 
+.account-dialog {
+  .contact-dialog-panel {
+    padding-bottom: 0;
+  }
+
+  .contact-dialog-footer {
+    position: sticky;
+    bottom: 0;
+    margin-right: -24px;
+    margin-left: -24px;
+    padding: 14px 24px 18px;
+    background: #fff;
+    border-top: 1px solid #e8eaed;
+  }
+}
+
+.account-type-chooser {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0 10px;
+  padding: 0;
+  border: 0;
+
+  label {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0;
+    padding: 8px;
+    color: #3c4043;
+    background: #fff;
+    border: 1px solid #dadce0;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+}
+
 .contact-dialog-header,
 .contact-dialog-footer {
   display: flex;
@@ -3906,6 +4055,68 @@ summary:focus-visible,
 
   .prefs-section .form-control {
     min-height: 44px;
+  }
+
+  .prefs-accounts-header {
+    display: block;
+
+    p {
+      margin-bottom: 12px;
+    }
+
+    .prefs-mail-account-create {
+      width: 100%;
+      min-height: 44px;
+    }
+  }
+
+  .prefs-account-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .prefs-account-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .prefs-account-source {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .account-dialog {
+    align-items: stretch;
+    justify-content: stretch;
+
+    .contact-dialog-panel {
+      display: flex;
+      width: 100vw;
+      max-width: none;
+      height: 100vh;
+      height: 100dvh;
+      max-height: none;
+      flex-direction: column;
+      padding: 16px 18px 0;
+      border-radius: 0;
+    }
+
+    .contact-dialog-header {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      margin: -16px -18px 12px;
+      padding: 16px 18px 12px;
+      background: #fff;
+      border-bottom: 1px solid #e8eaed;
+    }
+
+    .contact-dialog-footer {
+      margin-right: -18px;
+      margin-left: -18px;
+      padding: 12px 18px ~"calc(14px + env(safe-area-inset-bottom))";
+    }
   }
 
   .prefs-radio-group .radio-inline {

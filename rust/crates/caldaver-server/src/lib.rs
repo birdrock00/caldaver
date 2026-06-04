@@ -6,7 +6,7 @@ mod storage;
 
 use crate::caldav_backend::{CalDavAuth, CalDavClient, CalDavConfig, CalDavError};
 use crate::config::Config;
-use crate::storage::Storage;
+use crate::storage::{DavAccount, Storage};
 use axum::extract::{Form, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Json, Redirect, Response};
@@ -20,11 +20,12 @@ use imap_backend::{
     ImapMailBackend, MailAccount, MailAccountPublic, MailBackend, MailBackendError, MailMessage,
     SealedPassword,
 };
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::env;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::Duration;
 use tower_http::services::ServeDir;
@@ -127,6 +128,21 @@ pub(crate) struct Contact {
     etag: String,
 }
 
+#[derive(Clone, Debug, Serialize)]
+struct ConnectedAccountPublic {
+    #[serde(rename = "type")]
+    account_type: String,
+    id: String,
+    label: String,
+    identifier: String,
+    server: String,
+    home_set: String,
+    enabled: bool,
+    source: String,
+    password_needs_reset: bool,
+    last_error: String,
+}
+
 pub async fn run() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
@@ -177,6 +193,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/cards/delete", post(cards_delete))
         .route("/mail", get(mail_page))
         .route("/mail/read", get(mail_read_page))
+        .route("/accounts", get(accounts))
+        .route("/accounts/save", post(account_save))
         .route("/mail/accounts", get(mail_accounts))
         .route("/mail/accounts/save", post(mail_account_save))
         .route("/mail/messages", get(mail_messages))
@@ -388,7 +406,14 @@ async fn preferences_page(State(state): State<AppState>, headers: HeaderMap) -> 
     let Ok((_, session)) = session_from(&headers, &state).await else {
         return Redirect::to("/login").into_response();
     };
-    html_response(render_preferences(&state, &session)).into_response()
+    let accounts = match connected_accounts(&state, &session).await {
+        Ok(accounts) => accounts,
+        Err(error) => {
+            tracing::error!(%error, "failed to load connected accounts for preferences render");
+            session_fallback_accounts(&state, &session)
+        }
+    };
+    html_response(render_preferences(&state, &session, &accounts)).into_response()
 }
 
 async fn preferences_save(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
@@ -434,11 +459,11 @@ async fn calendars_list(State(state): State<AppState>, headers: HeaderMap) -> Re
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    let client = match caldav_client_for_session(&state.config, &session) {
+    let (client, calendar_home_set) = match caldav_client_for_request(&state, &session).await {
         Ok(client) => client,
         Err(error) => return caldav_response(error),
     };
-    match client.list_calendars(&session.calendar_home_set).await {
+    match client.list_calendars(&calendar_home_set).await {
         Ok(calendars) => Json(json!({
             "data": calendars.iter().map(calendar_payload).collect::<Vec<_>>()
         }))
@@ -454,7 +479,7 @@ async fn calendar_save(State(state): State<AppState>, headers: HeaderMap, Form(f
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let client = match caldav_client_for_session(&state.config, &session) {
+    let (client, calendar_home_set) = match caldav_client_for_request(&state, &session).await {
         Ok(client) => client,
         Err(error) => return caldav_response(error),
     };
@@ -472,8 +497,8 @@ async fn calendar_save(State(state): State<AppState>, headers: HeaderMap, Form(f
     let calendar_url = form
         .get("calendar")
         .cloned()
-        .unwrap_or_else(|| new_calendar_url(&session.calendar_home_set, displayname));
-    if !dav_href_in_scope(&calendar_url, &session.calendar_home_set) {
+        .unwrap_or_else(|| new_calendar_url(&calendar_home_set, displayname));
+    if !dav_href_in_scope(&calendar_url, &calendar_home_set) {
         return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
     }
     let result = if form.get("calendar").is_some() {
@@ -497,13 +522,13 @@ async fn calendar_delete(State(state): State<AppState>, headers: HeaderMap, Form
     let Some(calendar) = form.get("calendar").filter(|value| !value.is_empty()) else {
         return json_error(StatusCode::BAD_REQUEST, "Calendar is required");
     };
-    if !dav_href_in_scope(calendar, &session.calendar_home_set) {
-        return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
-    }
-    let client = match caldav_client_for_session(&state.config, &session) {
+    let (client, calendar_home_set) = match caldav_client_for_request(&state, &session).await {
         Ok(client) => client,
         Err(error) => return caldav_response(error),
     };
+    if !dav_href_in_scope(calendar, &calendar_home_set) {
+        return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+    }
     match client.delete_calendar(calendar, form.get("etag").map(String::as_str)).await {
         Ok(()) => Json(json!({"result": "SUCCESS", "message": calendar})).into_response(),
         Err(error) => caldav_response(error),
@@ -515,8 +540,8 @@ async fn events_list(State(state): State<AppState>, headers: HeaderMap, Query(qu
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
     let calendar = query.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
-    if let Ok(client) = caldav_client_for_session(&state.config, &session) {
-        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+    if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
+        if !dav_href_in_scope(&calendar, &calendar_home_set) {
             return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
         }
         let start = query
@@ -576,13 +601,13 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| session.preferences.timezone.clone()),
     };
-    if let Ok(client) = caldav_client_for_session(&state.config, &session) {
-        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+    if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
+        if !dav_href_in_scope(&calendar, &calendar_home_set) {
             return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
         }
         let original_calendar = form.get("original_calendar").filter(|value| !value.is_empty());
         if let Some(original_calendar) = original_calendar {
-            if !dav_href_in_scope(original_calendar, &session.calendar_home_set) {
+            if !dav_href_in_scope(original_calendar, &calendar_home_set) {
                 return json_error(StatusCode::BAD_REQUEST, "Original calendar href is outside the CalDAV home set");
             }
         }
@@ -649,8 +674,8 @@ async fn event_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
     let calendar = form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
-    if let Ok(client) = caldav_client_for_session(&state.config, &session) {
-        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+    if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
+        if !dav_href_in_scope(&calendar, &calendar_home_set) {
             return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
         }
         let Some(etag) = form.get("etag").map(String::as_str).filter(|value| !value.is_empty()) else {
@@ -714,9 +739,9 @@ async fn event_alter(state: AppState, headers: HeaderMap, form: HashMap<String, 
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    if let Ok(client) = caldav_client_for_session(&state.config, &session) {
+    if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
         let calendar = form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
-        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+        if !dav_href_in_scope(&calendar, &calendar_home_set) {
             return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
         }
         let uid = form.get("uid").cloned().unwrap_or_default();
@@ -755,8 +780,8 @@ async fn event_base(State(state): State<AppState>, headers: HeaderMap, Query(que
     };
     let calendar = query.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
     let uid = query.get("uid").cloned().unwrap_or_default();
-    if let Ok(client) = caldav_client_for_session(&state.config, &session) {
-        if !dav_href_in_scope(&calendar, &session.calendar_home_set) {
+    if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
+        if !dav_href_in_scope(&calendar, &calendar_home_set) {
             return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
         }
         match client.list_events_by_uid(&calendar, &uid).await {
@@ -783,9 +808,9 @@ async fn cards_list(State(state): State<AppState>, headers: HeaderMap) -> Respon
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    if let Ok(carddav) = carddav_client_for_session(&state.config, &session) {
+    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await {
         let addressbooks = match carddav
-            .ensure_addressbooks(Some(&session.addressbook_home_set), &session.displayname)
+            .ensure_addressbooks(Some(&addressbook_home_set), &session.displayname)
             .await
         {
             Ok(addressbooks) => addressbooks,
@@ -842,7 +867,7 @@ async fn cards_save(State(state): State<AppState>, headers: HeaderMap, Form(form
     if input.full_name.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "Full name is required");
     }
-    if let Ok(carddav) = carddav_client_for_session(&state.config, &session) {
+    if let Ok((carddav, _)) = carddav_client_for_request(&state, &session).await {
         return match carddav.create_contact(&input).await {
             Ok(contact) => Json(json!({"result": "SUCCESS", "data": contact_payload(&contact)})).into_response(),
             Err(error) => json_error(StatusCode::BAD_GATEWAY, &error.to_string()),
@@ -871,8 +896,8 @@ async fn cards_update(State(state): State<AppState>, headers: HeaderMap, Form(fo
     if input.full_name.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "Full name is required");
     }
-    if let Ok(carddav) = carddav_client_for_session(&state.config, &session) {
-        if !dav_href_in_scope(url, &session.addressbook_home_set) {
+    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await {
+        if !dav_href_in_scope(url, &addressbook_home_set) {
             return json_error(StatusCode::BAD_REQUEST, "Contact href is outside the CardDAV home set");
         }
         return match carddav
@@ -899,11 +924,11 @@ async fn cards_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    if let Ok(carddav) = carddav_client_for_session(&state.config, &session) {
+    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await {
         let Some(url) = form.get("url").filter(|value| !value.is_empty()) else {
             return json_error(StatusCode::BAD_REQUEST, "Contact URL is required");
         };
-        if !dav_href_in_scope(url, &session.addressbook_home_set) {
+        if !dav_href_in_scope(url, &addressbook_home_set) {
             return json_error(StatusCode::BAD_REQUEST, "Contact href is outside the CardDAV home set");
         }
         return match carddav
@@ -1001,6 +1026,308 @@ fn uid_from_contact_url(url: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+async fn accounts(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
+    };
+    match connected_accounts(&state, &session).await {
+        Ok(accounts) => Json(json!({"data": accounts})).into_response(),
+        Err(error) => {
+            tracing::error!(%error, "failed to load connected accounts from Postgres");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to load accounts")
+        }
+    }
+}
+
+async fn account_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
+    let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
+    };
+    if !valid_csrf(&session, &form) {
+        return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
+    }
+    match form.get("account_type").map(|value| value.trim()) {
+        Some("email") => match persist_mail_account_from_form(&state, &session.username, &form).await {
+            Ok(account) => Json(json!({"result": "SUCCESS", "data": connected_account_from_mail(&account)})).into_response(),
+            Err(response) => response,
+        },
+        Some("calendar" | "carddav") => match persist_dav_account_from_form(&state, &session.username, &form).await {
+            Ok(account) => Json(json!({"result": "SUCCESS", "data": connected_account_from_dav(&account)})).into_response(),
+            Err(response) => response,
+        },
+        _ => json_error(StatusCode::BAD_REQUEST, "Choose Calendar, Contacts, or Email"),
+    }
+}
+
+async fn connected_accounts(
+    state: &AppState,
+    session: &Session,
+) -> Result<Vec<ConnectedAccountPublic>, crate::storage::StorageError> {
+    let dav_accounts = state.storage.dav_accounts(&session.username).await?;
+    let mail_accounts = state.storage.mail_accounts(&session.username).await?;
+    let has_calendar = dav_accounts.iter().any(|account| account.account_type == "calendar");
+    let has_carddav = dav_accounts.iter().any(|account| account.account_type == "carddav");
+
+    let mut accounts = Vec::new();
+    if !has_calendar {
+        accounts.push(ConnectedAccountPublic {
+            account_type: "calendar".to_string(),
+            id: "session-calendar".to_string(),
+            label: "Current login".to_string(),
+            identifier: session.dav_username.clone(),
+            server: substitute_dav_username(&state.config.caldav_server, &session.dav_username),
+            home_set: session.calendar_home_set.clone(),
+            enabled: true,
+            source: "session".to_string(),
+            password_needs_reset: false,
+            last_error: String::new(),
+        });
+    }
+    if !has_carddav {
+        accounts.push(ConnectedAccountPublic {
+            account_type: "carddav".to_string(),
+            id: "session-carddav".to_string(),
+            label: "Current login".to_string(),
+            identifier: session.dav_username.clone(),
+            server: substitute_dav_username(&state.config.carddav_server, &session.dav_username),
+            home_set: session.addressbook_home_set.clone(),
+            enabled: true,
+            source: "session".to_string(),
+            password_needs_reset: false,
+            last_error: String::new(),
+        });
+    }
+    accounts.extend(dav_accounts.iter().map(connected_account_from_dav));
+    accounts.extend(mail_accounts.iter().map(connected_account_from_mail));
+    Ok(accounts)
+}
+
+fn session_fallback_accounts(state: &AppState, session: &Session) -> Vec<ConnectedAccountPublic> {
+    vec![
+        ConnectedAccountPublic {
+            account_type: "calendar".to_string(),
+            id: "session-calendar".to_string(),
+            label: "Current login".to_string(),
+            identifier: session.dav_username.clone(),
+            server: substitute_dav_username(&state.config.caldav_server, &session.dav_username),
+            home_set: session.calendar_home_set.clone(),
+            enabled: true,
+            source: "session".to_string(),
+            password_needs_reset: false,
+            last_error: String::new(),
+        },
+        ConnectedAccountPublic {
+            account_type: "carddav".to_string(),
+            id: "session-carddav".to_string(),
+            label: "Current login".to_string(),
+            identifier: session.dav_username.clone(),
+            server: substitute_dav_username(&state.config.carddav_server, &session.dav_username),
+            home_set: session.addressbook_home_set.clone(),
+            enabled: true,
+            source: "session".to_string(),
+            password_needs_reset: false,
+            last_error: String::new(),
+        },
+    ]
+}
+
+fn connected_account_from_dav(account: &DavAccount) -> ConnectedAccountPublic {
+    ConnectedAccountPublic {
+        account_type: account.account_type.clone(),
+        id: account.id.to_string(),
+        label: account.label.clone(),
+        identifier: account.username.clone(),
+        server: account.server_url.clone(),
+        home_set: account.home_set.clone(),
+        enabled: account.enabled,
+        source: "postgres".to_string(),
+        password_needs_reset: account.credential_needs_reset,
+        last_error: account.last_error.clone(),
+    }
+}
+
+fn connected_account_from_mail(account: &MailAccount) -> ConnectedAccountPublic {
+    ConnectedAccountPublic {
+        account_type: "email".to_string(),
+        id: account.id.to_string(),
+        label: account.label.clone(),
+        identifier: account.email_address.clone(),
+        server: format!("{}:{}", account.imap_host, account.imap_port),
+        home_set: "IMAP".to_string(),
+        enabled: true,
+        source: "postgres".to_string(),
+        password_needs_reset: account.password_needs_reset,
+        last_error: String::new(),
+    }
+}
+
+async fn persist_mail_account_from_form(
+    state: &AppState,
+    owner: &str,
+    form: &HashMap<String, String>,
+) -> Result<MailAccount, Response> {
+    for field in ["label", "email_address", "imap_host", "username"] {
+        if form.get(field).is_none_or(|value| value.trim().is_empty()) {
+            return Err(json_error(StatusCode::BAD_REQUEST, "Required mail account fields are missing"));
+        }
+    }
+    let id = form.get("id").and_then(|v| v.parse().ok()).unwrap_or(0);
+    if id == 0 && form.get("password").is_none_or(|value| value.trim().is_empty()) {
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "A password is required for new mail accounts",
+        ));
+    }
+    let account = MailAccount {
+        id,
+        label: limited_field(form, "label", 120),
+        email_address: limited_field(form, "email_address", 254),
+        imap_host: limited_field(form, "imap_host", 253),
+        imap_port: form.get("imap_port").and_then(|v| v.parse().ok()).unwrap_or(993),
+        encryption: limited_field_default(form, "encryption", 16, "ssl"),
+        username: limited_field(form, "username", 254),
+        password_sealed: match SealedPassword::seal(&form.get("password").cloned().unwrap_or_default()) {
+            Ok(password) => password,
+            Err(error) => return Err(mail_backend_response(error)),
+        },
+        password_needs_reset: false,
+        refresh_interval_seconds: form
+            .get("refresh_interval_minutes")
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(1)
+            .clamp(1, 1440)
+            * 60,
+    };
+    if let Err(error) = imap_backend::validate_account(&account) {
+        return Err(mail_backend_response(error));
+    }
+    state.storage.save_mail_account(owner, &account).await.map_err(|error| match error {
+        crate::storage::StorageError::NotFound => json_error(StatusCode::NOT_FOUND, "Mail account not found"),
+        error => {
+            tracing::error!(%error, "failed to save mail account to Postgres");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save mail account")
+        }
+    })
+}
+
+async fn persist_dav_account_from_form(
+    state: &AppState,
+    owner: &str,
+    form: &HashMap<String, String>,
+) -> Result<DavAccount, Response> {
+    let account_type = limited_field(form, "account_type", 16);
+    if account_type != "calendar" && account_type != "carddav" {
+        return Err(json_error(StatusCode::BAD_REQUEST, "Choose Calendar or Contacts"));
+    }
+    for field in ["label", "server_url", "username"] {
+        if form.get(field).is_none_or(|value| value.trim().is_empty()) {
+            return Err(json_error(StatusCode::BAD_REQUEST, "Required account fields are missing"));
+        }
+    }
+    let id = form.get("id").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let auth_method = limited_field_default(form, "auth_method", 16, "basic");
+    if !matches!(auth_method.as_str(), "basic" | "bearer" | "none") {
+        return Err(json_error(StatusCode::BAD_REQUEST, "Unsupported authentication method"));
+    }
+    if id == 0 && auth_method != "none" && form.get("password").is_none_or(|value| value.trim().is_empty()) {
+        return Err(json_error(StatusCode::BAD_REQUEST, "A password or token is required"));
+    }
+    let server_url = validated_dav_server_url(&limited_field(form, "server_url", 2048))?;
+    let home_set = limited_field(form, "home_set", 512);
+    if !home_set.is_empty() && !home_set.starts_with('/') {
+        return Err(json_error(StatusCode::BAD_REQUEST, "Home set must start with /"));
+    }
+    let credential_sealed = match SealedPassword::seal(&form.get("password").cloned().unwrap_or_default()) {
+        Ok(password) => password,
+        Err(error) => return Err(mail_backend_response(error)),
+    };
+    let account = DavAccount {
+        id,
+        account_type,
+        label: limited_field(form, "label", 120),
+        server_url,
+        auth_method,
+        username: limited_field(form, "username", 254),
+        credential_sealed,
+        credential_needs_reset: false,
+        principal_url: String::new(),
+        home_set,
+        enabled: true,
+        last_error: String::new(),
+    };
+    state.storage.save_dav_account(owner, &account).await.map_err(|error| match error {
+        crate::storage::StorageError::NotFound => json_error(StatusCode::NOT_FOUND, "Account not found"),
+        error => {
+            tracing::error!(%error, "failed to save DAV account to Postgres");
+            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save account")
+        }
+    })
+}
+
+fn validated_dav_server_url(value: &str) -> Result<String, Response> {
+    let url = Url::parse(value).map_err(|_| json_error(StatusCode::BAD_REQUEST, "Server URL is invalid"))?;
+    if url.scheme() != "https" && url.scheme() != "http" {
+        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must use http or https"));
+    }
+    if !url.username().is_empty() || url.password().is_some() {
+        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must not include credentials"));
+    }
+    let Some(host) = url.host_str() else {
+        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must include a host"));
+    };
+    if host.eq_ignore_ascii_case("localhost") || host.ends_with(".localhost") {
+        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL host is not allowed"));
+    }
+    if let Ok(ip) = host.parse::<IpAddr>() {
+        let blocked = match ip {
+            IpAddr::V4(ip) => blocked_ipv4(ip),
+            IpAddr::V6(ip) => blocked_ipv6(ip),
+        };
+        if blocked {
+            return Err(json_error(StatusCode::BAD_REQUEST, "Server URL host is not allowed"));
+        }
+    } else {
+        let port = url.port_or_known_default().unwrap_or(443);
+        let addresses = (host, port)
+            .to_socket_addrs()
+            .map_err(|_| json_error(StatusCode::BAD_REQUEST, "Server URL host did not resolve"))?;
+        for address in addresses {
+            let blocked = match address.ip() {
+                IpAddr::V4(ip) => blocked_ipv4(ip),
+                IpAddr::V6(ip) => blocked_ipv6(ip),
+            };
+            if blocked {
+                return Err(json_error(StatusCode::BAD_REQUEST, "Server URL host is not allowed"));
+            }
+        }
+    }
+    Ok(url.to_string())
+}
+
+fn limited_field(form: &HashMap<String, String>, name: &str, max_chars: usize) -> String {
+    form.get(name)
+        .map(|value| value.trim().chars().take(max_chars).collect())
+        .unwrap_or_default()
+}
+
+fn limited_field_default(
+    form: &HashMap<String, String>,
+    name: &str,
+    max_chars: usize,
+    default: &str,
+) -> String {
+    let value = limited_field(form, name, max_chars);
+    if value.is_empty() {
+        default.to_string()
+    } else {
+        value
+    }
+}
+
 async fn mail_accounts(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
@@ -1027,47 +1354,9 @@ async fn mail_account_save(State(state): State<AppState>, headers: HeaderMap, Fo
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    for field in ["label", "email_address", "imap_host", "username"] {
-        if form.get(field).is_none_or(|value| value.trim().is_empty()) {
-            return json_error(StatusCode::BAD_REQUEST, "Required mail account fields are missing");
-        }
-    }
-    let id = form.get("id").and_then(|v| v.parse().ok()).unwrap_or(0);
-    if id == 0 && form.get("password").is_none_or(|value| value.trim().is_empty()) {
-        return json_error(StatusCode::BAD_REQUEST, "A password is required for new mail accounts");
-    }
-    let account = MailAccount {
-        id,
-        label: form.get("label").cloned().unwrap_or_default(),
-        email_address: form.get("email_address").cloned().unwrap_or_default(),
-        imap_host: form.get("imap_host").cloned().unwrap_or_default(),
-        imap_port: form.get("imap_port").and_then(|v| v.parse().ok()).unwrap_or(993),
-        encryption: form.get("encryption").cloned().unwrap_or_else(|| "ssl".to_string()),
-        username: form.get("username").cloned().unwrap_or_default(),
-        password_sealed: match SealedPassword::seal(&form.get("password").cloned().unwrap_or_default()) {
-            Ok(password) => password,
-            Err(error) => return mail_backend_response(error),
-        },
-        password_needs_reset: false,
-        refresh_interval_seconds: form
-            .get("refresh_interval_minutes")
-            .and_then(|v| v.parse::<u64>().ok())
-            .unwrap_or(1)
-            .clamp(1, 1440)
-            * 60,
-    };
-    if let Err(error) = imap_backend::validate_account(&account) {
-        return mail_backend_response(error);
-    }
-    match state.storage.save_mail_account(&session.username, &account).await {
+    match persist_mail_account_from_form(&state, &session.username, &form).await {
         Ok(account) => Json(json!({"result": "SUCCESS", "data": MailAccountPublic::from(&account)})).into_response(),
-        Err(crate::storage::StorageError::NotFound) => {
-            json_error(StatusCode::NOT_FOUND, "Mail account not found")
-        }
-        Err(error) => {
-            tracing::error!(%error, "failed to save mail account to Postgres");
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save mail account")
-        }
+        Err(response) => response,
     }
 }
 
@@ -1428,6 +1717,72 @@ fn caldav_response(error: CalDavError) -> Response {
         }
     };
     json_error(status, &error.to_string())
+}
+
+async fn caldav_client_for_request(
+    state: &AppState,
+    session: &Session,
+) -> Result<(CalDavClient, String), CalDavError> {
+    match state.storage.dav_account(&session.username, "calendar").await {
+        Ok(Some(account)) => {
+            let mut dav_config = CalDavConfig::from_app_config(&state.config);
+            dav_config.base_url = account.server_url.clone();
+            dav_config.auth = dav_auth_for_account(&account).map_err(CalDavError::InvalidBaseUrl)?;
+            let client = CalDavClient::new(dav_config)?;
+            let home_set = if account.home_set.is_empty() {
+                client.login().await?.calendar_home_set
+            } else {
+                account.home_set.clone()
+            };
+            return Ok((client, home_set));
+        }
+        Ok(None) => {}
+        Err(error) => {
+            tracing::warn!(%error, user = %session.username, "failed to load stored CalDAV account; falling back to session credentials");
+        }
+    }
+    caldav_client_for_session(&state.config, session).map(|client| (client, session.calendar_home_set.clone()))
+}
+
+async fn carddav_client_for_request(
+    state: &AppState,
+    session: &Session,
+) -> Result<(CardDavClient, String), carddav_backend::CardDavError> {
+    match state.storage.dav_account(&session.username, "carddav").await {
+        Ok(Some(account)) => {
+            let client = CardDavClient::new(CardDavConfig {
+                base_url: account.server_url.clone(),
+                auth: dav_auth_for_account(&account).map_err(carddav_backend::CardDavError::InvalidBaseUrl)?,
+            })?;
+            let home_set = if account.home_set.is_empty() {
+                client.discover_addressbook_home_set().await?
+            } else {
+                account.home_set.clone()
+            };
+            return Ok((client, home_set));
+        }
+        Ok(None) => {}
+        Err(error) => {
+            tracing::warn!(%error, user = %session.username, "failed to load stored CardDAV account; falling back to session credentials");
+        }
+    }
+    carddav_client_for_session(&state.config, session)
+        .map(|client| (client, session.addressbook_home_set.clone()))
+}
+
+fn dav_auth_for_account(account: &DavAccount) -> Result<CalDavAuth, String> {
+    let credential = account
+        .credential_sealed
+        .reveal()
+        .map_err(|error| format!("Unable to open stored DAV credential: {error}"))?;
+    Ok(match account.auth_method.to_ascii_lowercase().as_str() {
+        "none" => CalDavAuth::None,
+        "bearer" => CalDavAuth::Bearer(credential),
+        _ => CalDavAuth::Basic {
+            username: account.username.clone(),
+            password: credential,
+        },
+    })
 }
 
 fn caldav_client_for_session(config: &Config, session: &Session) -> Result<CalDavClient, CalDavError> {
@@ -1986,13 +2341,13 @@ fn render_mail_read(state: &AppState, session: &Session, account_id: u64, uid: u
     layout(state, "caldaver-mail-page", &content, &part_js("mailmessagejs"))
 }
 
-fn render_preferences(state: &AppState, session: &Session) -> String {
+fn render_preferences(state: &AppState, session: &Session, accounts: &[ConnectedAccountPublic]) -> String {
     let prefs = &session.preferences;
     let content = format!(
         r#"{navbar}<div class="container"><h1>Preferences</h1><div class="preferences-container"><form method="post" id="prefs_form"><input type="hidden" name="_token" value="{csrf}">
 <fieldset class="prefs-section"><legend>General options</legend><div class="form-group"><label for="language">Language</label><select class="form-control" id="language" name="language"><option value="en" selected>English</option></select></div>{radio_date}{radio_time}{radio_week}<div class="form-group"><label for="timezone">Timezone</label><select class="form-control" id="timezone" name="timezone"><option value="{timezone}" selected>{timezone}</option><option value="UTC">UTC</option><option value="America/Los_Angeles">America/Los_Angeles</option></select></div></fieldset>
 <fieldset class="prefs-section"><legend>Calendars</legend><div class="form-group"><label for="default_calendar">Default calendar</label><select class="form-control" id="default_calendar" name="default_calendar"><option value="{calendar}" selected>Default</option></select></div><div class="form-group"><label for="default_view">Default view</label><select class="form-control" id="default_view" name="default_view"><option value="month" selected>Month</option><option value="week">Week</option><option value="day">Day</option><option value="list">List</option></select></div>{radio_week_nb}{radio_now}<div class="form-group prefs-radio-group" role="radiogroup" aria-labelledby="disable_javascript_label"><div class="prefs-control-label" id="disable_javascript_label">Disable JavaScript</div><label class="radio-inline" for="disable_javascript_yes"><input id="disable_javascript_yes" type="radio" name="disable_javascript" value="true"> Yes</label><label class="radio-inline" for="disable_javascript_no"><input id="disable_javascript_no" type="radio" name="disable_javascript" value="false" checked="checked"> No</label></div><div class="form-group"><label for="list_days">List view days</label><select class="form-control" id="list_days" name="list_days"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="31">31 days</option></select></div></fieldset>
-<fieldset class="prefs-section prefs-mail-section"><legend>Mail</legend><div class="form-group"><button type="button" id="mail_account_create" class="btn btn-default prefs-mail-account-create"><i class="fa fa-plus"></i> Add account</button></div></fieldset><div id="prefs_buttons"><input type="submit" class="btn btn-success" value="Save"><a href="/" id="return_button" class="btn btn-default"><i class="fa fa-calendar"></i> Return</a></div></form></div></div>{mail_dialog}"#,
+{accounts_section}<div id="prefs_buttons"><input type="submit" class="btn btn-success" value="Save"><a href="/" id="return_button" class="btn btn-default"><i class="fa fa-calendar"></i> Return</a></div></form></div></div>{account_dialog}"#,
         navbar = navbar(state, session, "calendar"),
         csrf = session.csrf,
         timezone = escape(&prefs.timezone),
@@ -2002,9 +2357,62 @@ fn render_preferences(state: &AppState, session: &Session) -> String {
         radio_week = pref_radios("weekstart", "Week starts on", &[("0", "Sunday"), ("1", "Monday")], &prefs.weekstart.to_string()),
         radio_week_nb = pref_radios("show_week_nb", "Show week numbers", &[("true", "Yes"), ("false", "No")], if prefs.show_week_nb {"true"} else {"false"}),
         radio_now = pref_radios("show_now_indicator", "Show a marker indicating the current time", &[("true", "Yes"), ("false", "No")], if prefs.show_now_indicator {"true"} else {"false"}),
-        mail_dialog = mail_account_dialog(&session.csrf)
+        accounts_section = preferences_accounts_section(accounts),
+        account_dialog = account_dialog(&session.csrf)
     );
     layout(state, "", &content, &part_js("mailaccountjs"))
+}
+
+fn preferences_accounts_section(accounts: &[ConnectedAccountPublic]) -> String {
+    let rows = accounts
+        .iter()
+        .map(account_row_html)
+        .collect::<Vec<_>>()
+        .join("");
+    format!(
+        r#"<fieldset class="prefs-section prefs-accounts-section"><legend>Accounts</legend><div class="prefs-accounts-header"><p>Calendar, contacts, and email accounts available to Caldaver.</p><button type="button" id="mail_account_create" class="btn btn-default prefs-mail-account-create"><i class="fa fa-plus"></i> Add account</button></div><div id="connected_accounts" class="prefs-account-list" aria-live="polite">{rows}</div><div id="connected_accounts_empty" class="prefs-account-empty" hidden>No accounts are configured.</div></fieldset>"#
+    )
+}
+
+fn account_row_html(account: &ConnectedAccountPublic) -> String {
+    let type_label = match account.account_type.as_str() {
+        "calendar" => "Calendar",
+        "carddav" => "Contacts",
+        "email" => "Email",
+        _ => "Account",
+    };
+    let source = if account.source == "session" { "Session" } else { "Postgres" };
+    let warning = if account.password_needs_reset {
+        r#"<span class="prefs-account-warning">Password needs reset</span>"#
+    } else {
+        ""
+    };
+    let last_error = if account.last_error.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"<span class="prefs-account-warning prefs-account-last-error">{}</span>"#,
+            escape(&account.last_error)
+        )
+    };
+    format!(
+        r#"<article class="prefs-account-row" data-account-type="{kind}"><div class="prefs-account-icon"><i class="fa {icon}" aria-hidden="true"></i></div><div class="prefs-account-main"><div class="prefs-account-title"><strong>{label}</strong><span>{type_label}</span></div><div class="prefs-account-detail">{identifier}</div><div class="prefs-account-detail">{server}</div><div class="prefs-account-home">{home}</div>{warning}{last_error}</div><div class="prefs-account-source">{source}</div></article>"#,
+        kind = escape(&account.account_type),
+        icon = match account.account_type.as_str() {
+            "calendar" => "fa-calendar",
+            "carddav" => "fa-book",
+            "email" => "fa-envelope",
+            _ => "fa-plug",
+        },
+        label = escape(&account.label),
+        type_label = type_label,
+        identifier = escape(&account.identifier),
+        server = escape(&account.server),
+        home = escape(&account.home_set),
+        warning = warning,
+        last_error = last_error,
+        source = source
+    )
 }
 
 fn layout(state: &AppState, body_class: &str, content: &str, bottom: &str) -> String {
@@ -2130,9 +2538,9 @@ fn contact_dialog(csrf: &str) -> String {
     )
 }
 
-fn mail_account_dialog(csrf: &str) -> String {
+fn account_dialog(csrf: &str) -> String {
     format!(
-        r#"<div id="mail_account_dialog" class="contact-dialog" hidden><form id="mail_account_form" action="/mail/accounts/save" method="post"><input type="hidden" name="_token" value="{csrf}"><input type="hidden" name="id" value=""><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2>Add account</h2><button type="button" id="mail_account_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><label><span>Account name</span><input required name="label" type="text" autocomplete="organization"></label><label><span>Email address</span><input required name="email_address" type="email" autocomplete="email"></label><label><span>IMAP host</span><input required name="imap_host" type="text" autocomplete="off"></label><label><span>IMAP port</span><input required name="imap_port" type="number" min="1" max="65535" value="993"></label><label><span>Encryption</span><select name="encryption"><option value="ssl">SSL</option><option value="tls">STARTTLS</option><option value="none">None</option></select></label><label><span>User name</span><input required name="username" type="text" autocomplete="username"></label><label><span>Password</span><input required name="password" type="password" autocomplete="current-password"></label><label><span>Auto refresh minutes</span><input required name="refresh_interval_minutes" type="number" min="1" max="1440" value="1"></label><div id="mail_account_error" class="mail-error" hidden></div><div class="contact-dialog-footer"><button type="button" id="mail_account_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
+        r#"<div id="mail_account_dialog" class="contact-dialog account-dialog" role="dialog" aria-modal="true" aria-labelledby="mail_account_dialog_title" hidden><form id="mail_account_form" action="/accounts/save" method="post"><input type="hidden" name="_token" value="{csrf}"><input type="hidden" name="id" value=""><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2 id="mail_account_dialog_title">Add account</h2><button type="button" id="mail_account_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><fieldset class="account-type-chooser" aria-label="Account type"><label><input type="radio" name="account_type" value="calendar" checked> <span>Calendar</span></label><label><input type="radio" name="account_type" value="carddav"> <span>Contacts</span></label><label><input type="radio" name="account_type" value="email"> <span>Email</span></label></fieldset><div class="account-common-fields"><label><span>Account name</span><input required name="label" type="text" autocomplete="organization"></label><label data-account-field="dav"><span>DAV server URL</span><input name="server_url" type="url" inputmode="url" autocomplete="url" placeholder="https://dav.example.com/"></label><label data-account-field="dav"><span>Auth method</span><select name="auth_method"><option value="basic">Basic password</option><option value="bearer">Bearer token</option><option value="none">None</option></select></label><label data-account-field="email"><span>Email address</span><input name="email_address" type="email" autocomplete="email"></label><label data-account-field="email"><span>IMAP host</span><input name="imap_host" type="text" autocomplete="off"></label><label data-account-field="email"><span>IMAP port</span><input name="imap_port" type="number" min="1" max="65535" value="993"></label><label data-account-field="email"><span>Encryption</span><select name="encryption"><option value="ssl">SSL</option><option value="tls">STARTTLS</option><option value="none">None</option></select></label><label><span>User name</span><input required name="username" type="text" autocomplete="username"></label><label><span>Password or token</span><input name="password" type="password" autocomplete="current-password"></label><label data-account-field="dav"><span>Home set</span><input name="home_set" type="text" autocomplete="off" placeholder="/calendars/user/"></label><label data-account-field="email"><span>Auto refresh minutes</span><input name="refresh_interval_minutes" type="number" min="1" max="1440" value="1"></label></div><div id="mail_account_error" class="mail-error" aria-live="assertive" hidden></div><div class="contact-dialog-footer"><button type="button" id="mail_account_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
     )
 }
 
