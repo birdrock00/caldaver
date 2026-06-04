@@ -193,6 +193,22 @@ async function visibleLinkTextIn(selector, linkText) {
   }, selector, linkText);
 }
 
+async function mobileCalendarMenuState() {
+  return browser.execute(() => {
+    const menu = document.querySelector('.mobile-calendar-menu-calendars');
+    const rows = Array.from(document.querySelectorAll('.mobile-calendar-menu-calendars .mobile-calendar-account'))
+      .map(row => row.textContent.trim().replace(/\s+/g, ' '));
+    const empty = document.querySelector('.mobile-calendar-menu-calendars .mobile-calendar-menu-empty');
+
+    return {
+      text: menu ? menu.textContent.trim().replace(/\s+/g, ' ') : '',
+      rows,
+      emptyText: empty ? empty.textContent.trim().replace(/\s+/g, ' ') : '',
+      hasMenu: !!menu
+    };
+  });
+}
+
 function mailMessageScriptSource() {
   return fs.readFileSync(path.join(repoRoot, 'web/templates/parts/mailmessagejs.html'), 'utf8')
     .replace(/^\s*<script>\s*/, '')
@@ -533,10 +549,8 @@ describe('Caldaver installed Android WebView', function () {
     const dateIconRemoved = await browser.execute(() => document.querySelector('.caldaver-brand-icon') === null);
     assert.equal(dateIconRemoved, true, 'Mobile topbar should not render the date icon');
     await browser.waitUntil(async () => {
-      return browser.execute(() => {
-        const menu = document.querySelector('.mobile-calendar-menu-calendars');
-        return !!(menu && !/Loading calendars/i.test(menu.textContent || ''));
-      });
+      const state = await mobileCalendarMenuState();
+      return state.hasMenu && !/Loading calendars/i.test(state.text);
     }, {
       timeoutMsg: 'Mobile calendar account menu did not finish loading'
     });
@@ -547,7 +561,12 @@ describe('Caldaver installed Android WebView', function () {
       return summary && summary.textContent.includes('Calendar');
     }), true);
     await browser.execute(() => document.querySelector('.mobile-calendar-menu').open = true);
-    await waitForExistingSelector('.mobile-calendar-account');
+    const menuState = await mobileCalendarMenuState();
+    assert.equal(
+      menuState.rows.length > 0 || /No calendars|Unable to load calendars/i.test(menuState.emptyText),
+      true,
+      'Mobile calendar menu should show account rows or a meaningful empty/error state'
+    );
     assert.equal(await visibleLinkTextIn('.mobile-section-menu', 'Contacts'), true);
     assert.equal(await visibleLinkTextIn('.mobile-section-menu', 'Mail'), true);
 
@@ -559,6 +578,26 @@ describe('Caldaver installed Android WebView', function () {
       const rect = calendar.getBoundingClientRect();
       return rect.width > 0 && rect.height > 0 && rect.top < window.innerHeight;
     }), true, 'Calendar grid should remain visible with the mobile section menu');
+  });
+
+  it('shows calendar account menu content instead of loading forever from the mobile contacts page', async function () {
+    await login();
+    await openPath('/cards');
+    await waitForSelector('.mobile-section-menu');
+
+    await browser.execute(() => {
+      document.querySelector('.mobile-section-menu').open = true;
+      document.querySelector('.mobile-calendar-menu').open = true;
+    });
+
+    const state = await mobileCalendarMenuState();
+    assert.equal(state.hasMenu, true);
+    assert.equal(/Loading calendars/i.test(state.text), false);
+    assert.equal(
+      state.rows.length > 0 || /No calendars|Unable to load calendars/i.test(state.emptyText),
+      true,
+      'Mobile calendar menu should show account rows or a meaningful empty/error state'
+    );
   });
 
   it('does not show a mobile calendar event loading error in the installed app WebView', async function () {

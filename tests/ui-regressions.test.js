@@ -51,6 +51,29 @@ test('Rust workspace owns backend crates and scripts', () => {
   }
 });
 
+test('daily release workflow creates dated releases and refreshes latest release date', () => {
+  const workflow = read('.github/workflows/daily-release.yml');
+
+  assert.match(workflow, /schedule:[\s\S]*cron: "17 10 \* \* \*"/);
+  assert.match(workflow, /release_tag="\$\(date -u \+'\%Y-\%m-\%d-\%H\%M\%S'\)"/);
+  assert.match(workflow, /gh release create "\$\{\{ needs\.prepare\.outputs\.release_tag \}\}"/);
+  assert.match(workflow, /gh release delete latest --yes/);
+  assert.match(workflow, /gh release create latest[\s\S]*--latest/);
+  assert.doesNotMatch(workflow, /gh release edit latest/);
+});
+
+test('Rust login supports hashed Caldaver auth secrets', () => {
+  const config = read('rust/crates/caldaver-server/src/config.rs');
+  const server = read('rust/crates/caldaver-server/src/lib.rs');
+
+  assert.match(config, /auth_password_hash: String/);
+  assert.match(config, /CALDAVER_AUTH_PASSWORD_HASH/);
+  assert.match(server, /verify_local_auth_password\(&state\.config, password\)/);
+  assert.match(server, /fn verify_password_hash\(encoded: &str, password: &str\) -> bool/);
+  assert.match(server, /pbkdf2-sha256/);
+  assert.match(server, /constant_time_eq\(config\.auth_password\.as_bytes\(\), password\.as_bytes\(\)\)/);
+});
+
 test('Rust server exposes the web route surface', () => {
   const server = read('rust/crates/caldaver-server/src/lib.rs');
 
@@ -141,9 +164,20 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(navbar, /class="mobile-section-menu"/);
   assert.ok(navbar.indexOf('class="mobile-section-menu"') < navbar.indexOf('class="navbar-header"'));
   assert.match(navbar, /class="mobile-calendar-menu"/);
+  assert.match(navbar, /data-calendar-href="\{\{ app\.url_generator\.generate\('calendar'\) \}\}"/);
   assert.match(navbar, /class="mobile-calendar-menu-calendars"/);
+  assert.match(navbar, /data-calendars-url="\{\{ app\.url_generator\.generate\('calendar'\) \}\}calendars"/);
+  assert.match(navbar, /function loadMobileCalendarMenu\(\)/);
+  assert.match(navbar, /fetch\(calendarsUrl/);
+  assert.doesNotMatch(navbar, /class="mobile-calendar-open"/);
   assert.match(server, /class="mobile-calendar-menu"/);
+  assert.match(server, /data-calendar-href="\/"/);
   assert.match(server, /class="mobile-calendar-menu-calendars"/);
+  assert.match(server, /data-calendars-url="\/calendars"/);
+  assert.match(server, /fn mobile_calendar_menu_script\(\)/);
+  assert.match(server, /function loadMobileCalendarMenu\(\)/);
+  assert.match(server, /fetch\(calendarsUrl/);
+  assert.doesNotMatch(server, /class="mobile-calendar-open"/);
   assert.match(eventBasicForm, /select name="timezone" id="event_timezone"/);
   assert.match(eventBasicForm, /\{#available_timezones current_timezone=timezone\}/);
   assert.match(appJs, /var default_calendar_timezone = 'America\/Los_Angeles';/);
@@ -205,6 +239,8 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(mailJs, /Sending is not configured for this account yet/);
   assert.match(appJs, /insert_mobile_previous_events_row/);
   assert.match(appJs, /show_mobile_previous_events/);
+  assert.match(appJs, /set_mobile_calendar_menu_status\('Unable to load calendars'\)/);
+  assert.match(appJs, /set_mobile_calendar_menu_status\('No calendars found'\)/);
   assert.match(appJs, /function mobile_previous_events_step_days\(\)/);
   assert.match(appJs, /visibleRange:\s*calendar_list_visible_range/);
   assert.match(appJs, /mobile_calendar_previous_event_days \+= mobile_previous_events_step_days\(\)/);
@@ -218,6 +254,37 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.calendar-sidebar-section,[\s\S]*#sidebar #footer[\s\S]*display:\s*none;/);
   assert.match(less, /@media \(max-width:\s*900px\)[\s\S]*#sidebar \.app-nav,[\s\S]*\.cards-sidebar \.app-nav,[\s\S]*\.mail-sidebar \.app-nav[\s\S]*display:\s*none;/);
   assert.match(less, /\.highlighted-unread/);
+});
+
+test('mobile calendar account menu settles after calendar load success empty or error states', () => {
+  const appJs = read('assets/js/app/app.js');
+  const updateBlock = sourceBetween(
+    appJs,
+    /var update_calendar_list = function update_calendar_list/,
+    /var sync_mobile_calendar_menu = function sync_mobile_calendar_menu/
+  );
+  const syncBlock = sourceBetween(
+    appJs,
+    /var sync_mobile_calendar_menu = function sync_mobile_calendar_menu/,
+    /\/\*\*\s*\n\s*\* Function used to query the server for events/
+  );
+  const failBlock = sourceBetween(
+    updateBlock,
+    /updcalendar_ajax_req\.fail/,
+    /updcalendar_ajax_req\.done/
+  );
+  const emptyBlock = sourceBetween(
+    updateBlock,
+    /Calendar list received empty twice/,
+    /return;\s*\n\s*}/
+  );
+
+  assert.match(updateBlock, /updcalendar_ajax_req\.done[\s\S]*sync_mobile_calendar_menu\(\)/);
+  assert.match(failBlock, /set_mobile_calendar_menu_status\('Unable to load calendars'\)/);
+  assert.match(emptyBlock, /set_mobile_calendar_menu_status\('No calendars found'\)/);
+  assert.match(syncBlock, /#own_calendar_list li\.available_calendar, #shared_calendar_list li\.available_calendar/);
+  assert.match(syncBlock, /set_mobile_calendar_menu_status/);
+  assert.match(syncBlock, /set_mobile_calendar_menu_status\('Loading calendars\.\.\.'\)/);
 });
 
 test('preferences account section exposes calendar contacts and email account management', () => {

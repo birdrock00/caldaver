@@ -1442,6 +1442,7 @@ var update_calendar_list = function update_calendar_list(maskbody) {
   updcalendar_ajax_req.fail(function(jqXHR, textStatus, errorThrown) {
     var message = errorThrown;
     $('.calendar-list-loading').text('Unable to load calendars');
+    set_mobile_calendar_menu_status('Unable to load calendars');
 
     // Avoid double warning if the session expired
     if (jqXHR.status === undefined || jqXHR.status != 401) {
@@ -1526,6 +1527,7 @@ var update_calendar_list = function update_calendar_list(maskbody) {
 
       // Calendar list received empty twice
       $('.calendar-list-loading').text('No calendars found');
+      set_mobile_calendar_menu_status('No calendars found');
       show_error(t('messages','notice_no_calendars'), '');
       $('#shortcut_add_event').attr('disabled', 'disabled');
       return;
@@ -1570,10 +1572,7 @@ var sync_mobile_calendar_menu = function sync_mobile_calendar_menu() {
   var $calendars = $('#own_calendar_list li.available_calendar, #shared_calendar_list li.available_calendar');
 
   if ($calendars.length === 0) {
-    $menu.append($('<span/>', {
-      'class': 'mobile-calendar-menu-empty',
-      text: 'Loading calendars...'
-    }));
+    set_mobile_calendar_menu_status('Loading calendars...');
     return;
   }
 
@@ -1608,6 +1607,19 @@ var sync_mobile_calendar_menu = function sync_mobile_calendar_menu() {
 
     $menu.append($button);
   });
+};
+
+var set_mobile_calendar_menu_status = function set_mobile_calendar_menu_status(message) {
+  var $menu = $('.mobile-calendar-menu-calendars');
+
+  if ($menu.length === 0) {
+    return;
+  }
+
+  $menu.empty().append($('<span/>', {
+    'class': 'mobile-calendar-menu-empty',
+    text: message
+  }));
 };
 
 /**
