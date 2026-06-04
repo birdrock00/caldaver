@@ -115,6 +115,9 @@ async function mockMailApi(page, options = {}) {
   });
 
   await page.route('**/accounts', async route => {
+    if (new URL(route.request().url()).pathname !== '/accounts') {
+      return route.fallback();
+    }
     if (accountStatus >= 400) {
       return route.fulfill({
         status: accountStatus,
@@ -187,7 +190,12 @@ async function mockMailApi(page, options = {}) {
       });
     };
     await page.route('**/mail/accounts/save', accountSaveHandler);
-    await page.route('**/accounts/save', accountSaveHandler);
+    await page.route('**/accounts/save', async route => {
+      if (new URL(route.request().url()).pathname !== '/accounts/save') {
+        return route.fallback();
+      }
+      return accountSaveHandler(route);
+    });
   }
 
   await page.route('**/mail/messages/sync?**', async route => {
