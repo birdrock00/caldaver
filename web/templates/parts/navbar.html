@@ -63,6 +63,10 @@
              <i class="fa fa-caret-down" aria-hidden="true"></i>
            </summary>
            <nav class="user-menu-list" aria-label="User menu">
+             <button type="button" class="user-menu-item user-menu-instance-reset" hidden>
+               <i class="fa fa-exchange" aria-hidden="true"></i>
+               <span>Change instance</span>
+             </button>
              <a class="user-menu-item user-menu-logout" href="{{ app.url_generator.generate('logout') }}">
                <i class="fa fa-power-off" aria-hidden="true"></i>
                <span>{% trans %}labels.logout{% endtrans %}</span>
@@ -191,6 +195,31 @@
         window.location.href = menu.dataset.calendarHref || '/';
       });
     }
+  });
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var resetButton = document.querySelector('.user-menu-instance-reset');
+    var plugin = window.Capacitor &&
+      window.Capacitor.Plugins &&
+      window.Capacitor.Plugins.CaldaverInstance;
+    var isAndroid = window.Capacitor &&
+      typeof window.Capacitor.getPlatform === 'function' &&
+      window.Capacitor.getPlatform() === 'android';
+
+    if (!resetButton || !isAndroid || !plugin || typeof plugin.clearAndShowSetup !== 'function') {
+      return;
+    }
+
+    resetButton.hidden = false;
+    resetButton.addEventListener('click', function() {
+      if (!window.confirm('Change the Caldaver instance for this Android app?')) {
+        return;
+      }
+
+      plugin.clearAndShowSetup().catch(function() {
+        window.location.href = '/';
+      });
+    });
   });
 })();
 </script>
