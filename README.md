@@ -26,7 +26,7 @@ This fork has moved beyond the original AgenDAV codebase:
 - The Docker image now builds frontend assets, compiles the Rust server, and
   runs `caldaver-server` directly on port `8080`.
 - Capacitor Android support builds a Caldaver APK from the same web assets and
-  can point at a configured remote Caldaver server at build time.
+  asks for the Caldaver instance URL on first launch.
 - Android Appium and ADB smoke tests validate the installed APK and WebView
   behavior against a live backend.
 - GitHub releases are produced when release artifacts are published. Each dated
@@ -114,21 +114,20 @@ docker run -d --name caldaver \
 
 ### Android APK
 
-The Android app is a Capacitor wrapper around the Caldaver web UI. Build-time
-configuration controls the remote server URL; do not commit deployment-specific
-URLs or credentials to this repository.
+The Android app is a Capacitor wrapper around the Caldaver web UI. The APK does
+not bake in a deployment URL. On first launch, enter the Caldaver instance URL;
+the app saves it on the device and opens that instance on later launches.
 
 Useful commands:
 
 ```sh
 npm install
-CALDAVER_BASE_URL=https://caldaver.example.test npm run android:apk
+npm run android:apk
 ANDROID_UDID=emulator-5554 npm run android:adb-smoke
 ```
 
-`CALDAVER_ANDROID_SERVER_URL` overrides `CALDAVER_BASE_URL` for the generated
-Capacitor Android config. `CALDAVER_ANDROID_ALLOW_NAVIGATION` can be set to a
-comma-separated list of additional hosts that should remain inside the WebView.
+Use the Android user menu's "Change instance" action to clear the saved URL and
+return to setup.
 
 ### Releases
 
