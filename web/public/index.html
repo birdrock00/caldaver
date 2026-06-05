@@ -8,63 +8,452 @@
     <style>
       :root {
         color-scheme: light dark;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
-        align-items: center;
-        background: #f6f8fb;
-        color: #20242a;
+        align-items: stretch;
+        background:
+          linear-gradient(135deg, rgba(32, 99, 155, .10), rgba(105, 146, 64, .12)),
+          #f6f8fb;
+        color: #1f2933;
         display: flex;
         justify-content: center;
         margin: 0;
         min-height: 100vh;
-        padding: 24px;
+        padding: max(24px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
       }
 
       main {
+        align-self: center;
+        background: rgba(255, 255, 255, .92);
+        border: 1px solid rgba(142, 156, 173, .38);
+        border-radius: 8px;
+        box-shadow: 0 18px 50px rgba(31, 41, 51, .16);
+        display: grid;
+        gap: 20px;
         max-width: 520px;
-        text-align: center;
+        padding: 28px;
+        width: min(100%, 520px);
       }
 
-      img {
-        height: auto;
-        margin-bottom: 20px;
-        max-width: 160px;
+      .brand {
+        align-items: center;
+        display: flex;
+        gap: 14px;
+      }
+
+      .brand img {
+        height: 56px;
+        width: 56px;
       }
 
       h1 {
-        font-size: 28px;
-        margin: 0 0 12px;
+        font-size: 26px;
+        line-height: 1.15;
+        margin: 0;
       }
 
-      p {
+      .subtitle {
         color: #5b6470;
-        font-size: 16px;
-        line-height: 1.5;
+        font-size: 15px;
+        line-height: 1.45;
+        margin: 5px 0 0;
+      }
+
+      form {
+        display: grid;
+        gap: 14px;
+      }
+
+      label {
+        color: #2f3b47;
+        display: grid;
+        font-size: 14px;
+        font-weight: 700;
+        gap: 8px;
+      }
+
+      input,
+      button {
+        border-radius: 6px;
+        font: inherit;
+        min-height: 46px;
+      }
+
+      input {
+        background: #fff;
+        border: 1px solid #9aa8b7;
+        color: #1f2933;
+        padding: 10px 12px;
+        width: 100%;
+      }
+
+      input:focus {
+        border-color: #20639b;
+        box-shadow: 0 0 0 3px rgba(32, 99, 155, .20);
+        outline: 0;
+      }
+
+      input[aria-invalid="true"] {
+        border-color: #b3261e;
+      }
+
+      button {
+        align-items: center;
+        background: #20639b;
+        border: 0;
+        color: #fff;
+        cursor: pointer;
+        display: inline-flex;
+        font-weight: 700;
+        justify-content: center;
+        padding: 10px 16px;
+      }
+
+      button:focus {
+        box-shadow: 0 0 0 3px rgba(32, 99, 155, .24);
+        outline: 0;
+      }
+
+      button:disabled {
+        cursor: progress;
+        opacity: .72;
+      }
+
+      .help,
+      .status {
+        color: #5b6470;
+        font-size: 14px;
+        line-height: 1.4;
         margin: 0;
+      }
+
+      .error {
+        background: #fff1f0;
+        border-left: 4px solid #b3261e;
+        color: #7d1a14;
+        font-size: 14px;
+        font-weight: 650;
+        line-height: 1.4;
+        margin: 0;
+        padding: 10px 12px;
+      }
+
+      .loading {
+        align-items: center;
+        display: flex;
+        gap: 10px;
+      }
+
+      .spinner {
+        animation: spin .8s linear infinite;
+        border: 2px solid rgba(32, 99, 155, .25);
+        border-top-color: #20639b;
+        border-radius: 999px;
+        display: inline-block;
+        height: 18px;
+        width: 18px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
 
       @media (prefers-color-scheme: dark) {
         body {
-          background: #11161c;
+          background:
+            linear-gradient(135deg, rgba(67, 143, 196, .16), rgba(133, 174, 84, .14)),
+            #11161c;
           color: #f5f7fa;
         }
 
-        p {
+        main {
+          background: rgba(22, 29, 37, .94);
+          border-color: rgba(116, 132, 151, .42);
+          box-shadow: 0 18px 50px rgba(0, 0, 0, .42);
+        }
+
+        label {
+          color: #eef3f8;
+        }
+
+        .subtitle,
+        .help,
+        .status {
           color: #b8c0ca;
+        }
+
+        input {
+          background: #18212b;
+          border-color: #647384;
+          color: #f5f7fa;
+        }
+
+        input:focus {
+          border-color: #8cc7ff;
+          box-shadow: 0 0 0 3px rgba(140, 199, 255, .20);
+        }
+
+        button {
+          background: #8cc7ff;
+          color: #11161c;
+        }
+
+        .error {
+          background: #3b1716;
+          color: #ffd7d4;
+        }
+
+        .spinner {
+          border-color: rgba(140, 199, 255, .28);
+          border-top-color: #8cc7ff;
         }
       }
     </style>
   </head>
   <body>
-    <main>
-      <img src="img/caldaver_300transp.png" alt="">
-      <h1>Caldaver</h1>
-      <p>
-        This Android build needs a Caldaver server URL configured at build time.
-        Set CALDAVER_ANDROID_SERVER_URL or CALDAVER_BASE_URL when building the APK.
+    <main id="server_url_setup" aria-labelledby="setup_title">
+      <div class="brand">
+        <img src="img/caldaver_300transp.png" alt="">
+        <div>
+          <h1 id="setup_title">Caldaver</h1>
+          <p class="subtitle">Enter the web address of the Caldaver server you want this Android app to open.</p>
+        </div>
+      </div>
+
+      <p id="startup_status" class="status loading">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Checking saved instance...</span>
       </p>
+
+      <form id="server_url_form" novalidate hidden>
+        <label for="server_url">
+          Caldaver instance URL
+          <input id="server_url" name="server_url" type="url" inputmode="url" autocomplete="url" autocapitalize="none" spellcheck="false" enterkeyhint="go" placeholder="https://caldaver.example.com" required aria-describedby="server_url_help server_url_error" aria-invalid="false">
+        </label>
+        <p id="server_url_help" class="help">If you omit the scheme, https:// will be used.</p>
+        <p id="server_url_error" class="error" role="alert" aria-live="assertive" hidden></p>
+        <button id="server_url_submit" type="submit">Open Caldaver</button>
+      </form>
     </main>
+
+    <script>
+      (function () {
+        var storageKey = 'caldaver.android.serverUrl';
+
+        function $(id) {
+          return document.getElementById(id);
+        }
+
+        function appStorage() {
+          try {
+            return window.localStorage || null;
+          } catch (error) {
+            return null;
+          }
+        }
+
+        function instancePlugin() {
+          return window.Capacitor &&
+            window.Capacitor.Plugins &&
+            window.Capacitor.Plugins.CaldaverInstance;
+        }
+
+        function normalizeServerUrl(value) {
+          var trimmed = String(value || '').trim();
+          var url;
+
+          if (!trimmed) {
+            throw new Error('Enter your Caldaver instance URL.');
+          }
+
+          if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+            trimmed = 'https://' + trimmed;
+          }
+
+          url = new URL(trimmed);
+          if (url.protocol !== 'https:') {
+            throw new Error('Use an HTTPS Caldaver URL.');
+          }
+          if (!url.hostname) {
+            throw new Error('Enter a URL that includes a host name.');
+          }
+          if (url.username || url.password) {
+            throw new Error('Do not include a username or password in the URL.');
+          }
+
+          url.hash = '';
+          url.search = '';
+          url.pathname = url.pathname.replace(/\/+$/, '');
+          return url.toString().replace(/\/$/, '');
+        }
+
+        function fallbackSavedServerUrl() {
+          var storage = appStorage();
+          return storage ? storage.getItem(storageKey) || '' : '';
+        }
+
+        function saveFallbackServerUrl(url) {
+          var storage = appStorage();
+          if (storage) {
+            storage.setItem(storageKey, url);
+          }
+        }
+
+        function clearFallbackServerUrl() {
+          var storage = appStorage();
+          if (storage) {
+            storage.removeItem(storageKey);
+          }
+        }
+
+        function nativeSavedServerUrl() {
+          var plugin = instancePlugin();
+          if (!plugin || typeof plugin.get !== 'function') {
+            return Promise.resolve('');
+          }
+
+          return plugin.get()
+            .then(function (result) {
+              return result && result.url ? result.url : '';
+            })
+            .catch(function () {
+              return '';
+            });
+        }
+
+        function saveServerUrl(url) {
+          var plugin = instancePlugin();
+          if (!plugin || typeof plugin.set !== 'function') {
+            saveFallbackServerUrl(url);
+            return Promise.resolve(url);
+          }
+
+          return plugin.set({ url: url })
+            .then(function (result) {
+              var saved = result && result.url ? result.url : url;
+              saveFallbackServerUrl(saved);
+              return saved;
+            });
+        }
+
+        function setBusy(isBusy) {
+          var button = $('server_url_submit');
+          button.disabled = isBusy;
+          button.textContent = isBusy ? 'Checking...' : 'Open Caldaver';
+        }
+
+        function showForm() {
+          $('startup_status').hidden = true;
+          $('server_url_form').hidden = false;
+          $('server_url').focus();
+        }
+
+        function showError(message) {
+          var input = $('server_url');
+          var error = $('server_url_error');
+          input.setAttribute('aria-invalid', 'true');
+          error.textContent = message;
+          error.hidden = false;
+          input.focus();
+        }
+
+        function clearError() {
+          var input = $('server_url');
+          var error = $('server_url_error');
+          input.setAttribute('aria-invalid', 'false');
+          error.textContent = '';
+          error.hidden = true;
+        }
+
+        function continueToServer(url) {
+          window.location.replace(url);
+        }
+
+        function submitServerUrl(event) {
+          event.preventDefault();
+          clearError();
+          setBusy(true);
+
+          try {
+            var normalized = normalizeServerUrl($('server_url').value);
+            saveServerUrl(normalized)
+              .then(continueToServer)
+              .catch(function () {
+                setBusy(false);
+                showError('Unable to save the instance URL on this device.');
+              });
+          } catch (error) {
+            setBusy(false);
+            showError(error && error.message ? error.message : 'Enter a valid Caldaver instance URL.');
+          }
+        }
+
+        function useSavedServerUrl(stored, migrateFallback) {
+          var normalized = normalizeServerUrl(stored);
+
+          if (normalized !== stored || migrateFallback) {
+            saveServerUrl(normalized)
+              .then(function (saved) {
+                if (migrateFallback) {
+                  clearFallbackServerUrl();
+                }
+                continueToServer(saved);
+              })
+              .catch(function () {
+                continueToServer(normalized);
+              });
+            return;
+          }
+
+          continueToServer(normalized);
+        }
+
+        function initAndroidServerSetup() {
+          $('server_url_form').addEventListener('submit', submitServerUrl);
+
+          nativeSavedServerUrl().then(function (nativeUrl) {
+            var fallbackUrl = fallbackSavedServerUrl();
+            var stored = nativeUrl || fallbackUrl;
+
+            if (!stored) {
+              showForm();
+              return;
+            }
+
+            try {
+              useSavedServerUrl(stored, !nativeUrl && !!fallbackUrl && !!instancePlugin());
+            } catch (error) {
+              clearFallbackServerUrl();
+              showForm();
+              showError('The saved Caldaver instance URL is invalid. Enter it again.');
+            }
+          });
+        }
+
+        window.CaldaverAndroidServerSetup = {
+          storageKey: storageKey,
+          init: initAndroidServerSetup,
+          normalizeServerUrl: normalizeServerUrl
+        };
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initAndroidServerSetup);
+        } else {
+          initAndroidServerSetup();
+        }
+      }());
+    </script>
   </body>
 </html>

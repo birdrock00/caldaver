@@ -6,7 +6,7 @@ The APK is not built or installed by the Appium harness. Build a debug APK,
 install and launch it with adb, then run the WebView navigation suite:
 
 ```sh
-CALDAVER_BASE_URL=https://caldaver.example.test npm run android:apk
+npm run android:apk
 npm run android:adb-smoke
 npm run test:android-appium:setup-driver
 CALDAVER_USERNAME=... CALDAVER_PASSWORD=... npm run test:android-appium
@@ -14,9 +14,7 @@ CALDAVER_USERNAME=... CALDAVER_PASSWORD=... npm run test:android-appium
 
 Useful environment variables:
 
-- `CALDAVER_BASE_URL`, required for live Android WebView tests and Android builds that point at a remote server
-- `CALDAVER_ANDROID_SERVER_URL`, overrides the Android Capacitor server URL at build time; when omitted, `CALDAVER_BASE_URL` is used
-- `CALDAVER_ANDROID_ALLOW_NAVIGATION`, optional comma-separated host list to keep inside the Android WebView at build time
+- `CALDAVER_BASE_URL`, required for live Android WebView tests; enter the same URL in the APK first-run setup screen before running Appium
 - `CALDAVER_USERNAME` and `CALDAVER_PASSWORD`, required
 - `CALDAVER_ANDROID_APP_PACKAGE`, defaults to `club.exampleapp.caldaver`
 - `CALDAVER_ANDROID_APP_ACTIVITY`, defaults to `.MainActivity`

@@ -3,6 +3,9 @@
   "appName": "Caldaver",
   "webDir": "web/public",
   "server": {
+    "allowNavigation": [
+      "*"
+    ],
     "cleartext": false
   },
   "android": {
