@@ -9,7 +9,7 @@
   "scripts": {
     "clean": "rm -rf node_modules && rm -rf web/public/dist/js/* && rm -rf web/public/dist/css/*",
     "test": "npm run test:ui",
-    "test:ui": "node --test tests/ui-regressions.test.js",
+    "test:ui": "node --test tests/*.test.js",
     "test:rust": "cargo test --manifest-path rust/Cargo.toml",
     "start:rust": "cargo run --manifest-path rust/Cargo.toml --bin caldaver-server",
     "test:live-ui": "playwright test tests/live-ui.spec.js",
