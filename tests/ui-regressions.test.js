@@ -225,7 +225,11 @@ test('frontend templates preserve mobile navigation and mail behavior', () => {
   assert.match(mailMessageJs, /\/mail\/image\?account_id=/);
   assert.match(mailMessageJs, /caldaver-mail-image-failed/);
   assert.match(mailMessageJs, /document\.images/);
-  assert.match(mailMessageJs, /navigateBySwipe\(deltaX > 0 \? 'newer' : 'older'\)/);
+  assert.match(mailMessageJs, /function handleSwipeProgress\(clientX, clientY, event\)/);
+  assert.match(mailMessageJs, /target\.addEventListener\('touchmove'[\s\S]*passive:\s*false/);
+  assert.match(mailMessageJs, /target\.addEventListener\('touchend'[\s\S]*passive:\s*false/);
+  assert.match(mailMessageJs, /preventNativeHorizontalScroll\(event\)/);
+  assert.match(mailMessageJs, /bindSwipeNavigationTarget\(reader, reader\)/);
   assert.match(mailMessageJs, /previous: currentIndex > 0 \? messages\[currentIndex - 1\] : null/);
   assert.match(mailMessageJs, /next: currentIndex !== -1 && currentIndex < messages\.length - 1 \? messages\[currentIndex \+ 1\] : null/);
   assert.match(mailMessageJs, /#mail_reader_previous/);
@@ -600,6 +604,9 @@ test('layout CSS keeps mobile pages scrollable and controls visible', () => {
   assert.match(less, /\.mail-shell\s*\{[\s\S]*height:\s*~"calc\(100dvh - 64px\)";/);
   assert.match(less, /\.mail-reader-message\s*\{[\s\S]*max-width:\s*none;/);
   assert.match(less, /\.mail-reader-html\s*\{[\s\S]*width:\s*100%;/);
+  assert.match(less, /\.mail-reader\s*\{[\s\S]*touch-action:\s*pan-y;/);
+  assert.match(less, /\.mail-reader-message\s*\{[\s\S]*touch-action:\s*pan-y;/);
+  assert.match(less, /\.mail-reader-html\s*\{[\s\S]*touch-action:\s*pan-y;/);
 });
 
 test('mobile previous-events control preserves future calendar scrolling', () => {

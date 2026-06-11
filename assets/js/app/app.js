@@ -217,6 +217,15 @@ $(document).ready(function() {
     header: calendar_header_for_viewport(),
     navLinks: true,
 
+    columnHeaderHtml: function(date) {
+      var now = moment();
+      var dayName = date.format('ddd');
+      if (date.isSame(now, 'day')) {
+        return dayName + ' <span class="fc-header-today-circle">' + date.format('D') + '</span>';
+      }
+      return dayName + ' ' + date.format('M/D');
+    },
+
     defaultView: calendar_default_view_for_viewport(fullcalendar_views),
     theme: true, // use jQuery UI themeing
     slotLabelFormat: CaldaverDateAndTime.fullCalendarFormat[CaldaverUserPrefs.time_format],

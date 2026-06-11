@@ -450,6 +450,11 @@ async function dispatchTouchSwipe(page, selector, startX, endX, y = 220) {
     Object.defineProperty(start, 'changedTouches', { value: [touch(fromX)] });
     element.dispatchEvent(start);
 
+    const move = new Event('touchmove', { bubbles: true, cancelable: true });
+    Object.defineProperty(move, 'touches', { value: [touch(toX)] });
+    Object.defineProperty(move, 'changedTouches', { value: [touch(toX)] });
+    element.dispatchEvent(move);
+
     const end = new Event('touchend', { bubbles: true, cancelable: true });
     Object.defineProperty(end, 'touches', { value: [] });
     Object.defineProperty(end, 'changedTouches', { value: [touch(toX)] });
