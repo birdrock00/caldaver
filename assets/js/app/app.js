@@ -220,9 +220,15 @@ $(document).ready(function() {
     columnHeaderHtml: function(date) {
       var now = moment();
       var dayName = date.format('ddd');
-      if (date.isSame(now, 'day')) {
-        return dayName + ' <span class="fc-header-today-circle">' + date.format('D') + '</span>';
-      }
+      try {
+        var viewName = $('#calendar_view').fullCalendar('getView').name;
+        if (viewName === 'month') {
+          return dayName;
+        }
+        if (date.isSame(now, 'day')) {
+          return dayName + ' <span class="fc-header-today-circle">' + date.format('D') + '</span>';
+        }
+      } catch(e) {}
       return dayName + ' ' + date.format('M/D');
     },
 

@@ -341,7 +341,7 @@
         event.target.action || accountSaveUrl,
         {
           method: 'POST',
-          body: new FormData(event.target)
+          body: new URLSearchParams(new FormData(event.target))
         },
         'Unable to save account'
       )
