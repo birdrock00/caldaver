@@ -2,9 +2,13 @@
 (function() {
   var swipeStart = null;
   var swipeNavigating = false;
+  var swipeHandled = false;
   var inboxMessagesPromise = null;
   var messageNavigationPromise = null;
   var mobileViewportQuery = '(max-width: 900px)';
+  var swipeMinDistance = 80;
+  var swipeMaxVerticalDistance = 70;
+  var swipeHorizontalRatio = 1.6;
   var messageByUid = {};
   var currentReplyUid = null;
 
@@ -182,7 +186,7 @@
       plainBody.hidden = true;
       plainBody.textContent = '';
       htmlFrame.hidden = false;
-      htmlFrame.srcdoc = '<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#202124;font:14px Arial,sans-serif;line-height:1.5;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}img.caldaver-mail-image-failed{display:none!important;width:0!important;height:0!important;}table{max-width:100%;}</style></head><body>' + html + '</body></html>';
+      htmlFrame.srcdoc = '<!doctype html><html><head><base target="_blank"><style>html,body{margin:0;padding:0;background:#fff;color:#202124;font:14px Arial,sans-serif;line-height:1.5;overflow-wrap:anywhere;touch-action:pan-y;}img{max-width:100%;height:auto;}img.caldaver-mail-image-failed{display:none!important;width:0!important;height:0!important;}table{max-width:100%;}</style></head><body>' + html + '</body></html>';
       htmlFrame.onload = function() {
         setupHtmlFrameSwipeNavigation(htmlFrame);
         resizeHtmlFrame(htmlFrame);
@@ -754,23 +758,66 @@
 
   function beginSwipe(clientX, clientY) {
     swipeStart = { x: clientX, y: clientY };
+    swipeHandled = false;
   }
 
-  function finishSwipe(clientX, clientY) {
+  function swipeDirection(clientX, clientY) {
     if (!swipeStart || !narrowViewport()) {
       swipeStart = null;
-      return;
+      return null;
     }
 
     var deltaX = clientX - swipeStart.x;
     var deltaY = clientY - swipeStart.y;
-    swipeStart = null;
 
-    if (Math.abs(deltaX) < 80 || Math.abs(deltaY) > 70 || Math.abs(deltaX) < Math.abs(deltaY) * 1.6) {
+    if (Math.abs(deltaX) < swipeMinDistance ||
+        Math.abs(deltaY) > swipeMaxVerticalDistance ||
+        Math.abs(deltaX) < Math.abs(deltaY) * swipeHorizontalRatio) {
+      return null;
+    }
+
+    return deltaX > 0 ? 'newer' : 'older';
+  }
+
+  function preventNativeHorizontalScroll(event) {
+    if (event && event.cancelable) {
+      event.preventDefault();
+    }
+  }
+
+  function handleSwipeProgress(clientX, clientY, event) {
+    if (swipeHandled) {
+      preventNativeHorizontalScroll(event);
       return;
     }
 
-    navigateBySwipe(deltaX > 0 ? 'newer' : 'older');
+    var direction = swipeDirection(clientX, clientY);
+    if (!direction) {
+      return;
+    }
+
+    swipeHandled = true;
+    swipeStart = null;
+    preventNativeHorizontalScroll(event);
+    navigateBySwipe(direction);
+  }
+
+  function finishSwipe(clientX, clientY, event) {
+    if (swipeHandled) {
+      swipeHandled = false;
+      swipeStart = null;
+      preventNativeHorizontalScroll(event);
+      return;
+    }
+
+    var direction = swipeDirection(clientX, clientY);
+    swipeStart = null;
+    swipeHandled = false;
+
+    if (direction) {
+      preventNativeHorizontalScroll(event);
+      navigateBySwipe(direction);
+    }
   }
 
   function touchPoint(event) {
@@ -790,6 +837,7 @@
     target.addEventListener('touchstart', function(event) {
       if (!narrowViewport() || event.touches.length !== 1 || interactiveSwipeTarget(event.target)) {
         swipeStart = null;
+        swipeHandled = false;
         return;
       }
 
@@ -798,21 +846,31 @@
         beginSwipe(point.clientX, point.clientY);
       } else {
         swipeStart = null;
+        swipeHandled = false;
       }
     }, { passive: true, capture: true });
+
+    target.addEventListener('touchmove', function(event) {
+      var point = touchPoint(event);
+      if (point) {
+        handleSwipeProgress(point.clientX, point.clientY, event);
+      }
+    }, { passive: false, capture: true });
 
     target.addEventListener('touchend', function(event) {
       var point = touchPoint(event);
       if (!point) {
         swipeStart = null;
+        swipeHandled = false;
         return;
       }
 
-      finishSwipe(point.clientX, point.clientY);
-    }, { passive: true, capture: true });
+      finishSwipe(point.clientX, point.clientY, event);
+    }, { passive: false, capture: true });
 
     target.addEventListener('touchcancel', function() {
       swipeStart = null;
+      swipeHandled = false;
     }, { passive: true, capture: true });
 
     target.addEventListener('pointerdown', function(event) {
@@ -833,11 +891,20 @@
         return;
       }
 
-      finishSwipe(event.clientX, event.clientY);
+      finishSwipe(event.clientX, event.clientY, event);
+    }, true);
+
+    target.addEventListener('pointermove', function(event) {
+      if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
+        return;
+      }
+
+      handleSwipeProgress(event.clientX, event.clientY, event);
     }, true);
 
     target.addEventListener('pointercancel', function() {
       swipeStart = null;
+      swipeHandled = false;
     }, true);
 
     target.addEventListener('mousedown', function(event) {
@@ -853,7 +920,7 @@
         return;
       }
 
-      finishSwipe(event.clientX, event.clientY);
+      finishSwipe(event.clientX, event.clientY, event);
     }, true);
   }
 
@@ -868,7 +935,12 @@
   }
 
   function setupSwipeNavigation() {
+    var reader = $('#mail_reader');
     var message = $('#mail_reader_message');
+
+    if (reader) {
+      bindSwipeNavigationTarget(reader, reader);
+    }
 
     bindSwipeNavigationTarget(message, message);
   }

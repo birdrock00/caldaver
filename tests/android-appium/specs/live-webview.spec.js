@@ -921,6 +921,11 @@ describe('Caldaver Android WebView mail reader gestures', function () {
         Object.defineProperty(start, 'changedTouches', { value: [touch(startX)] });
         element.dispatchEvent(start);
 
+        const move = new Event('touchmove', { bubbles: true, cancelable: true });
+        Object.defineProperty(move, 'touches', { value: [touch(endX)] });
+        Object.defineProperty(move, 'changedTouches', { value: [touch(endX)] });
+        element.dispatchEvent(move);
+
         const end = new Event('touchend', { bubbles: true, cancelable: true });
         Object.defineProperty(end, 'touches', { value: [] });
         Object.defineProperty(end, 'changedTouches', { value: [touch(endX)] });
