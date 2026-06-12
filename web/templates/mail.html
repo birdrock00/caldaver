@@ -32,8 +32,8 @@
         </button>
       </div>
       <div id="mail_empty" class="mail-empty" hidden>{% trans %}labels.noaccounts{% endtrans %}</div>
-      <div id="mail_loading" class="mail-empty" hidden>{% trans %}labels.nomessages{% endtrans %}</div>
-      <div id="mail_no_messages" class="mail-empty" hidden>{% trans %}labels.nomessages{% endtrans %}</div>
+      <div id="mail_loading" class="mail-empty mail-loading-state"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Loading messages...</div>
+      <div id="mail_no_messages" class="mail-empty mail-empty-state" hidden>{% trans %}labels.nomessages{% endtrans %}</div>
       <div id="mail_error" class="mail-error" hidden></div>
       <div id="mail_rows" class="mail-rows"></div>
     </section>
@@ -43,7 +43,7 @@
           <i class="fa fa-arrow-left" aria-hidden="true"></i>
         </button>
         <h1>New message</h1>
-        <button type="button" id="mail_compose_send" aria-label="Send" aria-disabled="true">
+        <button type="button" id="mail_compose_send" aria-label="Send" disabled>
           <i class="fa fa-send" aria-hidden="true"></i>
         </button>
       </div>

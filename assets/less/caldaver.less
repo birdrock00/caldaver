@@ -145,7 +145,7 @@ div.panel-body .buttons {
     }
 
     &.hidden_calendar, &.hidden_calendar i {
-      color: #eaeaea !important;
+      color: #9aa0a6 !important;
     }
   }
 }
@@ -1283,7 +1283,7 @@ body.caldaver-calendar-page {
   background: #a7d8f0;
   border: 0;
   border-radius: 6px;
-  color: #51656f;
+  color: #1a3a4a;
   font-size: 12px !important;
   line-height: 1.25 !important;
   box-shadow: none;
@@ -1993,8 +1993,10 @@ body.caldaver-calendar-page {
     }
   }
 
-  #mail_compose_send[aria-disabled="true"] {
+  #mail_compose_send[aria-disabled="true"],
+  #mail_compose_send[disabled] {
     color: #8c939d;
+    cursor: default;
   }
 }
 
@@ -4217,6 +4219,124 @@ summary:focus-visible,
     width: 100%;
     min-height: 44px;
   }
+}
+
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 9999;
+  padding: 12px 20px;
+  color: #fff;
+  background: #1a73e8;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.2s ease;
+
+  &:focus {
+    top: 8px;
+    outline: 3px solid #174ea6;
+    outline-offset: 2px;
+  }
+}
+
+.login-error {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 400px;
+  max-width: ~"calc(100vw - 32px)";
+  margin: 16px auto 0;
+  padding: 14px 18px;
+  background: #fce8e6;
+  border-left: 4px solid #d93025;
+  border-radius: 8px;
+  color: #b3261e;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+  box-sizing: border-box;
+
+  i {
+    flex: 0 0 auto;
+    font-size: 20px;
+  }
+}
+
+.mail-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #5f6368;
+  font-size: 15px;
+
+  i {
+    font-size: 18px;
+    color: #1a73e8;
+  }
+}
+
+.mail-empty-state {
+  text-align: center;
+  color: #5f6368;
+  padding: 48px 24px;
+}
+
+.mail-compose-screen #mail_compose_send[disabled] {
+  color: #bdc1c6;
+  cursor: default;
+
+  &:hover,
+  &:focus {
+    background: transparent;
+  }
+}
+
+.mail-reply-send[disabled],
+.mail-reply-send[aria-disabled="true"] {
+  color: #bdc1c6 !important;
+  background: #f1f3f4 !important;
+  border-color: #dadce0 !important;
+  cursor: default;
+}
+
+.calendar-list-loading i {
+  margin-right: 8px;
+  color: #1a73e8;
+}
+
+.contact-dialog:not([hidden]) {
+  animation: caldaver-fade-in 0.2s ease-out;
+
+  .contact-dialog-panel {
+    animation: caldaver-scale-in 0.2s ease-out;
+  }
+}
+
+@keyframes caldaver-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes caldaver-scale-in {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.mail-compose-screen:not([hidden]) {
+  animation: caldaver-slide-in 0.25s ease-out;
+}
+
+@keyframes caldaver-slide-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+#usermenu .user-pill {
+  transition: background-color 0.15s ease;
 }
 
 // vim: ft=css sw=2 tabstop=2 expandtab

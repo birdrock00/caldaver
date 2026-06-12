@@ -1052,9 +1052,6 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     }
   );
 
-  // Log to console for debugging purposes
-  console.log(event);
-
   var button_save = {
     'text': t('labels', 'save'),
     'class': 'addicon btn-icon-event-edit',
@@ -1724,9 +1721,6 @@ var generate_calendar_entry = function generate_calendar_entry(data) {
 
     // Associate data + eventsource to new list item
     $out.data(data);
-
-    // Disable text selection on this (useful for dblclick)
-    $out.disableSelection();
   });
 
   return $out;

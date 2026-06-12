@@ -8,6 +8,10 @@
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+        <meta name="theme-color" content="#1a73e8">
+        <meta name="description" content="Caldaver - Calendar, Contacts &amp; Mail">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
         {% if stylesheets is defined %}
             {% for stylesheet in stylesheets %}
             <link href="{{ asset(stylesheet, 'css') }}" rel="stylesheet" type="text/css" />
@@ -21,6 +25,7 @@
         {% endif %}
     </head>
     <body class="{% block body_class %}{% endblock %}">
+        <a href="#content" class="skip-link">Skip to main content</a>
         {% block content %}{% endblock %}
         {% set nojs_query = app.request.query.get('nojs') %}
         {% if nojs_query != '1'

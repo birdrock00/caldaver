@@ -76,12 +76,12 @@
   </main>
 </div>
 
-<div id="contact_dialog" class="contact-dialog" hidden>
+<div id="contact_dialog" class="contact-dialog" role="dialog" aria-modal="true" aria-labelledby="contact_dialog_title" hidden>
   <form id="contact_form" action="{{ app.url_generator.generate('cards.save') }}" method="post">
     <input type="hidden" name="_token" value="{{ csrf_token.getValue() }}">
     <div class="contact-dialog-panel">
       <div class="contact-dialog-header">
-        <h2>{% trans %}labels.createcontact{% endtrans %}</h2>
+        <h2 id="contact_dialog_title">{% trans %}labels.createcontact{% endtrans %}</h2>
         <button type="button" id="contact_cancel_icon" aria-label="{% trans %}labels.cancel{% endtrans %}">
           <i class="fa fa-times"></i>
         </button>
