@@ -594,7 +594,8 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
     response.headers_mut().insert(
         header::SET_COOKIE,
         HeaderValue::from_str(&format!(
-            "caldaver_sess={id}; Path=/; HttpOnly; SameSite=Lax{}",
+            "caldaver_sess={id}; Path=/; Max-Age={}; HttpOnly; SameSite=Lax{}",
+            state.config.session_lifetime.as_secs(),
             secure_cookie_attr(&state.config)
         ))
         .unwrap(),
