@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- [E1] Branded Caldaver color palette (#1a73e8 family) -->
+    <color name="colorPrimary">#1a73e8</color>
+    <!-- [E1] Darker shade used for the status bar so its icons stay legible -->
+    <color name="colorPrimaryDark">#1558b0</color>
+    <color name="colorAccent">#1a73e8</color>
+
+    <!-- [E2] Window/splash background to avoid a white flash on cold start -->
+    <color name="windowBackground">#ffffff</color>
+    <!-- [E2] Splash background color matching the branded surface -->
+    <color name="splashBackground">#ffffff</color>
+
+    <!-- [E3] Navigation bar color matching branding -->
+    <color name="navigationBarColor">#ffffff</color>
+</resources>

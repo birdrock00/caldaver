@@ -9,8 +9,9 @@
   <aside class="cards-sidebar">
     {% include 'parts/sidebrand.html' %}
     {% include 'parts/appnav.html' %}
-    <button id="contact_create" class="btn btn-default create-contact-button">
-      <i class="fa fa-plus"></i> {% trans %}labels.createcontact{% endtrans %}
+    <!-- [D3] explicit aria-label so the icon+text add affordance is announced clearly on mobile screen readers -->
+    <button id="contact_create" class="btn btn-default create-contact-button" type="button" aria-label="{% trans %}labels.createcontact{% endtrans %}">
+      <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.createcontact{% endtrans %}
     </button>
     <nav class="contacts-nav" aria-label="Contact lists">
       <a class="contacts-nav-item active" href="{{ app.url_generator.generate('cards') }}">
@@ -33,7 +34,10 @@
     <div class="contacts-search-row">
       <div class="contacts-search">
         <i class="fa fa-search"></i>
-        <input id="contacts_search" type="search" placeholder="{% trans %}labels.search{% endtrans %}">
+        <!-- [D2] mobile keyboard hints for the contact search field: search keyboard, no auto-capitalisation/correction -->
+        <input id="contacts_search" type="search" placeholder="{% trans %}labels.search{% endtrans %}"
+               inputmode="search" enterkeyhint="search" autocapitalize="none" autocorrect="off"
+               spellcheck="false" aria-label="{% trans %}labels.search{% endtrans %}">
       </div>
       <div class="contacts-view-switch" role="group" aria-label="Contact view">
         <button type="button" data-view="list" aria-pressed="false">{% trans %}labels.list{% endtrans %}</button>
@@ -55,8 +59,12 @@
         <h2>Loading contacts...</h2>
       </div>
 
+      <!-- [D3] empty-state now carries a reachable add affordance so mobile users can create their first contact without the off-canvas sidebar -->
       <div id="contacts_empty" class="contacts-empty" hidden>
         <h2>{% trans %}labels.nocontacts{% endtrans %}</h2>
+        <button type="button" id="contacts_empty_create" class="btn btn-primary contacts-empty-create" aria-label="{% trans %}labels.createcontact{% endtrans %}">
+          <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.createcontact{% endtrans %}
+        </button>
       </div>
 
       <div id="contacts_list" class="contacts-list-view">

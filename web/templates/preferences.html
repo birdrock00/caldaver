@@ -60,14 +60,15 @@
 
     <div class="form-group">
     <label for="timezone">{% trans %}labels.timezone{% endtrans %}</label>
-        <select class="form-control" id="timezone" name="timezone">
+        <!-- [C8] aria-describedby links the select to its help text for screen readers on mobile -->
+        <select class="form-control" id="timezone" name="timezone" aria-describedby="timezone_help">
             {% for timezone_name in available_timezones %}
             <option value="{{ timezone_name }}"{% if timezone == timezone_name %} selected="selected"{% endif %}>
                 {{ timezone_name }}
             </option>
             {% endfor %}
         </select>
-        <span class="help-block">{% trans %}messages.help_timezone{% endtrans %}</span>
+        <span class="help-block" id="timezone_help">{% trans %}messages.help_timezone{% endtrans %}</span>
     </div>
 
     </fieldset>
@@ -77,26 +78,28 @@
 
     <div class="form-group">
         <label for="default_calendar">{% trans %}labels.defaultcalendar{% endtrans %}</label>
-        <select class="form-control" id="default_calendar" name="default_calendar">
+        <!-- [C8] aria-describedby links select to its help text -->
+        <select class="form-control" id="default_calendar" name="default_calendar" aria-describedby="default_calendar_help">
             {% for calendar_id, name in calendars %}
             <option value="{{ calendar_id }}"{% if default_calendar == calendar_id %} selected="selected"{% endif %}>
                 {{ name }}
             </option>
             {% endfor %}
         </select>
-        <span class="help-block">{% trans %}messages.help_defaultcalendar{% endtrans %}</span>
+        <span class="help-block" id="default_calendar_help">{% trans %}messages.help_defaultcalendar{% endtrans %}</span>
     </div>
 
     <div class="form-group">
         <label for="default_view">{% trans %}labels.default_view{% endtrans %}</label>
-        <select class="form-control" id="default_view" name="default_view">
+        <!-- [C8] aria-describedby links select to its help text -->
+        <select class="form-control" id="default_view" name="default_view" aria-describedby="default_view_help">
             {% for view in ['month', 'week', 'day', 'list'] %}
             <option value="{{ view }}"{% if default_view == view %} selected="selected"{% endif %}>
                 {{ ('labels.view_' ~ view) |trans }}
             </option>
             {% endfor %}
         </select>
-        <span class="help-block">{% trans %}messages.help_default_view{% endtrans %}</span>
+        <span class="help-block" id="default_view_help">{% trans %}messages.help_default_view{% endtrans %}</span>
     </div>
 
 
@@ -120,7 +123,8 @@
         </label>
 	    </div>
 
-    <div class="form-group prefs-radio-group" role="radiogroup" aria-labelledby="disable_javascript_label">
+    <!-- [C8] radiogroup described by its help text so the warning is announced -->
+    <div class="form-group prefs-radio-group" role="radiogroup" aria-labelledby="disable_javascript_label" aria-describedby="disable_javascript_help">
         <div class="prefs-control-label" id="disable_javascript_label">{% trans %}labels.disable_javascript{% endtrans %}</div>
         <label class="radio-inline" for="disable_javascript_yes">
           <input id="disable_javascript_yes" type="radio" name="disable_javascript" {% if disable_javascript == true %} checked="checked" {% endif %} value="true"> {% trans %}labels.yes{% endtrans %}
@@ -128,20 +132,21 @@
         <label class="radio-inline" for="disable_javascript_no">
           <input id="disable_javascript_no" type="radio" name="disable_javascript" {% if disable_javascript == false %} checked="checked" {% endif %} value="false"> {% trans %}labels.no{% endtrans %}
         </label>
-        <span class="help-block">{% trans %}messages.help_disable_javascript{% endtrans %}</span>
+        <span class="help-block" id="disable_javascript_help">{% trans %}messages.help_disable_javascript{% endtrans %}</span>
     </div>
 
 
     <div class="form-group">
         <label for="list_days">{% trans %}labels.list_days{% endtrans %}</label>
-        <select class="form-control" id="list_days" name="list_days">
+        <!-- [C8] aria-describedby links select to its help text -->
+        <select class="form-control" id="list_days" name="list_days" aria-describedby="list_days_help">
             {% for days in [7, 14, 31] %}
             <option value="{{ days }}"{% if list_days == days %} selected="selected"{% endif %}>
               {{ days }} {% trans %} labels.days {% endtrans %}
             </option>
             {% endfor %}
         </select>
-        <span class="help-block">{% trans %}messages.help_list_days{% endtrans %}</span>
+        <span class="help-block" id="list_days_help">{% trans %}messages.help_list_days{% endtrans %}</span>
     </div>
 
     </fieldset>
@@ -149,10 +154,12 @@
     <fieldset class="prefs-section prefs-accounts-section">
     <legend>{% trans %}labels.accounts{% endtrans %}</legend>
 
+    <!-- [C6] Intro text marked up as paragraph with id so the Add button can reference it for context on small screens -->
     <div class="prefs-accounts-header">
-      <p>Calendar, contacts, and email accounts available to Caldaver.</p>
-      <button type="button" id="mail_account_create" class="btn btn-default prefs-mail-account-create">
-        <i class="fa fa-plus"></i> {% trans %}labels.addaccount{% endtrans %}
+      <p id="prefs_accounts_intro">Calendar, contacts, and email accounts available to Caldaver.</p>
+      <!-- [C6] Add-account button gets aria-describedby pointing at the section intro -->
+      <button type="button" id="mail_account_create" class="btn btn-default prefs-mail-account-create" aria-describedby="prefs_accounts_intro">
+        <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.addaccount{% endtrans %}
       </button>
     </div>
     <div id="connected_accounts" class="prefs-account-list" aria-live="polite"></div>
@@ -160,10 +167,13 @@
 
     </fieldset>
 
+    <!-- [C9] Primary Save is a large, full-width, descriptive button so it's an easy thumb target; back-to-calendar link is reachable below it -->
     <div id="prefs_buttons">
-      <input type="submit" class="btn btn-success" value="{% trans %}labels.save{% endtrans %}">
+      <button type="submit" class="btn btn-success btn-lg btn-block" style="width:100%;">
+        <i class="fa fa-check" aria-hidden="true"></i> {% trans %}labels.save{% endtrans %}
+      </button>
 
-        <a href="{{ app.url_generator.generate('calendar') }}" id="return_button" class="btn btn-default"><i class="fa fa-calendar"></i> {% trans %}labels.return{% endtrans %}</a>
+        <a href="{{ app.url_generator.generate('calendar') }}" id="return_button" class="btn btn-default btn-block" style="width:100%;"><i class="fa fa-calendar" aria-hidden="true"></i> {% trans %}labels.return{% endtrans %}</a>
     </div>
 
     </form>
@@ -188,13 +198,18 @@
         <label><input type="radio" name="account_type" value="carddav"> <span>Contacts</span></label>
         <label><input type="radio" name="account_type" value="email"> <span>Email</span></label>
       </fieldset>
+      <!-- [C7] Friendly account name: capitalise words like a normal label -->
       <label>
         <span>{% trans %}labels.accountname{% endtrans %}</span>
-        <input required name="label" type="text" autocomplete="organization">
+        <input required name="label" type="text" autocomplete="organization"
+          autocapitalize="words" placeholder="Work calendar">
       </label>
+      <!-- [C7] [C10] Server URL: url keyboard, no autocapitalize/autocorrect/spellcheck, example placeholder, go-to-next hint -->
       <label data-account-field="dav">
         <span>DAV server URL</span>
-        <input name="server_url" type="url" inputmode="url" autocomplete="url" placeholder="https://dav.example.com/">
+        <input name="server_url" type="url" inputmode="url" autocomplete="url"
+          autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next"
+          placeholder="https://dav.example.com/">
       </label>
       <label data-account-field="dav">
         <span>Auth method</span>
@@ -204,17 +219,22 @@
           <option value="none">None</option>
         </select>
       </label>
+      <!-- [C7] Email address: email keyboard layout, no autocapitalize/correct -->
       <label data-account-field="email">
         <span>{% trans %}labels.emailaddress{% endtrans %}</span>
-        <input required name="email_address" type="email" autocomplete="email">
+        <input required name="email_address" type="email" inputmode="email" autocomplete="email"
+          autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="you@example.com">
       </label>
+      <!-- [C7] [C10] IMAP host is a hostname: url keyboard, no autocapitalize/correct/spell, example placeholder -->
       <label data-account-field="email">
         <span>{% trans %}labels.imaphost{% endtrans %}</span>
-        <input required name="imap_host" type="text" autocomplete="off">
+        <input required name="imap_host" type="text" inputmode="url" autocomplete="off"
+          autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="imap.example.com">
       </label>
+      <!-- [C7] IMAP port: numeric keypad on mobile -->
       <label data-account-field="email">
         <span>{% trans %}labels.imapport{% endtrans %}</span>
-        <input required name="imap_port" type="number" min="1" max="65535" value="993">
+        <input required name="imap_port" type="number" inputmode="numeric" min="1" max="65535" value="993">
       </label>
       <label data-account-field="email">
         <span>{% trans %}labels.encryption{% endtrans %}</span>
@@ -224,22 +244,30 @@
           <option value="none">None</option>
         </select>
       </label>
+      <!-- [C7] Account username: no autocapitalize/correct so credentials aren't altered -->
       <label>
         <span>{% trans %}labels.username{% endtrans %}</span>
-        <input required name="username" type="text" autocomplete="username">
+        <input required name="username" type="text" autocomplete="username"
+          autocapitalize="none" autocorrect="off" spellcheck="false">
       </label>
+      <!-- [C7] Credential field associated with its help text via aria-describedby -->
       <label>
         <span>Password or token</span>
-        <input name="password" type="password" autocomplete="current-password">
-        <small class="account-credential-help">Saved credentials are never shown. Leave this blank when editing to keep the current credential.</small>
+        <input name="password" type="password" autocomplete="current-password"
+          autocapitalize="none" autocorrect="off" spellcheck="false"
+          aria-describedby="account_credential_help">
+        <small id="account_credential_help" class="account-credential-help">Saved credentials are never shown. Leave this blank when editing to keep the current credential.</small>
       </label>
+      <!-- [C7] [C10] Home set path: no autocapitalize/correct/spell -->
       <label data-account-field="dav">
         <span>Home set</span>
-        <input name="home_set" type="text" autocomplete="off" placeholder="/calendars/user/">
+        <input name="home_set" type="text" autocomplete="off"
+          autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="/calendars/user/">
       </label>
+      <!-- [C7] Refresh interval: numeric keypad on mobile -->
       <label data-account-field="email">
         <span>{% trans %}labels.refresh_interval_minutes{% endtrans %}</span>
-        <input required name="refresh_interval_minutes" type="number" min="1" max="1440" value="1">
+        <input required name="refresh_interval_minutes" type="number" inputmode="numeric" min="1" max="1440" value="1">
       </label>
       <div id="mail_account_error" class="mail-error" aria-live="assertive" hidden></div>
       <div class="contact-dialog-footer">

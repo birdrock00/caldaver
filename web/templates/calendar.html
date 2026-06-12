@@ -18,6 +18,40 @@
 
    </div>
   </div>
+
+  {# [B-markup] Mobile-only chrome: bottom navigation bar + FAB. Hidden by default;
+     mobile.js reveals it only on narrow/touch viewports so desktop is unaffected. #}
+  <nav id="mobile_bottom_bar" class="mobile-bottom-bar" aria-label="Calendar quick actions" hidden>
+    <button type="button" class="mobile-bottom-btn" data-mobile-action="prev" aria-label="Previous" title="Previous">
+      <i class="fa fa-chevron-left" aria-hidden="true"></i>
+      <span class="mobile-bottom-btn-label"><i class="fa fa-chevron-left" aria-hidden="true"></i></span>
+    </button>
+    <button type="button" class="mobile-bottom-btn" data-mobile-action="today" aria-label="Today" title="Today">
+      <i class="fa fa-dot-circle-o" aria-hidden="true"></i>
+      <span class="mobile-bottom-btn-label">Today</span>
+    </button>
+    <button type="button" class="mobile-bottom-btn" data-mobile-action="view" aria-label="Change view" title="Change view">
+      <i class="fa fa-th-list" aria-hidden="true"></i>
+      <span class="mobile-bottom-btn-label">View</span>
+    </button>
+    <button type="button" class="mobile-bottom-btn" data-mobile-action="refresh" aria-label="{% trans %}labels.refresh{% endtrans %}" title="{% trans %}labels.refresh{% endtrans %}">
+      <i class="fa fa-refresh" aria-hidden="true"></i>
+      <span class="mobile-bottom-btn-label">{% trans %}labels.refresh{% endtrans %}</span>
+    </button>
+    <button type="button" class="mobile-bottom-btn" data-mobile-action="next" aria-label="Next" title="Next">
+      <i class="fa fa-chevron-right" aria-hidden="true"></i>
+      <span class="mobile-bottom-btn-label"><i class="fa fa-chevron-right" aria-hidden="true"></i></span>
+    </button>
+  </nav>
+
+  <button type="button" id="mobile_fab_add" class="mobile-fab" aria-label="{% trans %}labels.createevent{% endtrans %}" title="{% trans %}labels.createevent{% endtrans %}" hidden>
+    <i class="fa fa-plus" aria-hidden="true"></i>
+  </button>
+
+  {# [B-markup] Pull-to-refresh affordance, shown by mobile.js while dragging down at top of list #}
+  <div id="mobile_ptr" class="mobile-ptr" aria-hidden="true" hidden>
+    <i class="fa fa-refresh" aria-hidden="true"></i>
+  </div>
 {% endblock %}
 
 {% block bottom %}

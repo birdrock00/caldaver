@@ -1,6 +1,6 @@
 {
   "name": "Caldaver",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "A web CalDAV client",
   "directories": {
     "doc": "doc",
@@ -75,5 +75,12 @@
   },
   "overrides": {
     "serialize-javascript": "^7.0.5"
+  },
+  "dependencies": {
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2"
   }
 }

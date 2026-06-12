@@ -1,7 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
+    <!-- [E4] Friendly, consistent app label shown under the launcher icon -->
     <string name="app_name">Caldaver</string>
+    <!-- [E4] Activity title kept consistent with the app name -->
     <string name="title_activity_main">Caldaver</string>
     <string name="package_name">club.exampleapp.caldaver</string>
     <string name="custom_url_scheme">club.exampleapp.caldaver</string>
+    <!-- [E4] Short user-facing description / tagline for the app -->
+    <string name="app_description">Your shared calendar, everywhere.</string>
 </resources>

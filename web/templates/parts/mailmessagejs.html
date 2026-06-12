@@ -25,6 +25,31 @@
     return (source.charAt(0) || '?').toUpperCase();
   }
 
+  // [D7] pull a bare email address out of a "Name <email@host>" style From header, if present
+  function extractEmail(value) {
+    var match = text(value).match(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/);
+    return match ? match[0] : '';
+  }
+
+  // [D7] render the sender as a tap-to-email mailto link when a valid address can be found,
+  // otherwise fall back to plain text so the header never breaks.
+  function fillSenderNode(node, fromValue) {
+    var raw = text(fromValue);
+    var email = extractEmail(raw);
+    node.textContent = '';
+    if (!email) {
+      node.textContent = raw;
+      return;
+    }
+
+    var link = document.createElement('a');
+    link.href = 'mailto:' + email;
+    link.className = 'mail-reader-from-link';
+    link.textContent = raw;
+    link.setAttribute('aria-label', 'Email ' + email);
+    node.appendChild(link);
+  }
+
   function jsonFetch(url, options, fallbackMessage) {
     options = options || {};
     options.headers = options.headers || {};
@@ -279,7 +304,8 @@
       from.id = 'mail_reader_from';
       date.id = 'mail_reader_date';
     }
-    from.textContent = text(message.from);
+    // [D7] tap-to-email sender link in the message header
+    fillSenderNode(from, message.from);
     date.textContent = text(message.date);
     textWrap.appendChild(from);
     textWrap.appendChild(date);
@@ -309,6 +335,8 @@
     if (isPrimary) {
       plainBody.id = 'mail_reader_body';
     }
+    // [D7] wrap long plain-text bodies (and long unbroken URLs) so they never force horizontal scroll on phones
+    plainBody.className = 'mail-reader-plain mail-reader-wrap';
     section.appendChild(plainBody);
 
     var htmlFrame = document.createElement('iframe');
@@ -965,7 +993,30 @@
       });
   }
 
+  // [D8] apply mobile keyboard hints to the reply recipient field (markup lives in a template
+  // owned by another agent, so we enhance it defensively from here at runtime).
+  function applyReplyMobileInputHints() {
+    var to = $('#mail_reply_to');
+    if (to) {
+      to.setAttribute('inputmode', 'email');
+      to.setAttribute('enterkeyhint', 'next');
+      to.setAttribute('autocapitalize', 'none');
+      to.setAttribute('autocorrect', 'off');
+      to.setAttribute('spellcheck', 'false');
+    }
+    var subject = $('#mail_reply_subject');
+    if (subject) {
+      subject.setAttribute('enterkeyhint', 'next');
+      subject.setAttribute('autocapitalize', 'sentences');
+    }
+    var body = $('#mail_reply_body');
+    if (body) {
+      body.setAttribute('enterkeyhint', 'enter');
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
+    applyReplyMobileInputHints();
     $('#mail_reader_refresh').addEventListener('click', loadMessage);
     $('#mail_reader_unread').addEventListener('click', markUnread);
     $('#mail_reader_previous').addEventListener('click', function() {
