@@ -521,7 +521,7 @@ var sync_mobile_calendar_chrome = function sync_mobile_calendar_chrome(view) {
     return;
   }
 
-  $('#mobile_calendar_toolbar_date').text(date.format('MMMM D, YYYY'));
+  $('#mobile_calendar_toolbar_date').text(date.format('MMM D, YYYY'));
   $('#mobile_calendar_toolbar_day').text(date.format('dddd'));
 };
 
@@ -703,9 +703,9 @@ var add_refresh_button = function add_refresh_button() {
     return;
   }
 
-  $('<button id="button-refresh" class="btn btn-default">' +
-    '<i class="fa fa-refresh"></i> ' +
-    t('labels', 'refresh') + '</button>')
+  $('<button id="button-refresh" class="btn btn-default" title="' + t('labels', 'refresh') + '" aria-label="' + t('labels', 'refresh') + '">' +
+    '<i class="fa fa-refresh" aria-hidden="true"></i>' +
+    '<span class="button-label">' + t('labels', 'refresh') + '</span></button>')
     .appendTo('#calendar_view div.fc-right')
     .on('click', function() {
       update_calendar_list(true);

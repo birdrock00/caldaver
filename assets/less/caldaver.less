@@ -26,6 +26,18 @@ body {
   background-color: @caldaverbgColor;
 }
 
+.visually-hidden-control {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 td.fc-event-container, div.fc-event-container,
 .ui-button, .ui-dialog .ui-dialog-buttonpane button,
 .ui-tabs .ui-tabs-nav li a, .ui-tabs.ui-tabs-collapsible .ui-tabs-nav li.ui-tabs-selected a {
@@ -112,13 +124,14 @@ div.panel-body .buttons {
     margin-bottom: 6px;
 
     .cfg {
-      display: none;
+      display: inline-flex;
       position: absolute;
       right: 5px;
       min-width: 36px;
       min-height: 36px;
       align-items: center;
       justify-content: center;
+      opacity: .42;
     }
 
     span.text {
@@ -136,12 +149,12 @@ div.panel-body .buttons {
       padding-right: 20px;
 
       > .cfg {
-        display: inline-flex;
+        opacity: 1;
       }
     }
 
     &:focus-within > .cfg {
-      display: inline-flex;
+      opacity: 1;
     }
 
     &.default_calendar {
@@ -381,6 +394,7 @@ span.table_title {
 
 div.preferences-container {
   max-width: 760px;
+  padding: 0 0 24px;
 }
 
 #prefs_form {
@@ -389,10 +403,11 @@ div.preferences-container {
 
 .prefs-section {
   margin: 0 0 24px;
-  padding: 18px 20px 8px;
+  padding: 18px 0 8px;
   background: #fff;
-  border: 1px solid #dadce0;
-  border-radius: 8px;
+  border: 0;
+  border-top: 1px solid #dadce0;
+  border-radius: 0;
 }
 
 .prefs-section legend {
@@ -593,6 +608,23 @@ body.caldaver-calendar-page {
   overflow: hidden;
 }
 
+body.caldaver-preferences-page {
+  background: #f8fafd;
+
+  > .container {
+    max-width: 820px;
+    padding-top: 24px;
+    padding-bottom: 32px;
+  }
+
+  h1 {
+    margin: 0 0 20px;
+    color: #202124;
+    font-size: 28px;
+    font-weight: 500;
+  }
+}
+
 .caldaver-topbar.navbar {
   min-height: 64px;
   margin: 0;
@@ -607,7 +639,9 @@ body.caldaver-calendar-page {
     min-height: 64px;
     align-items: center;
     flex-wrap: nowrap;
+    gap: 8px;
     padding: 0 16px 0 24px;
+    overflow: visible;
   }
 
   .navbar-header {
@@ -621,12 +655,13 @@ body.caldaver-calendar-page {
     display: flex;
     align-items: center;
     min-width: 0;
+    max-width: ~"min(34vw, 260px)";
     height: 64px;
     padding: 0;
     color: #3c4043;
     font-size: 22px;
     font-weight: 400;
-    line-height: 64px;
+    line-height: 1.2;
     text-shadow: none;
   }
 
@@ -639,6 +674,7 @@ body.caldaver-calendar-page {
     display: flex;
     flex-direction: row;
     align-items: center;
+    min-width: 0;
     float: none;
     gap: 4px;
     margin: 0 0 0 auto;
@@ -685,6 +721,11 @@ body.caldaver-calendar-page {
     background: #f1f3f4;
     outline: 0;
   }
+}
+
+body.caldaver-sidebar-collapsed .topbar-menu {
+  color: #174ea6;
+  background: #e8f0fe;
 }
 
 .caldaver-brand-title {
@@ -884,14 +925,16 @@ body.caldaver-calendar-page {
 #usermenu .user-pill {
   display: inline-flex;
   min-width: 40px;
+  max-width: 220px;
   height: 40px;
   align-items: center;
   justify-content: center;
   gap: 7px;
   margin-left: 8px;
   padding: 0 12px;
-  color: #fff;
-  background: #8e24aa;
+  color: #3c4043;
+  background: #f1f3f4;
+  border: 1px solid #dadce0;
   border-radius: 999px;
   cursor: pointer;
   font-weight: 500;
@@ -905,8 +948,8 @@ body.caldaver-calendar-page {
 
   &:hover,
   &:focus {
-    color: #fff;
-    background: #7b1fa2;
+    color: #202124;
+    background: #e8eaed;
     text-decoration: none;
   }
 }
@@ -978,10 +1021,11 @@ body.caldaver-calendar-page {
 }
 
 .app-nav {
-  margin: 10px 0 14px;
+  margin: 14px 0 18px;
 }
 
 .app-nav-item {
+  position: relative;
   display: flex;
   min-height: 44px;
   align-items: center;
@@ -1002,9 +1046,11 @@ body.caldaver-calendar-page {
 
   .mail-nav-spinner {
     display: none;
+    position: absolute;
+    right: 14px;
     width: auto;
     margin-right: 0;
-    margin-left: 8px;
+    margin-left: 0;
     font-size: 13px;
   }
 
@@ -1014,9 +1060,14 @@ body.caldaver-calendar-page {
 
   &:hover,
   &:focus {
-    color: #202124;
+    color: #001d35;
     background: #e8f0fe;
+    outline: 0;
     text-decoration: none;
+
+    i {
+      color: #174ea6;
+    }
   }
 
   &.active {
@@ -1043,11 +1094,12 @@ body.caldaver-calendar-page {
 }
 
 #sidebar {
-  width: 256px;
-  min-width: 256px;
+  flex: 0 0 clamp(216px, 21vw, 256px);
+  width: clamp(216px, 21vw, 256px);
+  min-width: 216px;
   max-width: 256px;
   height: 100%;
-  padding: 12px 20px 16px 16px;
+  padding: 10px 16px 16px 12px;
   overflow-y: auto;
   background: #f8fafd;
 }
@@ -1064,7 +1116,7 @@ body.caldaver-calendar-page {
   overflow: hidden;
   background: #fff;
   border: 0;
-  border-radius: 28px;
+  border-radius: 12px;
 }
 
 .create-event-button {
@@ -1097,7 +1149,7 @@ body.caldaver-calendar-page {
 }
 
 .calendar-sidebar-section.panel {
-  margin: 18px 0 0;
+  margin: 12px 0 0;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -1124,11 +1176,12 @@ body.caldaver-calendar-page {
   }
 
   li {
-    min-height: 32px;
+    min-height: 40px;
     margin: 2px 0;
-    padding: 6px 8px 6px 4px;
-    border-radius: 18px;
+    padding: 7px 40px 7px 6px;
+    border-radius: 20px;
     color: #3c4043;
+    cursor: pointer;
 
     &:hover {
       background: #e8f0fe;
@@ -1153,18 +1206,20 @@ body.caldaver-calendar-page {
 
 #calendar_view .fc-toolbar {
   display: flex;
-  min-height: 68px;
+  min-height: 58px;
   align-items: center;
+  gap: 12px;
   margin: 0;
-  padding: 10px 20px 6px;
+  padding: 8px 20px;
   color: #3c4043;
 }
 
 #calendar_view .fc-toolbar h2 {
   color: #3c4043;
-  font-size: 22px;
-  font-weight: 400;
-  line-height: 40px;
+  font-size: 23px;
+  font-weight: 500;
+  line-height: 36px;
+  white-space: nowrap;
 }
 
 #calendar_view .fc-left,
@@ -1172,6 +1227,7 @@ body.caldaver-calendar-page {
 #calendar_view .fc-right {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 #calendar_view .fc-left {
@@ -1180,17 +1236,33 @@ body.caldaver-calendar-page {
 
 #calendar_view .fc-center {
   order: 2;
-  margin-left: 24px;
+  min-width: 0;
+  margin-left: 8px;
 }
 
 #calendar_view .fc-right {
   order: 3;
   margin-left: auto;
+  flex-wrap: nowrap;
+}
+
+#calendar_view .fc-right .fc-button-group {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+#calendar_view .fc-right .fc-button-group .fc-button {
+  float: none;
 }
 
 #calendar_view .fc-button,
 #button-refresh {
+  display: inline-flex;
   height: 36px;
+  min-width: 36px;
+  align-items: center;
+  justify-content: center;
   padding: 0 14px;
   color: #3c4043;
   background: #fff;
@@ -1200,7 +1272,7 @@ body.caldaver-calendar-page {
   box-shadow: none;
   font-size: 14px;
   font-weight: 500;
-  line-height: 34px;
+  line-height: 1;
   text-shadow: none;
 
   &:hover,
@@ -1212,8 +1284,32 @@ body.caldaver-calendar-page {
   }
 }
 
+#calendar_view .fc-button:disabled,
+#calendar_view .fc-state-disabled,
+#calendar_view .ui-state-disabled,
+#button-refresh:disabled {
+  color: #7d838a;
+  background: #f8fafd;
+  border-color: #e8eaed;
+  opacity: 1;
+  cursor: default !important;
+}
+
 #calendar_view .fc-button-group .fc-button {
   border-radius: 0;
+  margin-left: -1px;
+}
+
+#calendar_view .fc-left .fc-button-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+#calendar_view .fc-left .fc-button-group .fc-prev-button,
+#calendar_view .fc-left .fc-button-group .fc-next-button {
+  float: none;
+  margin-left: 0;
 }
 
 #calendar_view .fc-button-group .fc-button:first-child {
@@ -1233,37 +1329,114 @@ body.caldaver-calendar-page {
 
 #calendar_view .fc-prev-button,
 #calendar_view .fc-next-button {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   padding: 0;
-  border-color: transparent;
+  color: #3c4043;
+  background: #f1f3f4;
+  border-color: #f1f3f4;
   border-radius: 50%;
-  font-size: 18px;
-  line-height: 48px;
+  font-size: 0;
+  line-height: 1;
+
+  &:hover,
+  &:focus {
+    background: #e8eaed;
+    border-color: #e8eaed;
+  }
 }
 
 #calendar_view .fc-prev-button .fc-icon,
-#calendar_view .fc-next-button .fc-icon {
-  font-size: 24px;
-  height: auto;
-  line-height: 48px;
-  overflow: visible;
+#calendar_view .fc-next-button .fc-icon,
+#calendar_view .fc-prev-button .ui-icon,
+#calendar_view .fc-next-button .ui-icon {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+  overflow: hidden;
   margin: 0;
-  vertical-align: middle;
+  background: none !important;
+  font-size: 0;
+  line-height: 1;
+  text-indent: 0;
 }
 
 #calendar_view .fc-prev-button .fc-icon:after,
+#calendar_view .fc-next-button .fc-icon:after,
+#calendar_view .fc-prev-button .ui-icon:after,
+#calendar_view .fc-next-button .ui-icon:after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  content: "";
+  font-size: 0;
+}
+
+#calendar_view .fc-prev-button .fc-icon:after {
+  transform: rotate(135deg);
+}
+
 #calendar_view .fc-next-button .fc-icon:after {
-  font-size: 200%;
-  top: 0;
+  transform: rotate(-45deg);
+}
+
+#calendar_view .fc-prev-button .ui-icon:after {
+  transform: rotate(135deg);
+}
+
+#calendar_view .fc-next-button .ui-icon:after {
+  transform: rotate(-45deg);
 }
 
 #calendar_view .fc-today-button {
-  margin-right: 12px;
+  margin-right: 4px;
+  border-radius: 999px !important;
+}
+
+#button-refresh {
+  width: 36px;
+  padding: 0;
+  font-size: 0;
+
+  .button-label {
+    .visually-hidden-control();
+  }
+
+  i {
+    margin: 0;
+    font-size: 14px;
+  }
+}
+
+.calendar-datepicker-button {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  margin-left: 6px;
+  padding: 0;
+  color: #3c4043;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font-size: 16px;
+
+  &:hover,
+  &:focus {
+    background: #f1f3f4;
+    outline: 0;
+  }
 }
 
 #calendar_view .fc-view-container {
-  height: ~"calc(100% - 68px)";
+  height: ~"calc(100% - 58px)";
   padding: 0;
 }
 
@@ -1288,10 +1461,10 @@ body.caldaver-calendar-page {
 }
 
 #calendar_view .fc-day-header {
-  padding: 10px 4px 8px;
+  padding: 12px 4px 10px;
   color: #5f6368;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: .04em;
   text-transform: uppercase;
 }
@@ -1331,9 +1504,10 @@ body.caldaver-calendar-page {
 }
 
 #calendar_view .fc-day-number {
-  padding: 8px;
-  color: #3c4043;
-  font-size: 13px;
+  padding: 8px 10px;
+  color: #202124;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 // FC3 month view puts fc-today on the cell (td.fc-day-top.fc-today) with the
@@ -1620,7 +1794,13 @@ body.caldaver-calendar-page {
   }
 
   &.muted {
-    color: #5f6368;
+    color: #9aa0a6;
+    cursor: not-allowed;
+    opacity: .78;
+
+    i {
+      color: #bdc1c6;
+    }
   }
 }
 
@@ -1689,6 +1869,7 @@ body.caldaver-calendar-page {
     &.active {
       color: #174ea6;
       background: #e8f0fe;
+      box-shadow: inset 0 0 0 1px #d2e3fc;
     }
   }
 }
@@ -1748,9 +1929,9 @@ body.caldaver-calendar-page {
 .contacts-table-header,
 .contact-row {
   display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) minmax(180px, 1fr) minmax(150px, .75fr) minmax(210px, 1fr) minmax(120px, .55fr) 48px;
+  grid-template-columns: minmax(190px, 1.35fr) minmax(150px, 1fr) minmax(120px, .75fr) minmax(160px, 1fr) minmax(96px, .55fr) 48px;
   align-items: center;
-  column-gap: 20px;
+  column-gap: 16px;
 }
 
 .contacts-table-header {
@@ -1955,27 +2136,27 @@ body.caldaver-calendar-page {
   justify-content: center;
   margin: 6px 8px 14px 0;
   padding: 0 20px;
-  color: #13233b;
-  background: #fff;
-  border: 1px solid #d7e3f4;
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(60, 64, 67, .18), 0 5px 16px rgba(60, 64, 67, .12);
-  font-size: 15px;
-  font-weight: 700;
+  color: #001d35;
+  background: #c2e7ff;
+  border: 0;
+  border-radius: 16px;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 500;
 
   i {
     margin-right: 12px;
-    color: #d93025;
+    color: #001d35;
     font-size: 18px;
   }
 
   &:hover,
   &:focus {
-    color: #0b1f3a;
-    background: #f8fbff;
-    border-color: #c7d7ee;
+    color: #001d35;
+    background: #b3ddf7;
+    border-color: transparent;
     outline: 0;
-    box-shadow: 0 2px 4px rgba(60, 64, 67, .2), 0 8px 20px rgba(60, 64, 67, .14);
+    box-shadow: none;
   }
 
   &[hidden] {
@@ -2401,7 +2582,7 @@ body.mail-compose-open .mail-search-row {
   height: ~"calc(100% - 72px)";
   overflow: auto;
   background: #fff;
-  border-radius: 16px;
+  border-radius: 12px;
 }
 
 body.mail-compose-open .mail-panel {
@@ -3003,6 +3184,17 @@ body.mail-compose-open .mail-compose-screen {
     border-radius: 6px;
     font-size: 14px;
     font-weight: 600;
+
+    &:has(input:checked) {
+      color: #174ea6;
+      background: #e8f0fe;
+      border-color: #0b57d0;
+      box-shadow: inset 0 0 0 1px #0b57d0;
+    }
+
+    input {
+      accent-color: #0b57d0;
+    }
   }
 }
 
@@ -3059,6 +3251,7 @@ textarea:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible,
 .pseudobutton:focus-visible,
+.calendar-datepicker-button:focus-visible,
 .ui-button:focus-visible,
 .ui-dialog .ui-dialog-buttonpane button:focus-visible,
 #calendar_view .fc-button:focus-visible,
@@ -3089,6 +3282,59 @@ summary:focus-visible,
   outline: 3px solid #1a73e8;
   outline-offset: 2px;
   box-shadow: 0 0 0 4px rgba(26, 115, 232, .18);
+}
+
+@media (min-width: 901px) and (max-width: 1120px) {
+  .caldaver-topbar.navbar .container-fluid {
+    padding-left: 16px;
+  }
+
+  .caldaver-topbar.navbar .navbar-brand {
+    max-width: 180px;
+    font-size: 20px;
+  }
+
+  #sidebar,
+  .cards-sidebar,
+  .mail-sidebar {
+    width: 220px;
+    min-width: 220px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  #content {
+    padding-right: 12px;
+  }
+
+  #calendar_view .fc-toolbar {
+    padding-right: 12px;
+    padding-left: 12px;
+    gap: 8px;
+  }
+
+  #calendar_view .fc-toolbar h2 {
+    font-size: 20px;
+  }
+
+  #calendar_view .fc-right {
+    gap: 6px;
+  }
+
+  #calendar_view .fc-button {
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .contacts-table-header,
+  .contact-row {
+    grid-template-columns: minmax(170px, 1.25fr) minmax(136px, 1fr) minmax(96px, .65fr) minmax(140px, .9fr) 48px;
+  }
+
+  .contacts-table-header span:nth-child(5),
+  .contact-row > div:nth-child(5) {
+    display: none;
+  }
 }
 
 @media (max-width: 900px) {
@@ -3327,9 +3573,9 @@ summary:focus-visible,
   }
 
   body.caldaver-calendar-page #shortcut_add_event.create-event-button {
-    width: 72px;
-    min-width: 72px;
-    height: 72px;
+    width: 56px;
+    min-width: 56px;
+    height: 56px;
     padding: 0;
     color: transparent;
     background: #7e7aa7;
@@ -3340,7 +3586,7 @@ summary:focus-visible,
     i {
       margin: 0;
       color: #fff;
-      font-size: 32px;
+      font-size: 24px;
     }
   }
 
@@ -3364,7 +3610,7 @@ summary:focus-visible,
   }
 
   #calendar_view {
-    border-radius: 18px;
+    border-radius: 12px;
     min-width: 760px;
     min-height: 720px;
     overflow: visible;
@@ -3522,17 +3768,17 @@ summary:focus-visible,
     z-index: 2400;
     display: inline-flex;
     width: auto;
-    min-width: 132px;
-    height: 56px;
+    min-width: 112px;
+    height: 52px;
     align-items: center;
     justify-content: center;
-    padding: 0 22px;
+    padding: 0 18px;
     color: #fff;
     background: #d93025;
     border: 0;
     border-radius: 28px;
     box-shadow: 0 4px 10px rgba(60, 64, 67, .3), 0 1px 3px rgba(60, 64, 67, .2);
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 700;
 
     i {
@@ -3776,7 +4022,7 @@ summary:focus-visible,
   }
 
   body.caldaver-calendar-page #calendar_view .fc-list-heading td {
-    padding: 18px 40px 8px;
+    padding: 16px 24px 8px;
     background: #fff;
     border-top: 1px solid #ddd;
     border-bottom: 0;
@@ -3786,7 +4032,7 @@ summary:focus-visible,
     display: block;
     float: none;
     color: #5f6368;
-    font-size: 19px;
+    font-size: clamp(14px, 4vw, 17px);
     font-weight: 400;
     line-height: 1.05;
     text-transform: uppercase;
@@ -3796,7 +4042,7 @@ summary:focus-visible,
     display: block;
     float: none;
     color: #5f6368;
-    font-size: 34px;
+    font-size: clamp(24px, 7vw, 30px);
     font-weight: 300;
     line-height: 1.05;
   }
@@ -3808,8 +4054,8 @@ summary:focus-visible,
 
   body.caldaver-calendar-page #calendar_view .fc-list-item {
     display: grid;
-    grid-template-columns: 82px minmax(0, 1fr);
-    padding: 18px 0 22px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 14px 0 18px;
     border-bottom: 1px solid #ddd;
   }
 
@@ -3825,7 +4071,7 @@ summary:focus-visible,
     grid-column: 1;
     grid-row: 1 / span 2;
     width: auto;
-    padding-left: 40px;
+    padding-left: 24px;
     vertical-align: top;
 
     .fc-event-dot {
@@ -3840,9 +4086,9 @@ summary:focus-visible,
     grid-column: 2;
     grid-row: 2;
     width: auto;
-    padding: 4px 40px 0 0;
+    padding: 3px 24px 0 0;
     color: #5f6368;
-    font-size: 22px;
+    font-size: clamp(15px, 4.6vw, 19px);
     line-height: 1.25;
     white-space: normal;
   }
@@ -3850,9 +4096,9 @@ summary:focus-visible,
   body.caldaver-calendar-page #calendar_view .fc-list-item-title {
     grid-column: 2;
     grid-row: 1;
-    padding: 0 40px 0 0;
+    padding: 0 24px 0 0;
     color: #212121;
-    font-size: 27px;
+    font-size: clamp(18px, 5.6vw, 23px);
     font-weight: 700;
     line-height: 1.18;
   }
@@ -3902,8 +4148,8 @@ summary:focus-visible,
 
   body.caldaver-calendar-page #calendar_view .mobile-calendar-previous-events-empty {
     display: grid;
-    grid-template-columns: 82px minmax(0, 1fr);
-    padding: 18px 0 22px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 14px 0 18px;
     border-bottom: 1px solid #ddd;
     background: #f8fbff;
   }
@@ -3913,15 +4159,15 @@ summary:focus-visible,
     grid-row: 1 / span 2;
     width: 31px;
     height: 31px;
-    margin: 2px 0 0 40px;
+    margin: 2px 0 0 24px;
   }
 
   body.caldaver-calendar-page #calendar_view .mobile-calendar-previous-events-title {
     grid-column: 2;
     grid-row: 1;
-    padding-right: 40px;
+    padding-right: 24px;
     color: #212121;
-    font-size: 27px;
+    font-size: clamp(18px, 5.6vw, 23px);
     font-weight: 700;
     line-height: 1.18;
   }
@@ -3929,9 +4175,9 @@ summary:focus-visible,
   body.caldaver-calendar-page #calendar_view .mobile-calendar-previous-events-subtitle {
     grid-column: 2;
     grid-row: 2;
-    padding: 4px 40px 0 0;
+    padding: 3px 24px 0 0;
     color: #5f6368;
-    font-size: 22px;
+    font-size: clamp(15px, 4.6vw, 19px);
     line-height: 1.25;
   }
 

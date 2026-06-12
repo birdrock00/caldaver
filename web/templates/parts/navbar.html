@@ -26,7 +26,7 @@
      </nav>
    </details>
     <div class="navbar-header">
-      <button class="topbar-menu" type="button" aria-label="Menu">
+      <button class="topbar-menu" type="button" aria-label="Toggle sidebar" title="Toggle sidebar">
         <i class="fa fa-bars"></i>
       </button>
       <span class="navbar-brand">
@@ -52,8 +52,8 @@
        </button>
        </li>
        <li>
-       <a class="prefs" href="{{ app.url_generator.generate('preferences') }}">
-         <i title="{% trans %}labels.preferences{% endtrans %}" class="fa fa-lg fa-wrench"></i>
+       <a class="prefs" href="{{ app.url_generator.generate('preferences') }}" title="{% trans %}labels.preferences{% endtrans %}" aria-label="{% trans %}labels.preferences{% endtrans %}">
+         <i class="fa fa-lg fa-wrench" aria-hidden="true"></i>
        </a>
        </li>
        <li class="user-menu">

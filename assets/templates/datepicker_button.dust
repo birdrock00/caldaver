@@ -1,2 +1,4 @@
-<i class="btn fa fa-calendar" title="{@i18n type="labels" name="choose_date"/}"></i>
-<input type="text" style="width: 0;height: 0;border:0;" id="datepicker_fullcalendar" />
+<button type="button" class="calendar-datepicker-button" title="{@i18n type="labels" name="choose_date"/}" aria-label="{@i18n type="labels" name="choose_date"/}">
+  <i class="fa fa-calendar" aria-hidden="true"></i>
+</button>
+<input type="text" class="visually-hidden-control" id="datepicker_fullcalendar" aria-hidden="true" tabindex="-1" />
