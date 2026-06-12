@@ -1,10 +1,5 @@
 apply plugin: 'com.android.application'
 
-def keystoreFile = System.getenv("KEYSTORE_FILE")
-def keystorePassword = System.getenv("KEYSTORE_PASSWORD")
-def keyAliasEnv = System.getenv("KEY_ALIAS")
-def keyPassword = System.getenv("KEY_PASSWORD")
-
 android {
     namespace = "club.exampleapp.caldaver"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -23,11 +18,16 @@ android {
     }
     signingConfigs {
         release {
-            if (keystoreFile && file(keystoreFile).exists()) {
-                storeFile = file(keystoreFile)
-                storePassword = keystorePassword
-                keyAlias = keyAliasEnv
-                keyPassword = keyPassword
+            if (System.getenv("KEYSTORE_FILE") ?: "") {
+                storeFile = file(System.getenv("KEYSTORE_FILE"))
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                storeFile = file("${System.getProperty('user.home')}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
             }
         }
     }
