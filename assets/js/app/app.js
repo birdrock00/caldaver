@@ -218,14 +218,16 @@ $(document).ready(function() {
     navLinks: true,
 
     columnHeaderHtml: function(date) {
-      var now = moment();
       var dayName = date.format('ddd');
       try {
         var viewName = $('#calendar_view').fullCalendar('getView').name;
         if (viewName === 'month') {
           return dayName;
         }
-        if (date.isSame(now, 'day')) {
+        // FullCalendar hands over ambiguously-zoned (UTC-mode) moments, so
+        // compare calendar dates as strings instead of instants. Only week
+        // view headers get the today circle.
+        if (viewName === 'agendaWeek' && date.format('YYYY-MM-DD') === moment().format('YYYY-MM-DD')) {
           return dayName + ' <span class="fc-header-today-circle">' + date.format('D') + '</span>';
         }
       } catch(e) {}

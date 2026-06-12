@@ -529,7 +529,7 @@ test('DAV account save validates account type auth method and URLs', () => {
 
   assert.match(server, /account_type != "calendar" && account_type != "carddav"/);
   assert.match(server, /matches!\(auth_method\.as_str\(\), "basic" \| "bearer" \| "none"\)/);
-  assert.match(server, /fn validated_dav_server_url\(value: &str\) -> Result<String, Response>/);
+  assert.match(server, /fn validated_dav_server_url\(value: &str, allowed_hosts: &\[String\]\) -> Result<String, Response>/);
   assert.match(server, /url\.username\(\)\.is_empty\(\) \|\| url\.password\(\)\.is_some\(\)/);
   assert.match(server, /host\.eq_ignore_ascii_case\("localhost"\)/);
   assert.match(server, /\.to_socket_addrs\(\)/);
@@ -755,4 +755,32 @@ test('Rust server handles sessions, CSRF, no-JS mail, and unread updates', () =>
   assert.match(server, /mark_cached_seen\(&session\.username, account_id, uid, false\)/);
   assert.match(storage, /jsonb_set\(message, '\{seen\}', to_jsonb\(\$4::boolean\), true\)/);
   assert.match(mailMessageJs, /unread_uid/);
+});
+
+test('today highlight targets FullCalendar 3 DOM and compares calendar dates, not instants', () => {
+  const less = read('assets/less/caldaver.less');
+  const appJs = read('assets/js/app/app.js');
+
+  // Month view: FC3 puts fc-today on the cell (td.fc-day-top.fc-today) with the
+  // number in a nested <a class="fc-day-number">, so the old selector
+  // `.fc-day-number.fc-today` on the anchor never matched.
+  assert.doesNotMatch(less, /#calendar_view \.fc-day-number\.fc-today/);
+  const badge = cssBlock(
+    less,
+    '#calendar_view td.fc-day-number.fc-today,\n#calendar_view td.fc-day-top.fc-today > .fc-day-number'
+  );
+  assert.match(badge, /width:\s*28px;/);
+  assert.match(badge, /height:\s*28px;/);
+  assert.match(badge, /color:\s*#fff;/);
+  assert.match(badge, /background:\s*#1a73e8;/);
+  assert.match(badge, /border-radius:\s*50%;/);
+
+  // Week view header: FullCalendar 3 hands over ambiguously-zoned (UTC-mode)
+  // moments, so deciding "today" with isSame() against a local moment puts the
+  // circle on the wrong day near UTC midnight. Compare date strings instead,
+  // and only week view headers get the circle (not day or list views).
+  const header = sourceBetween(appJs, /columnHeaderHtml: function\(date\)/, /defaultView:/);
+  assert.doesNotMatch(header, /date\.isSame\(/);
+  assert.match(header, /viewName === 'agendaWeek' && date\.format\('YYYY-MM-DD'\) === moment\(\)\.format\('YYYY-MM-DD'\)/);
+  assert.match(header, /fc-header-today-circle/);
 });
