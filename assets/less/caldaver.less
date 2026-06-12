@@ -1233,12 +1233,29 @@ body.caldaver-calendar-page {
 
 #calendar_view .fc-prev-button,
 #calendar_view .fc-next-button {
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   padding: 0;
   border-color: transparent;
   border-radius: 50%;
   font-size: 18px;
+  line-height: 48px;
+}
+
+#calendar_view .fc-prev-button .fc-icon,
+#calendar_view .fc-next-button .fc-icon {
+  font-size: 24px;
+  height: auto;
+  line-height: 48px;
+  overflow: visible;
+  margin: 0;
+  vertical-align: middle;
+}
+
+#calendar_view .fc-prev-button .fc-icon:after,
+#calendar_view .fc-next-button .fc-icon:after {
+  font-size: 200%;
+  top: 0;
 }
 
 #calendar_view .fc-today-button {
