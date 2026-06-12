@@ -291,6 +291,22 @@ span.fc-event-icons {
   display: none;
 }
 
+.navbar-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(60, 64, 67, .25);
+  border-top-color: #5f6368;
+  border-radius: 999px;
+  animation: navbar-spin .8s linear infinite;
+}
+
+@keyframes navbar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .calendar-list-loading {
   display: block;
   padding: 8px 12px;
@@ -1508,8 +1524,8 @@ body.caldaver-calendar-page {
 }
 
 .cards-sidebar {
-  width: 288px;
-  min-width: 288px;
+  width: 256px;
+  min-width: 256px;
   height: 100%;
   padding: 12px 16px;
   overflow-y: auto;
