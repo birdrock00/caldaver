@@ -24,10 +24,10 @@ android {
     signingConfigs {
         release {
             if (keystoreFile && file(keystoreFile).exists()) {
-                storeFile file(keystoreFile)
-                storePassword keystorePassword
-                keyAlias keyAliasEnv
-                keyPassword keyPassword
+                storeFile = file(keystoreFile)
+                storePassword = keystorePassword
+                keyAlias = keyAliasEnv
+                keyPassword = keyPassword
             }
         }
     }
