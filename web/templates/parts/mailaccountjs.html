@@ -313,6 +313,33 @@
       });
   }
 
+  // [D8] correct mobile keyboard / autofill hints for the account form fields.
+  // The form markup lives in a template owned by another agent, so we set the attributes
+  // here defensively at runtime to give phone users the right keyboard for each field.
+  function applyAccountMobileInputHints() {
+    function set(name, attrs) {
+      var input = $('#mail_account_form [name="' + name + '"]');
+      if (!input) {
+        return;
+      }
+      Object.keys(attrs).forEach(function(attr) {
+        input.setAttribute(attr, attrs[attr]);
+      });
+    }
+
+    // email address => email keyboard, no capitalisation, no autocorrect
+    set('email_address', { inputmode: 'email', autocomplete: 'email', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' });
+    // IMAP host / DAV server / home path => url-ish keyboard, never capitalised or spell-checked
+    set('imap_host', { inputmode: 'url', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' });
+    set('server_url', { inputmode: 'url', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' });
+    set('home_set', { inputmode: 'url', autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' });
+    // port / refresh interval => numeric keypad
+    set('imap_port', { inputmode: 'numeric' });
+    set('refresh_interval_minutes', { inputmode: 'numeric' });
+    // username => no auto-capitalisation/correction
+    set('username', { autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false' });
+  }
+
   document.addEventListener('DOMContentLoaded', function() {
     var createButton = $('#mail_account_create');
     var dialog = $('#mail_account_dialog');
@@ -320,6 +347,7 @@
       return;
     }
 
+    applyAccountMobileInputHints();
     loadAccounts();
     createButton.addEventListener('click', openDialog);
     $('#mail_account_cancel').addEventListener('click', closeDialog);

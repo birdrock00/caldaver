@@ -4,7 +4,8 @@
 <div class="container">
 
 {% if error is defined %}
-<div class="login-error">
+<!-- [C12] Login error region announced to screen readers / mobile assistive tech -->
+<div class="login-error" role="alert" aria-live="assertive">
     <i class="fa fa-exclamation-circle" aria-hidden="true"></i>
     <span>{{ error|e }}</span>
 </div>
@@ -12,23 +13,58 @@
 
 <div class="loginform ui-corner-all">
   <img src="{{ asset('caldaver_300transp.png', 'img') }}" alt="Caldaver" style="max-width: 200px; margin-bottom: 16px;">
-  <form method="post" action="{{ path('login') }}" class="form-horizontal">
+  <!-- [C5] autocomplete="on" on the form so mobile credential managers / passkeys offer to fill -->
+  <form method="post" action="{{ path('login') }}" class="form-horizontal" autocomplete="on">
     <div class="form-group">
       <label class="col-sm-3 control-label" for="user">{% trans %}labels.username{% endtrans %}</label>
+      <!-- [C1] Username field: mobile-friendly keyboard + autofill hints, no autocapitalize/autocorrect to avoid mangling usernames -->
       <div class="col-sm-9"><input id="user" name="user" class="form-control" type="text"
-        autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text"
-        enterkeyhint="next" autofocus="autofocus" required></div>
+        autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="text"
+        enterkeyhint="next" autofocus="autofocus"
+        aria-label="{% trans %}labels.username{% endtrans %}" required></div>
     </div>
 
     <div class="form-group">
       <label class="col-sm-3 control-label" for="password">{% trans %}labels.password{% endtrans %}</label>
-      <div class="col-sm-9"><input id="password" name="password" class="form-control" type="password"
-        autocomplete="current-password" enterkeyhint="go" required></div>
+      <!-- [C2] Password field with current-password autofill + accessible inline show/hide toggle -->
+      <div class="col-sm-9">
+        <div class="login-password-wrap" style="position:relative;">
+          <input id="password" name="password" class="form-control" type="password"
+            autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false"
+            enterkeyhint="go"
+            aria-label="{% trans %}labels.password{% endtrans %}" required>
+          <!-- [C2] Plain ES5, self-contained show/hide button; no dependency on the JS bundle -->
+          <button type="button" id="login_pw_toggle" class="login-pw-toggle"
+            aria-controls="password" aria-pressed="false" aria-label="Show password"
+            style="position:absolute;top:0;right:0;height:100%;padding:0 12px;background:none;border:0;cursor:pointer;">
+            <i class="fa fa-eye" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
     </div>
 
-    <input name="login" value="{% trans %}labels.login{% endtrans %}" type="submit" class="btn btn-primary">
+    <!-- [C3] Primary submit is a full-width, large, type=submit button -->
+    <input name="login" value="{% trans %}labels.login{% endtrans %}" type="submit"
+      class="btn btn-primary btn-lg btn-block" style="width:100%;">
   </form>
 
 </div>
 </div>
+<!-- [C2] Tiny defensive ES5 script wiring the password visibility toggle -->
+<script>
+(function () {
+  var btn = document.getElementById('login_pw_toggle');
+  var pw = document.getElementById('password');
+  if (!btn || !pw) { return; }
+  btn.addEventListener('click', function () {
+    var show = pw.getAttribute('type') === 'password';
+    pw.setAttribute('type', show ? 'text' : 'password');
+    btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    var icon = btn.querySelector('i');
+    if (icon) { icon.className = show ? 'fa fa-eye-slash' : 'fa fa-eye'; }
+    try { pw.focus(); } catch (e) {}
+  });
+})();
+</script>
 {% endblock %}

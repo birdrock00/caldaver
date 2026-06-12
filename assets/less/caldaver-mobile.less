@@ -1,0 +1,349 @@
+// caldaver-mobile.less — mobile-first enhancements. Filled in by the mobile CSS agent (Agent A).
+// (@import'd at the end of caldaver.less, so these rules win on equal specificity.)
+// Everything below is scoped under mobile media queries so desktop is untouched.
+// Selectors were verified against the real templates/CSS:
+//   navbar.html, sidebar.html, appnav.html, cards.html, preferences.html,
+//   mail.html, jquery.qtip.css, colorpicker.css, caldaver.less.
+
+@media (max-width: 768px) {
+
+  // [A1] Guarantee 44x44px finger-friendly touch targets across all interactive
+  // chrome (toolbar buttons, nav links, dropdown items, calendar nav arrows).
+  .caldaver-topbar .topbar-actions > li > button,
+  .caldaver-topbar .topbar-actions > li > a,
+  .mobile-calendar-toolbar-action button,
+  .user-menu-list .user-menu-item,
+  .mobile-calendar-account,
+  #calendar_view .fc-button,
+  #calendar_view .fc-prev-button,
+  #calendar_view .fc-next-button,
+  .contacts-nav-item,
+  .contacts-view-switch button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  // [A2] Larger, more legible base typography on phones, and crucially force
+  // every form input/select/textarea to >=16px so iOS Safari does not auto-zoom
+  // when the field is focused.
+  body {
+    font-size: 16px;
+    line-height: 1.5;
+  }
+  input,
+  select,
+  textarea,
+  .form-control,
+  .contact-dialog input,
+  .contacts-search input,
+  .mail-search input {
+    font-size: 16px;
+  }
+
+  // [A3] Safe-area insets: keep fixed chrome clear of the notch / status bar /
+  // home-gesture bar on Capacitor Android and notched browsers.
+  .caldaver-topbar.navbar .container-fluid {
+    padding-top: env(safe-area-inset-top);
+  }
+  .mail-mobile-compose-button,
+  .mail-compose-footer,
+  .contact-dialog-footer {
+    padding-bottom: ~"calc(8px + env(safe-area-inset-bottom))";
+  }
+
+  // [A4] Condense wasted vertical space in section headers so more content fits
+  // above the fold on short phone screens.
+  .contacts-heading,
+  .prefs-section legend,
+  .mail-toolbar {
+    margin-top: 0;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .prefs-section legend {
+    line-height: 1.2;
+  }
+
+  // [A5] Make FullCalendar event popovers (qtip) behave like a near-full-width,
+  // scrollable bottom sheet instead of a tiny floating box that overflows.
+  .qtip.qtip-default,
+  .qtip {
+    left: 8px !important;
+    right: 8px !important;
+    max-width: ~"calc(100vw - 16px)" !important;
+    width: auto !important;
+    box-sizing: border-box;
+  }
+  .qtip .qtip-content {
+    max-height: 60vh;
+    max-height: 60dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    font-size: 15px;
+  }
+
+  // [A6] Responsive contacts table: let the header/rows scroll horizontally as a
+  // unit rather than squashing columns into illegible slivers.
+  .contacts-list-view {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .contacts-table-header,
+  .contact-row {
+    min-width: 560px;
+  }
+
+  // [A7] Bigger, finger-friendly form controls with comfortable spacing in the
+  // contact dialog and search bars.
+  .contact-dialog label input,
+  .contacts-search input,
+  .mail-search input {
+    min-height: 44px;
+    padding: 10px 12px;
+  }
+  .contact-dialog label {
+    margin-bottom: 14px;
+  }
+
+  // [A8] Visible tap feedback (:active highlight) on buttons and list rows, and
+  // kill the legacy 300ms tap delay on the primary tappable surfaces.
+  .btn:active,
+  .pseudobutton:active,
+  .contact-row:active,
+  .mail-row:active,
+  .contacts-nav-item:active,
+  .user-menu-list .user-menu-item:active {
+    background-color: @caldaverbgHoverPseudobutton;
+  }
+  .btn,
+  .pseudobutton,
+  .contact-row,
+  .mail-row,
+  .app-nav-item,
+  .contacts-view-switch button {
+    touch-action: manipulation;
+  }
+
+  // [A9] Larger, more readable calendar month-view day cells and event chips so
+  // they are easy to read and tap on a phone.
+  #calendar_view .fc-day-number {
+    font-size: 14px;
+    padding: 4px 6px;
+  }
+  #calendar_view .fc-day-grid-event {
+    min-height: 22px;
+    padding: 2px 5px;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+  #calendar_view .fc-day-header {
+    padding: 6px 2px;
+    font-size: 13px;
+  }
+
+  // [A10] Hide non-essential desktop chrome to maximise content area: the
+  // duplicated brand title and the navbar loading spinner are redundant on
+  // phones where the topbar is already cramped.
+  .caldaver-topbar .caldaver-brand-title {
+    display: none;
+  }
+  #loading.navbar-text {
+    display: none;
+  }
+
+  // [A11] Smooth momentum scrolling on the app's scrollable panels and the
+  // collapsible section/calendar menus.
+  #content,
+  #sidebar,
+  .mail-rows,
+  .contacts-panel,
+  .mobile-section-menu-list,
+  .mobile-calendar-menu-calendars {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  // [A12] Stronger focus-visible outline for keyboard + switch-access users on
+  // the touch-first controls that lacked an obvious focus ring.
+  .mobile-calendar-toolbar-action button:focus-visible,
+  .contacts-view-switch button:focus-visible,
+  .contact-dialog input:focus-visible,
+  .qtip-close:focus-visible {
+    outline: 3px solid #1a73e8;
+    outline-offset: 2px;
+  }
+
+  // [A13] Comfortable, vertically-stacked preferences form: full-width controls
+  // and roomy radio groups instead of cramped inline rows.
+  .prefs-section .form-group {
+    display: block;
+    margin-bottom: 18px;
+  }
+  .prefs-section .form-control {
+    width: 100%;
+    min-height: 44px;
+  }
+  .prefs-radio-group .radio-inline {
+    display: block;
+    min-height: 40px;
+    margin-left: 0;
+    padding: 8px 0;
+    line-height: 1.4;
+  }
+  .prefs-radio-group .radio-inline + .radio-inline {
+    margin-left: 0;
+  }
+
+  // [A14] Open the user menu as a properly-positioned full-width sheet anchored
+  // to the screen edges so it cannot be clipped off-screen.
+  .user-menu-dropdown[open] .user-menu-list {
+    position: fixed;
+    left: ~"calc(8px + env(safe-area-inset-left))";
+    right: ~"calc(8px + env(safe-area-inset-right))";
+    width: auto;
+    max-width: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .25);
+  }
+  .user-menu-list .user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  // [A15] Larger, easier-to-hit close (x) controls on popovers and the contact
+  // dialog so they are not fiddly pin-pricks on a touch screen.
+  .qtip-close,
+  .contact-dialog-header button,
+  #contact_cancel_icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 22px;
+  }
+
+  // [A16] Respect prefers-reduced-motion: disable non-essential spin/transition
+  // animations for users who get motion sick.
+  @media (prefers-reduced-motion: reduce) {
+    .navbar-spinner,
+    .mail-nav-spinner,
+    .fa-spin,
+    .calendar-list-loading .fa-spinner {
+      animation: none !important;
+    }
+    .btn,
+    .pseudobutton,
+    .app-nav-item,
+    .contact-row,
+    .mail-row {
+      transition: none !important;
+    }
+  }
+
+  // [A17] Bigger, finger-friendly colour picker swatches so calendar colours can
+  // be chosen accurately by tapping rather than by surgical precision.
+  div.color_picker {
+    height: 28px;
+    width: 48px;
+  }
+  div#color_selector {
+    width: ~"calc(100vw - 32px)";
+    max-width: 280px;
+  }
+  div.color_swatch {
+    height: 36px;
+    width: 36px;
+    margin: 4px;
+  }
+
+  // [A18] Make the contact dialog a comfortable, scrollable full-width sheet on
+  // phones instead of a fixed desktop-sized card, with sticky header/footer so
+  // the title and Save/Cancel stay reachable while scrolling a long form.
+  .contact-dialog:not([hidden]) .contact-dialog-panel {
+    width: 100%;
+    max-width: 100%;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .contact-dialog-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff;
+  }
+  .contact-dialog-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    gap: 10px;
+    background: #fff;
+  }
+  .contact-dialog-footer .btn {
+    flex: 1 1 0;
+    min-height: 44px;
+  }
+
+  // [A19] Style the markup hooks added by the contacts/mail templates so the new
+  // tap-to-call/email anchors, stacked detail fields, wrapped message bodies and
+  // empty-state CTAs render well on phones.
+  .contact-value-link {
+    display: inline-block;
+    min-height: 32px;
+    line-height: 32px;
+    color: #1a73e8;
+    text-decoration: none;
+    word-break: break-word;
+  }
+  .contact-value-link:active {
+    text-decoration: underline;
+  }
+  dl.mobile-stack,
+  .mobile-stack {
+    display: block;
+  }
+  dl.mobile-stack dt {
+    margin-top: 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    color: #5f6368;
+  }
+  dl.mobile-stack dd {
+    margin: 2px 0 0;
+    font-size: 16px;
+    word-break: break-word;
+  }
+  .mail-reader-wrap {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .mail-empty-add-account,
+  #contacts_empty_create,
+  #mail_empty .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 18px;
+  }
+}
+
+// [A20] Keep the mobile FAB / bottom bar / drawer toggle from covering dialog
+// buttons. The event editor is a jQuery UI modal dialog (it appends a
+// .ui-widget-overlay) and Bootstrap modals use .modal.in; whenever either is on
+// screen, hide the floating chrome. Declarative :has() so it never depends on JS
+// event timing (the WebView and modern mobile browsers support :has()).
+body:has(.ui-widget-overlay) .mobile-fab,
+body:has(.ui-widget-overlay) .mobile-bottom-bar,
+body:has(.ui-widget-overlay) .mobile-drawer-toggle,
+body:has(.modal.in) .mobile-fab,
+body:has(.modal.in) .mobile-bottom-bar,
+body:has(.modal.in) .mobile-drawer-toggle {
+  display: none !important;
+}

@@ -20,7 +20,10 @@
     <div class="mail-search-row">
       <div class="mail-search">
         <i class="fa fa-search"></i>
-        <input id="mail_search" type="search" placeholder="{% trans %}labels.searchmail{% endtrans %}">
+        <!-- [D6] mobile keyboard hints for mail search: search keyboard, no capitalisation/autocorrect -->
+        <input id="mail_search" type="search" placeholder="{% trans %}labels.searchmail{% endtrans %}"
+               inputmode="search" enterkeyhint="search" autocapitalize="none" autocorrect="off"
+               spellcheck="false" aria-label="{% trans %}labels.searchmail{% endtrans %}">
       </div>
     </div>
 
@@ -31,7 +34,13 @@
           <i class="fa fa-refresh"></i>
         </button>
       </div>
-      <div id="mail_empty" class="mail-empty" hidden>{% trans %}labels.noaccounts{% endtrans %}</div>
+      <!-- [D9] empty-state for users with no mail accounts now offers a clear way to add one from the phone -->
+      <div id="mail_empty" class="mail-empty mail-empty-state" hidden>
+        <p>{% trans %}labels.noaccounts{% endtrans %}</p>
+        <a href="{{ app.url_generator.generate('preferences') }}" class="btn btn-primary mail-empty-add-account">
+          <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.addaccount{% endtrans %}
+        </a>
+      </div>
       <div id="mail_loading" class="mail-empty mail-loading-state"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Loading messages...</div>
       <div id="mail_no_messages" class="mail-empty mail-empty-state" hidden>{% trans %}labels.nomessages{% endtrans %}</div>
       <div id="mail_error" class="mail-error" hidden></div>
@@ -53,27 +62,30 @@
             <span>From</span>
             <input id="mail_compose_from" type="email" readonly aria-label="From">
           </label>
+          <!-- [D7] email recipient fields use the email keyboard, no auto-capitalisation, and "next" go-to-next-field hint -->
           <label>
             <span>To</span>
-            <input id="mail_compose_to" type="email" autocomplete="email">
+            <input id="mail_compose_to" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" autocapitalize="none" autocorrect="off" spellcheck="false">
             <button type="button" id="mail_compose_ccbcc" class="mail-compose-ccbcc" aria-expanded="false" aria-controls="mail_compose_cc mail_compose_bcc">Cc/Bcc</button>
           </label>
           <label id="mail_compose_cc_row" hidden>
             <span>Cc</span>
-            <input id="mail_compose_cc" type="email" autocomplete="email" multiple>
+            <input id="mail_compose_cc" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" autocapitalize="none" autocorrect="off" spellcheck="false" multiple>
           </label>
           <label id="mail_compose_bcc_row" hidden>
             <span>Bcc</span>
-            <input id="mail_compose_bcc" type="email" autocomplete="email" multiple>
+            <input id="mail_compose_bcc" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" autocapitalize="none" autocorrect="off" spellcheck="false" multiple>
           </label>
+          <!-- [D7] subject keyboard advances to the message body -->
           <label>
             <span>Subject</span>
-            <input id="mail_compose_subject" type="text" autocomplete="off">
+            <input id="mail_compose_subject" type="text" autocomplete="off" enterkeyhint="next" autocapitalize="sentences">
           </label>
         </div>
         <label class="mail-compose-body-label">
           <span>Message</span>
-          <textarea id="mail_compose_body" rows="12" aria-label="Message"></textarea>
+          <!-- [D7] body keyboard returns a normal newline rather than a submit hint -->
+          <textarea id="mail_compose_body" rows="12" aria-label="Message" enterkeyhint="enter" autocapitalize="sentences"></textarea>
         </label>
         <div class="mail-compose-footer">
           <button type="button" id="mail_compose_discard" class="mail-compose-discard" aria-label="Discard draft">

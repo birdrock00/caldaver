@@ -94,6 +94,53 @@
     return 'tel:' + text(phone).trim().replace(/\s+/g, '');
   }
 
+  // [D1] sanitize a phone value down to a dialable tel: target (digits and a single leading +)
+  function dialableTel(phone) {
+    var raw = text(phone).trim();
+    if (!raw) {
+      return '';
+    }
+    var plus = raw.charAt(0) === '+' ? '+' : '';
+    var digits = raw.replace(/[^0-9]/g, '');
+    return digits ? 'tel:' + plus + digits : '';
+  }
+
+  // [D1] build a tap-to-call/email/web anchor; falls back to a plain text node when the value
+  // is empty or cannot be turned into a safe link, so list/card cells never break.
+  function contactValueNode(value, kind) {
+    var raw = text(value).trim();
+    if (!raw) {
+      return document.createTextNode('');
+    }
+
+    var href = '';
+    var external = false;
+    if (kind === 'tel') {
+      href = dialableTel(raw);
+    } else if (kind === 'mailto') {
+      href = /^[^\s@]+@[^\s@]+$/.test(raw) ? 'mailto:' + raw : '';
+    } else if (kind === 'url') {
+      if (/^https?:\/\//i.test(raw)) {
+        href = raw;
+        external = true;
+      }
+    }
+
+    if (!href) {
+      return document.createTextNode(raw);
+    }
+
+    var link = document.createElement('a');
+    link.href = href;
+    link.textContent = raw;
+    link.className = 'contact-value-link';
+    if (external) {
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+    }
+    return link;
+  }
+
   function initiateContactCall(contact) {
     window.open(telHref(contact.phone), '_self');
   }
@@ -161,14 +208,18 @@
     data.forEach(function(contact) {
       var row = document.createElement('div');
       row.className = 'contact-row';
+      // [D2] each contact row is a labelled group so the whole block reads as one tappable contact on mobile
+      row.setAttribute('role', 'group');
+      row.setAttribute('aria-label', text(contact.full_name) || 'Contact');
       row.innerHTML =
         '<div class="contact-name-cell"><span class="contact-name"></span></div>' +
-        '<div></div><div></div><div></div><div class="contact-labels"></div>' +
-        '<div class="contact-actions-cell"><button type="button" class="contact-edit" title="Edit"><i class="fa fa-pencil"></i></button><button type="button" class="contact-delete" title="{{ 'labels.delete'|trans }}"><i class="fa fa-trash"></i></button></div>';
+        '<div class="contact-email-cell"></div><div class="contact-phone-cell"></div><div></div><div class="contact-labels"></div>' +
+        '<div class="contact-actions-cell"><button type="button" class="contact-edit" title="Edit" aria-label="Edit"><i class="fa fa-pencil" aria-hidden="true"></i></button><button type="button" class="contact-delete" title="{{ 'labels.delete'|trans }}" aria-label="{{ 'labels.delete'|trans }}"><i class="fa fa-trash" aria-hidden="true"></i></button></div>';
       row.children[0].insertBefore(contactAvatar(contact), row.children[0].firstChild);
       row.querySelector('.contact-name').textContent = contact.full_name;
-      row.children[1].textContent = text(contact.email);
-      row.children[2].textContent = text(contact.phone);
+      // [D1] tap-to-email and tap-to-call links in the list view
+      row.children[1].appendChild(contactValueNode(contact.email, 'mailto'));
+      row.children[2].appendChild(contactValueNode(contact.phone, 'tel'));
       row.children[3].textContent = text(contact.company_line);
       row.children[4].textContent = (contact.labels || []).join(', ');
       row.querySelector('.contact-edit').addEventListener('click', function() {
@@ -187,6 +238,8 @@
     data.forEach(function(contact) {
       var card = document.createElement('article');
       card.className = 'contact-card';
+      // [D2] announce the whole card as a single labelled contact for screen readers / large tap target
+      card.setAttribute('aria-label', text(contact.full_name) || 'Contact');
       card.addEventListener('touchend', function(event) {
         handleContactCardTap(contact, card, event);
       });
@@ -204,12 +257,15 @@
       card.appendChild(meta);
 
       var detail = document.createElement('dl');
+      // [D4] mobile-stack lets the CSS render each label/value pair stacked vertically on small screens
+      detail.className = 'mobile-stack';
       detail.innerHTML =
         '<dt>Email</dt><dd></dd>' +
         '<dt>Phone</dt><dd></dd>' +
         '<dt>Company</dt><dd></dd>';
-      detail.children[1].textContent = text(contact.email);
-      detail.children[3].textContent = text(contact.phone);
+      // [D1] tap-to-email / tap-to-call links inside the contact card detail
+      detail.children[1].appendChild(contactValueNode(contact.email, 'mailto'));
+      detail.children[3].appendChild(contactValueNode(contact.phone, 'tel'));
       detail.children[5].textContent = text(contact.company_line);
       card.appendChild(detail);
 
@@ -370,6 +426,11 @@
 
   document.addEventListener('DOMContentLoaded', function() {
     $('#contact_create').addEventListener('click', openDialog);
+    // [D3] wire the mobile-reachable empty-state add button to the same create dialog
+    var emptyCreate = $('#contacts_empty_create');
+    if (emptyCreate) {
+      emptyCreate.addEventListener('click', function() { openDialog(); });
+    }
     $('#contact_cancel').addEventListener('click', closeDialog);
     $('#contact_cancel_icon').addEventListener('click', closeDialog);
     $('#contacts_refresh').addEventListener('click', loadContacts);

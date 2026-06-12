@@ -10,6 +10,8 @@
   },
   "android": {
     "allowMixedContent": false,
-    "captureInput": true
+    "captureInput": true,
+    "backgroundColor": "#ffffff",
+    "webContentsDebuggingEnabled": false
   }
 }

@@ -13,10 +13,25 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- [E1] Branded status bar color so the system bar matches the app -->
+        <item name="android:statusBarColor">@color/colorPrimaryDark</item>
+        <!-- [E1] colorPrimaryDark is dark enough that the default light status-bar
+             icons stay legible; no light-icon override needed here -->
+        <!-- [E2] Solid window background prevents a white flash between splash and web view -->
+        <item name="android:windowBackground">@color/windowBackground</item>
+        <!-- [E3] Navigation bar color matching branding -->
+        <item name="android:navigationBarColor">@color/navigationBarColor</item>
+        <!-- [E3] Dark navigation-bar icons since the nav bar is a light surface
+             (windowLightNavigationBar is honored on API 27+, ignored gracefully below) -->
+        <item name="android:windowLightNavigationBar">true</item>
     </style>
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <!-- [E2] Branded splash status bar so there is no white flash on cold start -->
+        <item name="android:statusBarColor">@color/colorPrimaryDark</item>
+        <!-- [E2] Splash window background color (used behind the splash drawable) -->
+        <item name="android:windowBackground">@color/splashBackground</item>
     </style>
 </resources>
