@@ -17,6 +17,7 @@ pub struct Config {
     pub caldav_connect_timeout: Duration,
     pub caldav_response_timeout: Duration,
     pub caldav_certificate_verify: bool,
+    pub dav_host_allowlist: Vec<String>,
     pub database_url: String,
     pub csrf_secret: String,
     pub session_lifetime: Duration,
@@ -50,6 +51,9 @@ impl Config {
             caldav_connect_timeout: Duration::from_secs(env_u64("CALDAVER_CALDAV_CONNECT_TIMEOUT", 10)),
             caldav_response_timeout: Duration::from_secs(env_u64("CALDAVER_CALDAV_RESPONSE_TIMEOUT", 30)),
             caldav_certificate_verify: env_bool("CALDAVER_CALDAV_CERTIFICATE_VERIFY", true),
+            dav_host_allowlist: parse_host_allowlist(
+                &env::var("CALDAVER_DAV_HOST_ALLOWLIST").unwrap_or_default(),
+            ),
             database_url,
             csrf_secret,
             session_lifetime: Duration::from_secs(env_u64("CALDAVER_SESSION_LIFETIME", 2_592_000)),
@@ -85,6 +89,7 @@ impl Config {
             caldav_connect_timeout: Duration::from_secs(1),
             caldav_response_timeout: Duration::from_secs(1),
             caldav_certificate_verify: true,
+            dav_host_allowlist: Vec::new(),
             database_url,
             csrf_secret: "test-secret".to_string(),
             session_lifetime: Duration::from_secs(3600),
@@ -167,6 +172,14 @@ fn env_bool(name: &str, default: bool) -> bool {
         .unwrap_or(default)
 }
 
+fn parse_host_allowlist(value: &str) -> Vec<String> {
+    value
+        .split(',')
+        .map(|entry| entry.trim().to_ascii_lowercase())
+        .filter(|entry| !entry.is_empty())
+        .collect()
+}
+
 fn percent_encode(input: &str) -> String {
     urlencoding::encode(input).into_owned()
 }
@@ -181,5 +194,15 @@ mod tests {
 
         assert!(config.database_url.starts_with("postgres://"));
         assert_eq!(config.database_url, "postgres://example.test/caldaver");
+    }
+
+    #[test]
+    fn test_parse_host_allowlist_trims_lowercases_and_skips_empty_entries() {
+        assert_eq!(
+            parse_host_allowlist(" Radicale.example.invalid , dav.example.org ,, "),
+            vec!["radicale.example.invalid".to_string(), "dav.example.org".to_string()]
+        );
+        assert!(parse_host_allowlist("").is_empty());
+        assert!(parse_host_allowlist(" , ,").is_empty());
     }
 }

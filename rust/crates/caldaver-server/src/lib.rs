@@ -1558,7 +1558,10 @@ async fn persist_dav_account_from_form(
     if id == 0 && auth_method != "none" && form.get("password").is_none_or(|value| value.trim().is_empty()) {
         return Err(json_error(StatusCode::BAD_REQUEST, "A password or token is required"));
     }
-    let server_url = validated_dav_server_url(&limited_field(form, "server_url", 2048))?;
+    let server_url = validated_dav_server_url(
+        &limited_field(form, "server_url", 2048),
+        &allowed_dav_hosts(&state.config),
+    )?;
     let home_set = limited_field(form, "home_set", 512);
     if !home_set.is_empty() && !home_set.starts_with('/') {
         return Err(json_error(StatusCode::BAD_REQUEST, "Home set must start with /"));
@@ -1602,7 +1605,30 @@ async fn persist_dav_account_from_form(
     })
 }
 
-fn validated_dav_server_url(value: &str) -> Result<String, Response> {
+/// Hosts that bypass the IP-block check in [`validated_dav_server_url`]: the hosts of the
+/// admin-configured CalDAV/CardDAV servers plus any extra hosts from
+/// `CALDAVER_DAV_HOST_ALLOWLIST`. In homelab deployments the configured DAV server often
+/// resolves to a private address that the SSRF guard would otherwise reject.
+fn allowed_dav_hosts(config: &Config) -> Vec<String> {
+    let mut hosts: Vec<String> = config
+        .dav_host_allowlist
+        .iter()
+        .map(|host| host.to_ascii_lowercase())
+        .collect();
+    for server in [&config.caldav_server, &config.carddav_server] {
+        // The configured value may contain a `%u` username placeholder (normally in the
+        // path, not the host); if it does not parse as a URL, just skip it.
+        if let Some(host) = Url::parse(server)
+            .ok()
+            .and_then(|url| url.host_str().map(|host| host.to_ascii_lowercase()))
+        {
+            hosts.push(host);
+        }
+    }
+    hosts
+}
+
+fn validated_dav_server_url(value: &str, allowed_hosts: &[String]) -> Result<String, Response> {
     let url = Url::parse(value).map_err(|_| json_error(StatusCode::BAD_REQUEST, "Server URL is invalid"))?;
     if url.scheme() != "https" && url.scheme() != "http" {
         return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must use http or https"));
@@ -1613,6 +1639,9 @@ fn validated_dav_server_url(value: &str) -> Result<String, Response> {
     let Some(host) = url.host_str() else {
         return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must include a host"));
     };
+    if allowed_hosts.iter().any(|allowed| host.eq_ignore_ascii_case(allowed)) {
+        return Ok(url.to_string());
+    }
     if host.eq_ignore_ascii_case("localhost") || host.ends_with(".localhost") {
         return Err(json_error(StatusCode::BAD_REQUEST, "Server URL host is not allowed"));
     }
@@ -3198,6 +3227,85 @@ mod tests {
             let config = test_auth_config("", encoded);
             assert!(!verify_local_auth_password(&config, "anything"));
         }
+    }
+
+    fn no_allowed_hosts() -> Vec<String> {
+        Vec::new()
+    }
+
+    #[test]
+    fn dav_server_url_rejects_private_and_loopback_hosts_by_default() {
+        for url in [
+            "https://10.20.30.40/",
+            "https://192.168.1.10/dav/",
+            "http://127.0.0.1/",
+            "https://localhost/dav/",
+            "https://foo.localhost/",
+            "https://[::1]/",
+        ] {
+            assert!(validated_dav_server_url(url, &no_allowed_hosts()).is_err(), "{url} should be rejected");
+        }
+    }
+
+    #[test]
+    fn dav_server_url_allows_allowlisted_private_ip() {
+        let allowed = vec!["10.20.30.40".to_string()];
+        assert_eq!(
+            validated_dav_server_url("https://10.20.30.40/dav/", &allowed).unwrap(),
+            "https://10.20.30.40/dav/"
+        );
+        // Other private addresses stay blocked.
+        assert!(validated_dav_server_url("https://10.20.30.41/dav/", &allowed).is_err());
+    }
+
+    #[test]
+    fn dav_server_url_allowlisted_host_skips_dns_resolution() {
+        // `.invalid` never resolves, so success proves DNS resolution was skipped.
+        let allowed = vec!["radicale.homelab.invalid".to_string()];
+        assert_eq!(
+            validated_dav_server_url("https://Radicale.HomeLab.invalid/radicale/", &allowed).unwrap(),
+            "https://radicale.homelab.invalid/radicale/"
+        );
+        assert!(validated_dav_server_url("https://radicale.homelab.invalid/", &no_allowed_hosts()).is_err());
+    }
+
+    #[test]
+    fn dav_server_url_allowlist_match_is_case_insensitive() {
+        let allowed = vec!["LocalHost".to_string()];
+        assert!(validated_dav_server_url("https://localhost/dav/", &allowed).is_ok());
+    }
+
+    #[test]
+    fn dav_server_url_allowlisted_host_still_requires_scheme_and_no_credentials() {
+        let allowed = vec!["radicale.homelab.invalid".to_string()];
+        assert!(validated_dav_server_url("ftp://radicale.homelab.invalid/", &allowed).is_err());
+        assert!(validated_dav_server_url("https://user:pass@radicale.homelab.invalid/", &allowed).is_err());
+        assert!(validated_dav_server_url("https://user@radicale.homelab.invalid/", &allowed).is_err());
+    }
+
+    #[test]
+    fn allowed_dav_hosts_includes_configured_dav_servers_and_allowlist() {
+        let mut config = Config::for_tests("postgres://localhost/caldaver_test".to_string());
+        config.caldav_server = "https://Radicale.example.invalid/radicale/%u/".to_string();
+        config.carddav_server = "https://cards.example.org/dav/".to_string();
+        config.dav_host_allowlist = vec!["Extra.Example.NET".to_string()];
+
+        let hosts = allowed_dav_hosts(&config);
+        assert!(hosts.contains(&"radicale.example.invalid".to_string()));
+        assert!(hosts.contains(&"cards.example.org".to_string()));
+        assert!(hosts.contains(&"extra.example.net".to_string()));
+
+        assert!(validated_dav_server_url("https://radicale.example.invalid/radicale/", &hosts).is_ok());
+    }
+
+    #[test]
+    fn allowed_dav_hosts_skips_unparseable_configured_servers() {
+        let mut config = Config::for_tests("postgres://localhost/caldaver_test".to_string());
+        config.caldav_server = "not a url at all".to_string();
+        config.carddav_server = String::new();
+        config.dav_host_allowlist = vec!["dav.example.org".to_string()];
+
+        assert_eq!(allowed_dav_hosts(&config), vec!["dav.example.org".to_string()]);
     }
 
     fn fake_account() -> MailAccount {
