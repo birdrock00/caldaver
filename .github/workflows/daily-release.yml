@@ -133,6 +133,12 @@ jobs:
 
       - name: Build Capacitor Android APK
         shell: bash
+        env:
+          BUILD_TYPE: release
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: scripts/ci/build-capacitor-android-apk.sh
 
       - name: Name APK with release date
