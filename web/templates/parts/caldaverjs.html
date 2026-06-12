@@ -1,5 +1,5 @@
-<script language="JavaScript" type="text/javascript" src="{{ path('settings.js') }}"></script>
-<script language="JavaScript" type="text/javascript">
+<script src="{{ path('settings.js') }}"></script>
+<script>
 //<![CDATA[
 var translations = {{ app.translator.getCatalogue(app.request.locale).all('messages')|json_encode|raw }};
 var csrf_id = '_token';
