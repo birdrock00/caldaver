@@ -663,7 +663,15 @@ async fn preferences_page(State(state): State<AppState>, headers: HeaderMap) -> 
             Vec::new()
         }
     };
-    html_response(render_preferences(&state, &session, &accounts)).into_response()
+    let calendars = match caldav_client_for_request(&state, &session).await {
+        Ok((client, calendar_home_set)) => client
+            .list_calendars(&calendar_home_set)
+            .await
+            .map(|cals| cals.iter().map(|c| (c.url().to_string(), c.property(CoreCalendar::DISPLAYNAME).unwrap_or("Calendar").to_string())).collect::<Vec<_>>())
+            .unwrap_or_default(),
+        Err(_) => Vec::new(),
+    };
+    html_response(render_preferences(&state, &session, &accounts, &calendars)).into_response()
 }
 
 async fn preferences_save(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
@@ -2007,6 +2015,9 @@ fn blocked_ipv6(ip: Ipv6Addr) -> bool {
 
 async fn principals(Query(query): Query<HashMap<String, String>>) -> Json<Value> {
     let term = query.get("term").cloned().unwrap_or_default();
+    if term.trim().is_empty() {
+        return Json(json!([]));
+    }
     Json(json!([{"label": term, "value": term, "url": term}]))
 }
 
@@ -2672,14 +2683,11 @@ fn render_login(state: &AppState, error: Option<&str>) -> String {
         state,
         "",
         &format!(
-            r#"<div class="container"><div class="page-header"><h1>{title}</h1></div>{sidebrand}{error}
-<div class="loginform ui-corner-all"><form method="post" action="/login" class="form-horizontal">
-<input type="hidden" name="_token" value="">
+            r#"<div class="container">{error}
+<div class="loginform ui-corner-all"><img src="/img/caldaver_300transp.png" alt="Caldaver" style="max-width: 200px; margin-bottom: 16px;"><form method="post" action="/login" class="form-horizontal">
 <div class="form-group"><label class="col-sm-3 control-label" for="user">User name</label><div class="col-sm-9"><input id="user" name="user" class="form-control" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="next" autofocus required></div></div>
 <div class="form-group"><label class="col-sm-3 control-label" for="password">Password</label><div class="col-sm-9"><input id="password" name="password" class="form-control" type="password" autocomplete="current-password" enterkeyhint="go" required></div></div>
-<input name="login" value="Log in" type="submit" class="btn btn-success"></form></div></div>"#,
-            title = escape(&state.config.title),
-            sidebrand = sidebrand(),
+<input name="login" value="Log in" type="submit" class="btn btn-primary"></form></div></div>"#,
             error = error_html
         ),
         "",
@@ -2730,17 +2738,29 @@ fn render_mail_read(state: &AppState, session: &Session, account_id: u64, uid: u
     layout(state, "caldaver-mail-page", &content, &part_js("mailmessagejs"))
 }
 
-fn render_preferences(state: &AppState, session: &Session, accounts: &[ConnectedAccountPublic]) -> String {
+fn render_preferences(state: &AppState, session: &Session, accounts: &[ConnectedAccountPublic], calendars: &[(String, String)]) -> String {
     let prefs = &session.preferences;
+    let calendar_options = if calendars.is_empty() {
+        format!(r#"<option value="{calendar}" selected>Default</option>"#, calendar = DEFAULT_CALENDAR)
+    } else {
+        calendars
+            .iter()
+            .map(|(url, name)| {
+                let selected = if url == &prefs.default_calendar { r#" selected"# } else { "" };
+                format!(r#"<option value="{url}"{selected}>{name}</option>"#)
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    };
     let content = format!(
         r#"{navbar}<div class="container"><h1>Preferences</h1><div class="preferences-container"><form method="post" id="prefs_form"><input type="hidden" name="_token" value="{csrf}">
 <fieldset class="prefs-section"><legend>General options</legend><div class="form-group"><label for="language">Language</label><select class="form-control" id="language" name="language"><option value="en" selected>English</option></select></div>{radio_date}{radio_time}{radio_week}<div class="form-group"><label for="timezone">Timezone</label><select class="form-control" id="timezone" name="timezone"><option value="{timezone}" selected>{timezone}</option><option value="UTC">UTC</option><option value="America/Los_Angeles">America/Los_Angeles</option></select></div></fieldset>
-<fieldset class="prefs-section"><legend>Calendars</legend><div class="form-group"><label for="default_calendar">Default calendar</label><select class="form-control" id="default_calendar" name="default_calendar"><option value="{calendar}" selected>Default</option></select></div><div class="form-group"><label for="default_view">Default view</label><select class="form-control" id="default_view" name="default_view"><option value="month" selected>Month</option><option value="week">Week</option><option value="day">Day</option><option value="list">List</option></select></div>{radio_week_nb}{radio_now}<div class="form-group prefs-radio-group" role="radiogroup" aria-labelledby="disable_javascript_label"><div class="prefs-control-label" id="disable_javascript_label">Disable JavaScript</div><label class="radio-inline" for="disable_javascript_yes"><input id="disable_javascript_yes" type="radio" name="disable_javascript" value="true"> Yes</label><label class="radio-inline" for="disable_javascript_no"><input id="disable_javascript_no" type="radio" name="disable_javascript" value="false" checked="checked"> No</label></div><div class="form-group"><label for="list_days">List view days</label><select class="form-control" id="list_days" name="list_days"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="31">31 days</option></select></div></fieldset>
+<fieldset class="prefs-section"><legend>Calendars</legend><div class="form-group"><label for="default_calendar">Default calendar</label><select class="form-control" id="default_calendar" name="default_calendar">{calendar_options}</select></div><div class="form-group"><label for="default_view">Default view</label><select class="form-control" id="default_view" name="default_view"><option value="month" selected>Month</option><option value="week">Week</option><option value="day">Day</option><option value="list">List</option></select></div>{radio_week_nb}{radio_now}<div class="form-group prefs-radio-group" role="radiogroup" aria-labelledby="disable_javascript_label"><div class="prefs-control-label" id="disable_javascript_label">Disable JavaScript</div><label class="radio-inline" for="disable_javascript_yes"><input id="disable_javascript_yes" type="radio" name="disable_javascript" value="true"> Yes</label><label class="radio-inline" for="disable_javascript_no"><input id="disable_javascript_no" type="radio" name="disable_javascript" value="false" checked="checked"> No</label></div><div class="form-group"><label for="list_days">List view days</label><select class="form-control" id="list_days" name="list_days"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="31">31 days</option></select></div></fieldset>
 {accounts_section}<div id="prefs_buttons"><input type="submit" class="btn btn-success" value="Save"><a href="/" id="return_button" class="btn btn-default"><i class="fa fa-calendar"></i> Return</a></div></form></div></div>{account_dialog}"#,
         navbar = navbar(state, session, "calendar"),
         csrf = session.csrf,
         timezone = escape(&prefs.timezone),
-        calendar = DEFAULT_CALENDAR,
+        calendar_options = calendar_options,
         radio_date = pref_radios("date_format", "Date format", &[("ymd", "2026-05-30"), ("dmy", "30/05/2026"), ("mdy", "05/30/2026")], &prefs.date_format),
         radio_time = pref_radios("time_format", "Time format", &[("24", "13:00"), ("12", "01:00 pm")], &prefs.time_format),
         radio_week = pref_radios("weekstart", "Week starts on", &[("0", "Sunday"), ("1", "Monday")], &prefs.weekstart.to_string()),
@@ -2816,7 +2836,7 @@ fn layout(state: &AppState, body_class: &str, content: &str, bottom: &str) -> St
 
 fn navbar(state: &AppState, session: &Session, active: &str) -> String {
     format!(
-        r#"<div class="navbar navbar-default caldaver-topbar" role="navigation"><div class="container-fluid"><details class="mobile-section-menu"><summary aria-label="Sections"><i class="fa fa-bars"></i></summary><nav class="mobile-section-menu-list" aria-label="Application sections">{mobile_links}</nav></details><div class="navbar-header"><button class="topbar-menu" type="button" aria-label="Menu"><i class="fa fa-bars"></i></button><span class="navbar-brand"><span class="caldaver-brand-title">{title}</span><span class="mobile-calendar-toolbar-title" aria-hidden="true"><span id="mobile_calendar_toolbar_date"></span><span id="mobile_calendar_toolbar_day"></span></span></span></div><p class="navbar-text navbar-right" id="loading"><img src="/img/loading.gif" alt=""></p><ul class="nav navbar-nav navbar-right topbar-actions" id="usermenu"><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_date_action" title="Choose date" aria-label="Choose date"><i class="fa fa-calendar"></i></button></li><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_more_action" title="More" aria-label="More"><i class="fa fa-ellipsis-v"></i></button></li><li><a class="prefs" href="/preferences"><i title="Preferences" class="fa fa-lg fa-wrench"></i></a></li><li class="user-menu"><details class="user-menu-dropdown"><summary class="user-pill" aria-label="User menu"><span class="user-pill-label">{displayname}</span><i class="fa fa-caret-down" aria-hidden="true"></i></summary><nav class="user-menu-list" aria-label="User menu"><a class="user-menu-item user-menu-logout" href="/logout"><i class="fa fa-power-off" aria-hidden="true"></i><span>Log out</span></a></nav></details></li></ul></div></div>{mobile_calendar_script}"#,
+        r#"<div class="navbar navbar-default caldaver-topbar" role="navigation"><div class="container-fluid"><details class="mobile-section-menu"><summary aria-label="Sections"><i class="fa fa-bars"></i></summary><nav class="mobile-section-menu-list" aria-label="Application sections">{mobile_links}</nav></details><div class="navbar-header"><button class="topbar-menu" type="button" aria-label="Menu"><i class="fa fa-bars"></i></button><span class="navbar-brand"><span class="caldaver-brand-title">{title}</span><span class="mobile-calendar-toolbar-title" aria-hidden="true"><span id="mobile_calendar_toolbar_date"></span><span id="mobile_calendar_toolbar_day"></span></span></span></div><p class="navbar-text navbar-right" id="loading"><span class="navbar-spinner" aria-hidden="true"></span></p><ul class="nav navbar-nav navbar-right topbar-actions" id="usermenu"><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_date_action" title="Choose date" aria-label="Choose date"><i class="fa fa-calendar"></i></button></li><li class="mobile-calendar-toolbar-action"><button type="button" id="mobile_calendar_more_action" title="More" aria-label="More"><i class="fa fa-ellipsis-v"></i></button></li><li><a class="prefs" href="/preferences"><i title="Preferences" class="fa fa-lg fa-wrench"></i></a></li><li class="user-menu"><details class="user-menu-dropdown"><summary class="user-pill" aria-label="User menu"><span class="user-pill-label">{displayname}</span><i class="fa fa-caret-down" aria-hidden="true"></i></summary><nav class="user-menu-list" aria-label="User menu"><a class="user-menu-item user-menu-logout" href="/logout"><i class="fa fa-power-off" aria-hidden="true"></i><span>Log out</span></a></nav></details></li></ul></div></div>{mobile_calendar_script}"#,
         title = escape(&state.config.title),
         displayname = escape(&session.displayname),
         mobile_links = mobile_links(active),
