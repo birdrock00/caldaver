@@ -91,7 +91,7 @@ Common optional runtime configuration:
 - `CALDAVER_CALDAV_SERVER`, optional DAV base URL used only as a bootstrap/default server URL before an account has been saved in Postgres
 - `CALDAVER_CARDDAV_SERVER`, optional CardDAV bootstrap/default server URL that defaults to `CALDAVER_CALDAV_SERVER`
 - `CALDAVER_CALDAV_PUBLIC_URL`, optional public CalDAV URL shown to users
-- `CALDAVER_SESSION_LIFETIME`, defaults to 30 days
+- `CALDAVER_SESSION_LIFETIME`, defaults to 30 days. Login sessions are persisted in PostgreSQL and survive server restarts. Session cookies include a `Max-Age` matching the configured lifetime, so closing the browser does not require re-authentication.
 - `CALDAVER_TITLE`, defaults to `Caldaver`
 - `CALDAVER_FOOTER`, defaults to `Caldaver`
 - `CALDAVER_BIND`, defaults to `0.0.0.0:8080`
