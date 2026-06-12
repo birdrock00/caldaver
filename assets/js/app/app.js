@@ -224,10 +224,8 @@ $(document).ready(function() {
         if (viewName === 'month') {
           return dayName;
         }
-        // FullCalendar hands over ambiguously-zoned (UTC-mode) moments, so
-        // compare calendar dates as strings instead of instants. Only week
-        // view headers get the today circle.
-        if (viewName === 'agendaWeek' && date.format('YYYY-MM-DD') === moment().format('YYYY-MM-DD')) {
+        var now = moment.tz(calendar_timezone());
+        if (viewName === 'agendaWeek' && date.format('YYYY-MM-DD') === now.format('YYYY-MM-DD')) {
           return dayName + ' <span class="fc-header-today-circle">' + date.format('D') + '</span>';
         }
       } catch(e) {}
