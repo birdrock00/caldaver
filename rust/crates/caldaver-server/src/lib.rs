@@ -2677,8 +2677,11 @@ where
 
 fn render_login(state: &AppState, error: Option<&str>) -> String {
     let error_html = error
-        .map(|message| format!(r#"<div class="ui-widget loginerrors"><div class="ui-state-error ui-corner-all"><p>{}</p></div></div>"#, escape(message)))
+        .map(|message| format!(r#"<div class="ui-widget loginerrors" role="alert" aria-live="assertive"><div class="ui-state-error ui-corner-all"><p>{}</p></div></div>"#, escape(message)))
         .unwrap_or_default();
+    // Small, self-contained show/hide password toggle. The login page loads no JS
+    // bundle, so this inline script keeps the feature dependency-free.
+    let password_toggle_script = r#"<script>(function(){var b=document.getElementById('toggle_password'),p=document.getElementById('password');if(!b||!p){return;}b.addEventListener('click',function(){var hidden=p.getAttribute('type')==='password';p.setAttribute('type',hidden?'text':'password');b.setAttribute('aria-pressed',hidden?'true':'false');b.setAttribute('aria-label',hidden?'Hide password':'Show password');var i=b.querySelector('i');if(i){i.className=hidden?'fa fa-eye-slash':'fa fa-eye';}p.focus();});})();</script>"#;
     layout(
         state,
         "",
@@ -2686,11 +2689,11 @@ fn render_login(state: &AppState, error: Option<&str>) -> String {
             r#"<div class="container">{error}
 <div class="loginform ui-corner-all"><img src="/img/caldaver_300transp.png" alt="Caldaver" style="max-width: 200px; margin-bottom: 16px;"><form method="post" action="/login" class="form-horizontal">
 <div class="form-group"><label class="col-sm-3 control-label" for="user">User name</label><div class="col-sm-9"><input id="user" name="user" class="form-control" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="next" autofocus required></div></div>
-<div class="form-group"><label class="col-sm-3 control-label" for="password">Password</label><div class="col-sm-9"><input id="password" name="password" class="form-control" type="password" autocomplete="current-password" enterkeyhint="go" required></div></div>
-<input name="login" value="Log in" type="submit" class="btn btn-primary"></form></div></div>"#,
+<div class="form-group"><label class="col-sm-3 control-label" for="password">Password</label><div class="col-sm-9" style="position:relative"><input id="password" name="password" class="form-control" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" required style="padding-right:46px"><button type="button" id="toggle_password" aria-label="Show password" aria-pressed="false" aria-controls="password" style="position:absolute;top:0;right:15px;height:100%;min-width:44px;background:none;border:0;color:#555;cursor:pointer"><i class="fa fa-eye" aria-hidden="true"></i></button></div></div>
+<input name="login" value="Log in" type="submit" class="btn btn-primary btn-lg btn-block"></form></div></div>"#,
             error = error_html
         ),
-        "",
+        password_toggle_script,
     )
 }
 
