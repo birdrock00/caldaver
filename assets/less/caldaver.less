@@ -285,12 +285,6 @@ span.fc-event-icons {
   }
 }
 
-td.fc-day-number.fc-today {
-  font-weight: bold;
-  color: #3A6440;
-  font-size: 110%;
-}
-
 #loading {
   width: 20px;
   height: 20px;
@@ -1296,7 +1290,11 @@ body.caldaver-calendar-page {
   font-size: 13px;
 }
 
-#calendar_view .fc-day-number.fc-today {
+// FC3 month view puts fc-today on the cell (td.fc-day-top.fc-today) with the
+// number in a nested <a class="fc-day-number">; older basic views put
+// fc-day-number directly on the td. Cover both DOM shapes.
+#calendar_view td.fc-day-number.fc-today,
+#calendar_view td.fc-day-top.fc-today > .fc-day-number {
   display: inline-flex;
   width: 28px;
   height: 28px;
