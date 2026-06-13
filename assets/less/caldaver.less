@@ -1490,6 +1490,16 @@ body.caldaver-sidebar-collapsed .topbar-menu {
   font-size: 13px !important;
   line-height: 1.25 !important;
   box-shadow: none;
+  text-shadow: 0 0 2px rgba(255, 255, 255, .55), 0 1px 2px rgba(0, 0, 0, .18);
+}
+
+#calendar_view .fc-event {
+  cursor: pointer;
+}
+
+#calendar_view .fc-event:hover {
+  overflow: visible;
+  z-index: 10;
 }
 
 #calendar_view .fc-event .fc-title,
@@ -3945,6 +3955,40 @@ summary:focus-visible,
     grid-column: 1;
   }
 
+  .mail-attachment {
+    min-height: 44px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .prefs-account-edit {
+    min-height: 44px;
+  }
+
+  .prefs-radio-group .radio-inline {
+    min-height: 44px;
+    padding: 10px 12px 10px 0;
+  }
+
+  .prefs-radio-group .radio-inline input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item-title a {
+    display: block;
+    min-height: 44px;
+    line-height: 44px;
+  }
+
+  .card-edit,
+  .card-delete {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .mail-reader {
     min-height: auto;
   }
@@ -4407,6 +4451,43 @@ summary:focus-visible,
   .nav-tabs > li {
     float: none;
     flex: 0 0 auto;
+  }
+
+  .card-edit,
+  .card-delete {
+    min-width: 44px;
+    min-height: 44px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .mail-attachment {
+    min-height: 44px;
+  }
+
+  .prefs-account-edit {
+    min-height: 44px;
+  }
+
+  body.caldaver-calendar-page #calendar_view .fc-list-item-title a {
+    display: block;
+    min-height: 44px;
+  }
+
+  .prefs-radio-group .radio-inline {
+    min-height: 44px;
+    padding: 10px 12px 10px 0;
+  }
+
+  input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+  }
+
+  .login-pw-toggle {
+    min-height: 44px;
+    min-width: 44px;
   }
 }
 

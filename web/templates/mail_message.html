@@ -11,7 +11,7 @@
     {% include 'parts/appnav.html' %}
   </aside>
 
-  <main class="mail-content">
+  <main id="content" class="mail-content">
     <section
       id="mail_reader"
       class="mail-reader"
@@ -37,10 +37,10 @@
           <i class="fa fa-envelope"></i>
         </button>
         <div class="mail-reader-toolbar-nav" aria-label="{% trans %}labels.mail{% endtrans %}">
-          <button type="button" id="mail_reader_previous" title="Previous message" aria-label="Previous message" disabled>
+          <button type="button" id="mail_reader_previous" title="{% trans %}labels.previous_message{% endtrans %}" aria-label="{% trans %}labels.previous_message{% endtrans %}" disabled>
             <i class="fa fa-chevron-left"></i>
           </button>
-          <button type="button" id="mail_reader_next" title="Next message" aria-label="Next message" disabled>
+          <button type="button" id="mail_reader_next" title="{% trans %}labels.next_message{% endtrans %}" aria-label="{% trans %}labels.next_message{% endtrans %}" disabled>
             <i class="fa fa-chevron-right"></i>
           </button>
         </div>
@@ -59,7 +59,7 @@
                 </div>
               </div>
               <button type="button" id="mail_reader_reply" class="mail-reader-reply-button" data-uid="{{ uid }}" aria-label="Reply to this message">
-                <i class="fa fa-reply" aria-hidden="true"></i><span>Reply</span>
+                <i class="fa fa-reply" aria-hidden="true"></i><span>{% trans %}labels.reply{% endtrans %}</span>
               </button>
             </div>
             <pre id="mail_reader_body"></pre>
@@ -76,30 +76,30 @@
         </div>
         <section id="mail_reply_composer" class="mail-reply-composer" hidden aria-label="Reply draft">
           <div class="mail-reply-composer-header">
-            <h2>Reply</h2>
+            <h2>{% trans %}labels.reply{% endtrans %}</h2>
             <button type="button" id="mail_reply_close" aria-label="Close reply draft">
               <i class="fa fa-times" aria-hidden="true"></i>
             </button>
           </div>
           <form id="mail_reply_form" class="mail-reply-form">
             <label>
-              <span>To</span>
+              <span>{% trans %}labels.to{% endtrans %}</span>
               <input id="mail_reply_to" type="email" autocomplete="email">
             </label>
             <label>
-              <span>Subject</span>
+              <span>{% trans %}labels.subject{% endtrans %}</span>
               <input id="mail_reply_subject" type="text" autocomplete="off">
             </label>
             <label class="mail-reply-body-label">
-              <span>Message</span>
+              <span>{% trans %}labels.message{% endtrans %}</span>
               <textarea id="mail_reply_body" rows="12" aria-label="Reply message"></textarea>
             </label>
             <div class="mail-reply-actions">
               <button type="button" id="mail_reply_send" class="mail-reply-send" disabled>
-                <i class="fa fa-send" aria-hidden="true"></i><span>Send</span>
+                <i class="fa fa-send" aria-hidden="true"></i><span>{% trans %}labels.send{% endtrans %}</span>
               </button>
               <button type="button" id="mail_reply_discard" class="mail-reply-discard">
-                <i class="fa fa-trash" aria-hidden="true"></i><span>Discard</span>
+                <i class="fa fa-trash" aria-hidden="true"></i><span>{% trans %}labels.discard{% endtrans %}</span>
               </button>
             </div>
             <div id="mail_reply_status" class="mail-reply-status" aria-live="polite"></div>
