@@ -436,7 +436,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/jssettings", get(jssettings))
         .route("/keepalive", get(|| async { "" }))
         .route("/__rust/health", get(|| async { Json(json!({"ok": true, "backend": "rust"})) }))
-        .fallback_service(ServeDir::new(static_root))
+        .fallback_service(
+            ServeDir::new(static_root).fallback(get(not_found_page).with_state(state.clone()))
+        )
         .layer(TraceLayer::new_for_http())
         .with_state(state)
 }
@@ -483,6 +485,16 @@ fn valid_csrf(session: &Session, form: &HashMap<String, String>) -> bool {
 
 fn html_response(body: String) -> Html<String> {
     Html(body)
+}
+
+async fn not_found_page(State(state): State<AppState>) -> Response {
+    let html = layout(
+        &state,
+        "caldaver-error-page",
+        r#"<div id="content" class="container"><div class="page-header"><h1>Page not found</h1></div><div class="alert alert-danger" role="alert"><p>The page you requested could not be found.</p></div><p style="margin-top: 20px;"><a href="/" style="color: #1a73e8; font-weight: 500;">Return to Calendar</a></p></div>"#,
+        "",
+    );
+    (StatusCode::NOT_FOUND, html_response(html)).into_response()
 }
 
 async fn login_page(State(state): State<AppState>) -> Html<String> {
@@ -2699,7 +2711,7 @@ fn render_login(state: &AppState, error: Option<&str>) -> String {
 
 fn render_calendar(state: &AppState, session: &Session) -> String {
     let content = format!(
-        r#"{navbar}<div class="container-fluid calendar-shell"><div id="wrapper" class="calendar-layout"><div id="sidebar">{sidebar}<div id="footer"><p>{footer}</p></div></div><div id="content"><div id="calendar_view"></div></div></div></div>"#,
+        r#"{navbar}<div class="container-fluid calendar-shell"><div id="wrapper" class="calendar-layout"><div id="sidebar">{sidebar}<div id="footer"><p>{footer}</p></div></div><div id="content"><div id="calendar_view"></div></div></div></div><nav id="mobile_bottom_bar" class="mobile-bottom-bar" aria-label="Calendar quick actions" hidden><button type="button" class="mobile-bottom-btn" data-mobile-action="prev" aria-label="Previous" title="Previous"><i class="fa fa-chevron-left" aria-hidden="true"></i><span class="mobile-bottom-btn-label"><i class="fa fa-chevron-left" aria-hidden="true"></i></span></button><button type="button" class="mobile-bottom-btn" data-mobile-action="today" aria-label="Today" title="Today"><i class="fa fa-dot-circle-o" aria-hidden="true"></i><span class="mobile-bottom-btn-label">Today</span></button><button type="button" class="mobile-bottom-btn" data-mobile-action="view" aria-label="Change view" title="Change view"><i class="fa fa-th-list" aria-hidden="true"></i><span class="mobile-bottom-btn-label">View</span></button><button type="button" class="mobile-bottom-btn" data-mobile-action="refresh" aria-label="Refresh" title="Refresh"><i class="fa fa-refresh" aria-hidden="true"></i><span class="mobile-bottom-btn-label">Refresh</span></button><button type="button" class="mobile-bottom-btn" data-mobile-action="next" aria-label="Next" title="Next"><i class="fa fa-chevron-right" aria-hidden="true"></i><span class="mobile-bottom-btn-label"><i class="fa fa-chevron-right" aria-hidden="true"></i></span></button></nav><button type="button" id="mobile_fab_add" class="mobile-fab" aria-label="Create event" title="Create event" hidden><i class="fa fa-plus" aria-hidden="true"></i></button><div id="mobile_ptr" class="mobile-ptr" aria-hidden="true" hidden><i class="fa fa-refresh" aria-hidden="true"></i></div>"#,
         navbar = navbar(state, session, "calendar"),
         sidebar = calendar_sidebar(),
         footer = escape(&state.config.footer)

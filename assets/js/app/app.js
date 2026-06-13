@@ -322,7 +322,10 @@ $(document).ready(function() {
 
     events: {
       show: function (event, api) {
-        // Attach modify and delete events
+        if (api.elements && api.elements.tooltip) {
+          api.elements.tooltip.attr('role', 'dialog').attr('aria-modal', 'false');
+        }
+
         $(this)
           .find('.remove')
           .off('click')
@@ -331,7 +334,6 @@ $(document).ready(function() {
 
             event_delete(event_id);
 
-            // Close tooltip
             event_details_popup.hide();
             e.preventDefault();
           })
@@ -343,7 +345,6 @@ $(document).ready(function() {
 
             modify_event_handler(event_id);
 
-            // Close tooltip
             event_details_popup.hide();
             e.preventDefault();
           });
@@ -392,6 +393,41 @@ $(document).ready(function() {
       color: '#E78AEF'
     },
     true);
+
+
+  /*************************************************************
+   * Keyboard shortcuts
+   *************************************************************/
+
+  $(document).on('keydown', function(e) {
+    if ($(e.target).is('input, textarea, select')) {
+      return;
+    }
+
+    if ($('.ui-dialog:visible').length > 0) {
+      return;
+    }
+
+    var view = $('#calendar_view').fullCalendar('getView');
+    if (!view) {
+      return;
+    }
+
+    switch(e.which) {
+      case 37:
+        $('#calendar_view .fc-prev-button').click();
+        e.preventDefault();
+        break;
+      case 39:
+        $('#calendar_view .fc-next-button').click();
+        e.preventDefault();
+        break;
+      case 84:
+        $('#calendar_view .fc-today-button').click();
+        e.preventDefault();
+        break;
+    }
+  });
 
 
   /*************************************************************
@@ -901,8 +937,37 @@ var show_dialog = function show_dialog(params) {
         var buttons = $(event.target).parent().find('.ui-dialog-buttonset').children();
         add_button_icons(buttons);
         blur_mobile_dialog_input();
+
+        var $widget = $(this).dialog('widget');
+        var $focusable = $widget.find('a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+        if ($focusable.length > 0) {
+          $focusable.first().focus();
+        }
+        $widget.on('keydown.focusTrap', function(e) {
+          if (e.keyCode !== $.ui.keyCode.TAB) {
+            return;
+          }
+          var $tabbable = $(this).find('a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+          if ($tabbable.length === 0) {
+            return;
+          }
+          var firstEl = $tabbable.first()[0];
+          var lastEl = $tabbable.last()[0];
+          if (e.shiftKey) {
+            if (document.activeElement === firstEl) {
+              e.preventDefault();
+              lastEl.focus();
+            }
+          } else {
+            if (document.activeElement === lastEl) {
+              e.preventDefault();
+              firstEl.focus();
+            }
+          }
+        });
       },
       close: function(ev, ui) {
+        $(this).dialog('widget').off('keydown.focusTrap');
         $(this).remove();
       }
     });
