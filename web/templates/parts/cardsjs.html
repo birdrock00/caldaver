@@ -433,6 +433,11 @@
     }
     $('#contact_cancel').addEventListener('click', closeDialog);
     $('#contact_cancel_icon').addEventListener('click', closeDialog);
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && !$('#contact_dialog').hidden) {
+        closeDialog();
+      }
+    });
     $('#contacts_refresh').addEventListener('click', loadContacts);
     $('#contacts_search').addEventListener('input', render);
 

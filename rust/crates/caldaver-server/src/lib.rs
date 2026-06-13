@@ -2698,7 +2698,7 @@ fn render_login(state: &AppState, error: Option<&str>) -> String {
         state,
         "",
         &format!(
-            r#"<div class="container">{error}
+            r#"<a href="#user" class="sr-only sr-only-focusable skip-link">Skip to login form</a><div class="container">{error}
 <div class="loginform ui-corner-all"><img src="/img/caldaver_300transp.png" alt="Caldaver" style="max-width: 200px; margin-bottom: 16px;"><form method="post" action="/login" class="form-horizontal">
 <div class="form-group"><label class="col-sm-3 control-label" for="user">User name</label><div class="col-sm-9"><input id="user" name="user" class="form-control" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="next" autofocus required></div></div>
 <div class="form-group"><label class="col-sm-3 control-label" for="password">Password</label><div class="col-sm-9" style="position:relative"><input id="password" name="password" class="form-control" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" required style="padding-right:46px"><button type="button" id="toggle_password" aria-label="Show password" aria-pressed="false" aria-controls="password" style="position:absolute;top:0;right:15px;height:100%;min-width:44px;background:none;border:0;color:#555;cursor:pointer"><i class="fa fa-eye" aria-hidden="true"></i></button></div></div>
@@ -2855,7 +2855,7 @@ fn account_row_html(account: &ConnectedAccountPublic) -> String {
 
 fn layout(state: &AppState, body_class: &str, content: &str, bottom: &str) -> String {
     format!(
-        r#"<!DOCTYPE html><html lang="en"><head><title>{title}</title><link rel="shortcut icon" href="/img/favicon.ico"><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link href="/dist/css/caldaver.css" rel="stylesheet" type="text/css"></head><body class="{body_class}">{content}{bottom}</body></html>"#,
+        r#"<!DOCTYPE html><html lang="en"><head><title>{title}</title><link rel="shortcut icon" href="/img/favicon.ico"><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link href="/dist/css/caldaver.css" rel="stylesheet" type="text/css"><link href="/dist/css/caldaver.print.css" rel="stylesheet" type="text/css" media="print"></head><body class="{body_class}">{content}{bottom}</body></html>"#,
         title = escape(&state.config.title),
         body_class = body_class,
         content = content,
@@ -3097,7 +3097,7 @@ fn translations_json() -> String {
 
 fn contact_dialog(csrf: &str) -> String {
     format!(
-        r#"<div id="contact_dialog" class="contact-dialog" hidden><form id="contact_form" action="/cards/save" method="post"><input type="hidden" name="_token" value="{csrf}"><input type="hidden" name="url" value=""><input type="hidden" name="etag" value=""><input type="hidden" name="uid" value=""><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2 id="contact_dialog_title">Create contact</h2><button type="button" id="contact_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><label><span>Name</span><input required name="full_name" type="text" autocomplete="name"></label><label><span>Email</span><input name="email" type="email" autocomplete="email"></label><label><span>Phone number</span><input name="phone" type="tel" autocomplete="tel"></label><label><span>Company</span><input name="organization" type="text" autocomplete="organization"></label><label><span>Job title</span><input name="job_title" type="text" autocomplete="organization-title"></label><div class="contact-dialog-footer"><button type="button" id="contact_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
+        r#"<div id="contact_dialog" class="contact-dialog" role="dialog" aria-modal="true" aria-labelledby="contact_dialog_title" hidden><form id="contact_form" action="/cards/save" method="post"><input type="hidden" name="_token" value="{csrf}"><input type="hidden" name="url" value=""><input type="hidden" name="etag" value=""><input type="hidden" name="uid" value=""><div class="contact-dialog-panel"><div class="contact-dialog-header"><h2 id="contact_dialog_title">Create contact</h2><button type="button" id="contact_cancel_icon" aria-label="Cancel"><i class="fa fa-times"></i></button></div><label><span>Name</span><input required name="full_name" type="text" autocomplete="name"></label><label><span>Email</span><input name="email" type="email" autocomplete="email"></label><label><span>Phone number</span><input name="phone" type="tel" autocomplete="tel"></label><label><span>Company</span><input name="organization" type="text" autocomplete="organization"></label><label><span>Job title</span><input name="job_title" type="text" autocomplete="organization-title"></label><div class="contact-dialog-footer"><button type="button" id="contact_cancel" class="btn btn-default">Cancel</button><button type="submit" class="btn btn-primary">Save</button></div></div></form></div>"#
     )
 }
 
