@@ -4,8 +4,7 @@
 
 {% block content %}
 {% include 'parts/navbar.html' %}
-  <div class="container">
-    <h1>{% trans %}labels.preferences{% endtrans %}</h1>
+  <div id="content" class="container">
 
     <div class="preferences-container">
     <form method="post" id="prefs_form">
@@ -156,14 +155,14 @@
 
     <!-- [C6] Intro text marked up as paragraph with id so the Add button can reference it for context on small screens -->
     <div class="prefs-accounts-header">
-      <p id="prefs_accounts_intro">Calendar, contacts, and email accounts available to Caldaver.</p>
+      <p id="prefs_accounts_intro">{% trans %}labels.accounts_intro{% endtrans %}</p>
       <!-- [C6] Add-account button gets aria-describedby pointing at the section intro -->
       <button type="button" id="mail_account_create" class="btn btn-default prefs-mail-account-create" aria-describedby="prefs_accounts_intro">
         <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.addaccount{% endtrans %}
       </button>
     </div>
     <div id="connected_accounts" class="prefs-account-list" aria-live="polite"></div>
-    <div id="connected_accounts_empty" class="prefs-account-empty" hidden>No accounts are configured.</div>
+    <div id="connected_accounts_empty" class="prefs-account-empty" hidden>{% trans %}labels.no_accounts_configured{% endtrans %}</div>
 
     </fieldset>
 
@@ -194,80 +193,80 @@
         </button>
       </div>
       <fieldset class="account-type-chooser" aria-label="Account type">
-        <label><input type="radio" name="account_type" value="calendar" checked> <span>Calendar</span></label>
-        <label><input type="radio" name="account_type" value="carddav"> <span>Contacts</span></label>
-        <label><input type="radio" name="account_type" value="email"> <span>Email</span></label>
+        <label><input type="radio" name="account_type" value="calendar" checked> <span>{% trans %}labels.calendar{% endtrans %}</span></label>
+        <label><input type="radio" name="account_type" value="carddav"> <span>{% trans %}labels.contacts{% endtrans %}</span></label>
+        <label><input type="radio" name="account_type" value="email"> <span>{% trans %}labels.mail{% endtrans %}</span></label>
       </fieldset>
       <!-- [C7] Friendly account name: capitalise words like a normal label -->
-      <label>
+      <label for="account_label">
         <span>{% trans %}labels.accountname{% endtrans %}</span>
-        <input required name="label" type="text" autocomplete="organization"
+        <input id="account_label" required name="label" type="text" autocomplete="organization"
           autocapitalize="words" placeholder="Work calendar">
       </label>
       <!-- [C7] [C10] Server URL: url keyboard, no autocapitalize/autocorrect/spellcheck, example placeholder, go-to-next hint -->
-      <label data-account-field="dav">
-        <span>DAV server URL</span>
-        <input name="server_url" type="url" inputmode="url" autocomplete="url"
+      <label data-account-field="dav" for="account_server_url">
+        <span>{% trans %}labels.dav_server_url{% endtrans %}</span>
+        <input id="account_server_url" name="server_url" type="url" inputmode="url" autocomplete="url"
           autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next"
           placeholder="https://dav.example.com/">
       </label>
-      <label data-account-field="dav">
-        <span>Auth method</span>
-        <select name="auth_method">
-          <option value="basic">Basic password</option>
-          <option value="bearer">Bearer token</option>
-          <option value="none">None</option>
+      <label data-account-field="dav" for="account_auth_method">
+        <span>{% trans %}labels.auth_method{% endtrans %}</span>
+        <select id="account_auth_method" name="auth_method">
+          <option value="basic">{% trans %}labels.auth_basic{% endtrans %}</option>
+          <option value="bearer">{% trans %}labels.auth_bearer{% endtrans %}</option>
+          <option value="none">{% trans %}labels.auth_none{% endtrans %}</option>
         </select>
       </label>
       <!-- [C7] Email address: email keyboard layout, no autocapitalize/correct -->
-      <label data-account-field="email">
+      <label data-account-field="email" for="account_email_address">
         <span>{% trans %}labels.emailaddress{% endtrans %}</span>
-        <input required name="email_address" type="email" inputmode="email" autocomplete="email"
+        <input id="account_email_address" required name="email_address" type="email" inputmode="email" autocomplete="email"
           autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="you@example.com">
       </label>
       <!-- [C7] [C10] IMAP host is a hostname: url keyboard, no autocapitalize/correct/spell, example placeholder -->
-      <label data-account-field="email">
+      <label data-account-field="email" for="account_imap_host">
         <span>{% trans %}labels.imaphost{% endtrans %}</span>
-        <input required name="imap_host" type="text" inputmode="url" autocomplete="off"
+        <input id="account_imap_host" required name="imap_host" type="text" inputmode="url" autocomplete="off"
           autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="imap.example.com">
       </label>
       <!-- [C7] IMAP port: numeric keypad on mobile -->
-      <label data-account-field="email">
+      <label data-account-field="email" for="account_imap_port">
         <span>{% trans %}labels.imapport{% endtrans %}</span>
-        <input required name="imap_port" type="number" inputmode="numeric" min="1" max="65535" value="993">
+        <input id="account_imap_port" required name="imap_port" type="number" inputmode="numeric" min="1" max="65535" value="993">
       </label>
-      <label data-account-field="email">
+      <label data-account-field="email" for="account_encryption">
         <span>{% trans %}labels.encryption{% endtrans %}</span>
-        <select name="encryption">
+        <select id="account_encryption" name="encryption">
           <option value="ssl">SSL</option>
           <option value="tls">STARTTLS</option>
           <option value="none">None</option>
         </select>
       </label>
       <!-- [C7] Account username: no autocapitalize/correct so credentials aren't altered -->
-      <label>
+      <label for="account_username">
         <span>{% trans %}labels.username{% endtrans %}</span>
-        <input required name="username" type="text" autocomplete="username"
+        <input id="account_username" required name="username" type="text" autocomplete="username"
           autocapitalize="none" autocorrect="off" spellcheck="false">
       </label>
       <!-- [C7] Credential field associated with its help text via aria-describedby -->
-      <label>
-        <span>Password or token</span>
-        <input name="password" type="password" autocomplete="current-password"
+      <label for="account_password">
+        <span>{% trans %}labels.password_or_token{% endtrans %}</span>
+        <input id="account_password" name="password" type="password" autocomplete="current-password"
           autocapitalize="none" autocorrect="off" spellcheck="false"
           aria-describedby="account_credential_help">
-        <small id="account_credential_help" class="account-credential-help">Saved credentials are never shown. Leave this blank when editing to keep the current credential.</small>
+        <small id="account_credential_help" class="account-credential-help">{% trans %}labels.credential_help{% endtrans %}</small>
       </label>
       <!-- [C7] [C10] Home set path: no autocapitalize/correct/spell -->
-      <label data-account-field="dav">
-        <span>Home set</span>
-        <input name="home_set" type="text" autocomplete="off"
+      <label data-account-field="dav" for="account_home_set">
+        <span>{% trans %}labels.home_set{% endtrans %}</span>
+        <input id="account_home_set" name="home_set" type="text" autocomplete="off"
           autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="/calendars/user/">
       </label>
       <!-- [C7] Refresh interval: numeric keypad on mobile -->
-      <label data-account-field="email">
+      <label data-account-field="email" for="account_refresh_interval">
         <span>{% trans %}labels.refresh_interval_minutes{% endtrans %}</span>
-        <input required name="refresh_interval_minutes" type="number" inputmode="numeric" min="1" max="1440" value="1">
+        <input id="account_refresh_interval" required name="refresh_interval_minutes" type="number" inputmode="numeric" min="1" max="1440" value="1">
       </label>
       <div id="mail_account_error" class="mail-error" aria-live="assertive" hidden></div>
       <div class="contact-dialog-footer">

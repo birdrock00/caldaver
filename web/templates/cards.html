@@ -30,7 +30,7 @@
     </nav>
   </aside>
 
-  <main class="cards-content">
+  <main id="content" class="cards-content">
     <div class="contacts-search-row">
       <div class="contacts-search">
         <i class="fa fa-search"></i>
@@ -112,25 +112,25 @@
           <i class="fa fa-times"></i>
         </button>
       </div>
-      <label>
+      <label for="contact_full_name">
         <span>{% trans %}labels.name{% endtrans %}</span>
-        <input required name="full_name" type="text" autocomplete="name">
+        <input id="contact_full_name" required name="full_name" type="text" autocomplete="name">
       </label>
-      <label>
+      <label for="contact_email">
         <span>{% trans %}labels.email{% endtrans %}</span>
-        <input name="email" type="email" autocomplete="email">
+        <input id="contact_email" name="email" type="email" autocomplete="email">
       </label>
-      <label>
+      <label for="contact_phone">
         <span>{% trans %}labels.phone{% endtrans %}</span>
-        <input name="phone" type="tel" autocomplete="tel">
+        <input id="contact_phone" name="phone" type="tel" autocomplete="tel">
       </label>
-      <label>
+      <label for="contact_organization">
         <span>{% trans %}labels.company{% endtrans %}</span>
-        <input name="organization" type="text" autocomplete="organization">
+        <input id="contact_organization" name="organization" type="text" autocomplete="organization">
       </label>
-      <label>
+      <label for="contact_job_title">
         <span>{% trans %}labels.jobtitle{% endtrans %}</span>
-        <input name="job_title" type="text" autocomplete="organization-title">
+        <input id="contact_job_title" name="job_title" type="text" autocomplete="organization-title">
       </label>
       <div class="contact-dialog-footer">
         <button type="button" id="contact_cancel" class="btn btn-default">{% trans %}labels.cancel{% endtrans %}</button>

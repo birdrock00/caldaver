@@ -47,7 +47,7 @@
        </button>
        </li>
        <li class="mobile-calendar-toolbar-action">
-       <button type="button" id="mobile_calendar_more_action" title="More" aria-label="More">
+        <button type="button" id="mobile_calendar_more_action" title="{% trans %}labels.more{% endtrans %}" aria-label="{% trans %}labels.more{% endtrans %}">
          <i class="fa fa-ellipsis-v"></i>
        </button>
        </li>
@@ -65,7 +65,7 @@
            <nav class="user-menu-list" aria-label="User menu">
              <button type="button" class="user-menu-item user-menu-instance-reset" hidden>
                <i class="fa fa-exchange" aria-hidden="true"></i>
-               <span>Change instance</span>
+                <span>{% trans %}labels.change_instance{% endtrans %}</span>
              </button>
              <a class="user-menu-item user-menu-logout" href="{{ app.url_generator.generate('logout') }}">
                <i class="fa fa-power-off" aria-hidden="true"></i>

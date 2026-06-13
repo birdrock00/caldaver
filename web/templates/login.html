@@ -1,7 +1,7 @@
 {% extends 'layout.html' %}
 
 {% block content %}
-<div class="container">
+<div id="content" class="container">
 
 {% if error is defined %}
 <!-- [C12] Login error region announced to screen readers / mobile assistive tech -->
@@ -45,6 +45,7 @@
 
     <!-- [C3] Primary submit is a full-width, large, type=submit button -->
     <input name="login" value="{% trans %}labels.login{% endtrans %}" type="submit"
+      aria-label="{% trans %}labels.login{% endtrans %}"
       class="btn btn-primary btn-lg btn-block" style="width:100%;">
   </form>
 

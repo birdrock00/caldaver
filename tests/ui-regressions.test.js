@@ -295,10 +295,10 @@ test('preferences account section exposes calendar contacts and email account ma
   const preferences = read('web/templates/preferences.html');
   const server = read('rust/crates/caldaver-server/src/lib.rs');
 
-  assert.match(preferences, /<legend>Accounts<\/legend>/);
-  assert.match(preferences, /Calendar, contacts, and email accounts available to Caldaver/);
+  assert.match(preferences, /<legend>\{% trans %\}labels\.accounts\{% endtrans %\}<\/legend>/);
+  assert.match(preferences, /id="prefs_accounts_intro"\{%\s*trans\s*%\}labels\.accounts_intro/);
   assert.match(preferences, /id="connected_accounts" class="prefs-account-list" aria-live="polite"/);
-  assert.match(preferences, /id="connected_accounts_empty"[\s\S]*No accounts are configured/);
+  assert.match(preferences, /id="connected_accounts_empty"[\s\S]*\{% trans %\}labels\.no_accounts_configured/);
   assert.match(server, /fn preferences_accounts_section\(accounts: &\[ConnectedAccountPublic\]\)/);
   assert.match(server, /accounts\.iter\(\)[\s\S]*\.map\(account_row_html\)/);
 });
@@ -311,7 +311,7 @@ test('unified account dialog supports the three account types', () => {
     assert.match(preferences, new RegExp(`name="account_type" value="${type}"`));
     assert.match(server, new RegExp(`name="account_type" value="${type}"`));
   }
-  assert.match(preferences, /data-account-field="dav"[\s\S]*DAV server URL/);
+  assert.match(preferences, /data-account-field="dav"[\s\S]*\{% trans %\}labels\.dav_server_url/);
   assert.match(preferences, /data-account-field="email"[\s\S]*labels\.imaphost/);
   assert.match(server, /<span>Password or token<\/span>/);
 });

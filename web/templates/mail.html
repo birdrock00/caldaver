@@ -11,12 +11,12 @@
     {% include 'parts/appnav.html' %}
     <button type="button" id="mail_compose" class="mail-mobile-compose-button" aria-label="Compose mail" hidden>
       <i class="fa fa-pencil" aria-hidden="true"></i>
-      <span>Compose</span>
+      <span>{% trans %}labels.compose{% endtrans %}</span>
     </button>
     <nav id="mail_accounts" class="mail-accounts" aria-label="Mail accounts"></nav>
   </aside>
 
-  <main class="mail-content">
+  <main id="content" class="mail-content">
     <div class="mail-search-row">
       <div class="mail-search">
         <i class="fa fa-search"></i>
@@ -41,7 +41,7 @@
           <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.addaccount{% endtrans %}
         </a>
       </div>
-      <div id="mail_loading" class="mail-empty mail-loading-state"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Loading messages...</div>
+      <div id="mail_loading" class="mail-empty mail-loading-state"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> {% trans %}labels.loadingmessages{% endtrans %}</div>
       <div id="mail_no_messages" class="mail-empty mail-empty-state" hidden>{% trans %}labels.nomessages{% endtrans %}</div>
       <div id="mail_error" class="mail-error" hidden></div>
       <div id="mail_rows" class="mail-rows"></div>
@@ -51,39 +51,39 @@
         <button type="button" id="mail_compose_back" aria-label="Back">
           <i class="fa fa-arrow-left" aria-hidden="true"></i>
         </button>
-        <h1>New message</h1>
+        <h1>{% trans %}labels.newmessage{% endtrans %}</h1>
         <button type="button" id="mail_compose_send" aria-label="Send" aria-disabled="true" disabled>
           <i class="fa fa-send" aria-hidden="true"></i>
         </button>
       </div>
       <form id="mail_compose_form" class="mail-compose-form">
         <div class="mail-compose-fields">
-          <label class="mail-compose-from">
-            <span>From</span>
+          <label class="mail-compose-from" for="mail_compose_from">
+            <span>{% trans %}labels.from{% endtrans %}</span>
             <input id="mail_compose_from" type="email" readonly aria-label="From">
           </label>
           <!-- [D7] email recipient fields use the email keyboard, no auto-capitalisation, and "next" go-to-next-field hint -->
-          <label>
-            <span>To</span>
+          <label for="mail_compose_to">
+            <span>{% trans %}labels.to{% endtrans %}</span>
             <input id="mail_compose_to" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" autocapitalize="none" autocorrect="off" spellcheck="false">
-            <button type="button" id="mail_compose_ccbcc" class="mail-compose-ccbcc" aria-expanded="false" aria-controls="mail_compose_cc mail_compose_bcc">Cc/Bcc</button>
+            <button type="button" id="mail_compose_ccbcc" class="mail-compose-ccbcc" aria-expanded="false" aria-controls="mail_compose_cc mail_compose_bcc">{% trans %}labels.ccbcc{% endtrans %}</button>
           </label>
-          <label id="mail_compose_cc_row" hidden>
-            <span>Cc</span>
+          <label id="mail_compose_cc_row" for="mail_compose_cc" hidden>
+            <span>{% trans %}labels.cc{% endtrans %}</span>
             <input id="mail_compose_cc" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" autocapitalize="none" autocorrect="off" spellcheck="false" multiple>
           </label>
-          <label id="mail_compose_bcc_row" hidden>
-            <span>Bcc</span>
+          <label id="mail_compose_bcc_row" for="mail_compose_bcc" hidden>
+            <span>{% trans %}labels.bcc{% endtrans %}</span>
             <input id="mail_compose_bcc" type="email" autocomplete="email" inputmode="email" enterkeyhint="next" autocapitalize="none" autocorrect="off" spellcheck="false" multiple>
           </label>
           <!-- [D7] subject keyboard advances to the message body -->
-          <label>
-            <span>Subject</span>
+          <label for="mail_compose_subject">
+            <span>{% trans %}labels.subject{% endtrans %}</span>
             <input id="mail_compose_subject" type="text" autocomplete="off" enterkeyhint="next" autocapitalize="sentences">
           </label>
         </div>
         <label class="mail-compose-body-label">
-          <span>Message</span>
+          <span>{% trans %}labels.message{% endtrans %}</span>
           <!-- [D7] body keyboard returns a normal newline rather than a submit hint -->
           <textarea id="mail_compose_body" rows="12" aria-label="Message" enterkeyhint="enter" autocapitalize="sentences"></textarea>
         </label>
