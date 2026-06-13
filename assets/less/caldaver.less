@@ -1150,9 +1150,9 @@ body.caldaver-sidebar-collapsed .topbar-menu {
 
 .calendar-sidebar-section.panel {
   margin: 12px 0 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 12px;
   box-shadow: none;
 
   .panel-heading {
@@ -1232,17 +1232,19 @@ body.caldaver-sidebar-collapsed .topbar-menu {
 
 #calendar_view .fc-left {
   order: 1;
+  flex: 1 1 0;
 }
 
 #calendar_view .fc-center {
   order: 2;
-  min-width: 0;
-  margin-left: 8px;
+  flex: 0 1 auto;
+  justify-content: center;
 }
 
 #calendar_view .fc-right {
   order: 3;
-  margin-left: auto;
+  flex: 1 1 0;
+  justify-content: flex-end;
   flex-wrap: nowrap;
 }
 
@@ -2049,6 +2051,12 @@ body.caldaver-sidebar-collapsed .topbar-menu {
   padding: 20px;
   border: 1px solid #e0e7ef;
   border-radius: 8px;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    box-shadow: 0 1px 6px rgba(32,33,36,.12);
+    transform: translateY(-1px);
+  }
 
   .contact-avatar {
     width: 48px;
