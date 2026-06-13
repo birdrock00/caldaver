@@ -273,6 +273,7 @@
       editButton.type = 'button';
       editButton.className = 'contact-edit card-edit';
       editButton.title = 'Edit';
+      editButton.setAttribute('aria-label', 'Edit');
       editButton.innerHTML = '<i class="fa fa-pencil"></i>';
       editButton.addEventListener('click', function() {
         openDialog(contact);
@@ -282,7 +283,8 @@
       var deleteButton = document.createElement('button');
       deleteButton.type = 'button';
       deleteButton.className = 'contact-delete card-delete';
-      deleteButton.title = '{{ 'labels.delete'|trans }}';
+      deleteButton.title = 'Delete';
+      deleteButton.setAttribute('aria-label', 'Delete');
       deleteButton.innerHTML = '<i class="fa fa-trash"></i>';
       deleteButton.addEventListener('click', function(event) {
         deleteContact(contact, event.currentTarget);
