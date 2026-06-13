@@ -2767,14 +2767,28 @@ fn render_preferences(state: &AppState, session: &Session, accounts: &[Connected
             .collect::<Vec<_>>()
             .join("")
     };
+    let timezone_options = {
+        let tzs = available_timezones();
+        let mut opts: Vec<String> = tzs
+            .iter()
+            .map(|tz| {
+                let selected = if *tz == prefs.timezone { r#" selected"# } else { "" };
+                format!(r#"<option value="{tz}"{selected}>{tz}</option>"#)
+            })
+            .collect();
+        if !tzs.contains(&prefs.timezone.as_str()) {
+            opts.insert(0, format!(r#"<option value="{tz}" selected>{tz}</option>"#, tz = escape(&prefs.timezone)));
+        }
+        opts.join("")
+    };
     let content = format!(
         r#"{navbar}<div class="container"><h1>Preferences</h1><div class="preferences-container"><form method="post" id="prefs_form"><input type="hidden" name="_token" value="{csrf}">
-<fieldset class="prefs-section"><legend>General options</legend><div class="form-group"><label for="language">Language</label><select class="form-control" id="language" name="language"><option value="en" selected>English</option></select></div>{radio_date}{radio_time}{radio_week}<div class="form-group"><label for="timezone">Timezone</label><select class="form-control" id="timezone" name="timezone"><option value="{timezone}" selected>{timezone}</option><option value="UTC">UTC</option><option value="America/Los_Angeles">America/Los_Angeles</option></select></div></fieldset>
+<fieldset class="prefs-section"><legend>General options</legend><div class="form-group"><label for="language">Language</label><select class="form-control" id="language" name="language"><option value="en" selected>English</option></select></div>{radio_date}{radio_time}{radio_week}<div class="form-group"><label for="timezone">Timezone</label><select class="form-control" id="timezone" name="timezone">{timezone_options}</select></div></fieldset>
 <fieldset class="prefs-section"><legend>Calendars</legend><div class="form-group"><label for="default_calendar">Default calendar</label><select class="form-control" id="default_calendar" name="default_calendar">{calendar_options}</select></div><div class="form-group"><label for="default_view">Default view</label><select class="form-control" id="default_view" name="default_view"><option value="month" selected>Month</option><option value="week">Week</option><option value="day">Day</option><option value="list">List</option></select></div>{radio_week_nb}{radio_now}<div class="form-group prefs-radio-group" role="radiogroup" aria-labelledby="disable_javascript_label"><div class="prefs-control-label" id="disable_javascript_label">Disable JavaScript</div><label class="radio-inline" for="disable_javascript_yes"><input id="disable_javascript_yes" type="radio" name="disable_javascript" value="true"> Yes</label><label class="radio-inline" for="disable_javascript_no"><input id="disable_javascript_no" type="radio" name="disable_javascript" value="false" checked="checked"> No</label></div><div class="form-group"><label for="list_days">List view days</label><select class="form-control" id="list_days" name="list_days"><option value="7" selected>7 days</option><option value="14">14 days</option><option value="31">31 days</option></select></div></fieldset>
 {accounts_section}<div id="prefs_buttons"><input type="submit" class="btn btn-success" value="Save"><a href="/" id="return_button" class="btn btn-default"><i class="fa fa-calendar"></i> Return</a></div></form></div></div>{account_dialog}"#,
         navbar = navbar(state, session, "calendar"),
         csrf = session.csrf,
-        timezone = escape(&prefs.timezone),
+        timezone_options = timezone_options,
         calendar_options = calendar_options,
         radio_date = pref_radios("date_format", "Date format", &[("ymd", "2026-05-30"), ("dmy", "30/05/2026"), ("mdy", "05/30/2026")], &prefs.date_format),
         radio_time = pref_radios("time_format", "Time format", &[("24", "13:00"), ("12", "01:00 pm")], &prefs.time_format),
