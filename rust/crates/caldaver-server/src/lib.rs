@@ -2698,11 +2698,11 @@ fn render_login(state: &AppState, error: Option<&str>) -> String {
         state,
         "",
         &format!(
-            r#"<a href="#user" class="sr-only sr-only-focusable skip-link">Skip to login form</a><div class="container">{error}
+            r##"<a href="#user" class="sr-only sr-only-focusable skip-link">Skip to login form</a><div class="container">{error}
 <div class="loginform ui-corner-all"><img src="/img/caldaver_300transp.png" alt="Caldaver" style="max-width: 200px; margin-bottom: 16px;"><form method="post" action="/login" class="form-horizontal">
 <div class="form-group"><label class="col-sm-3 control-label" for="user">User name</label><div class="col-sm-9"><input id="user" name="user" class="form-control" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="next" autofocus required></div></div>
 <div class="form-group"><label class="col-sm-3 control-label" for="password">Password</label><div class="col-sm-9" style="position:relative"><input id="password" name="password" class="form-control" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" enterkeyhint="go" required style="padding-right:46px"><button type="button" id="toggle_password" aria-label="Show password" aria-pressed="false" aria-controls="password" style="position:absolute;top:0;right:15px;height:100%;min-width:44px;background:none;border:0;color:#555;cursor:pointer"><i class="fa fa-eye" aria-hidden="true"></i></button></div></div>
-<input name="login" value="Log in" type="submit" class="btn btn-primary btn-lg btn-block"></form></div></div>"#,
+<input name="login" value="Log in" type="submit" class="btn btn-primary btn-lg btn-block"></form></div></div>"##,
             error = error_html
         ),
         password_toggle_script,
