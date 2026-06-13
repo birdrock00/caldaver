@@ -257,6 +257,15 @@ $(document).ready(function() {
     viewRender: function(view, element) {
       sync_mobile_calendar_chrome(view);
       insert_mobile_previous_events_row(view);
+
+      var cal = $('#calendar_view');
+      var todayBtn = cal.find('.fc-today-button');
+      var now = moment.tz(calendar_timezone());
+      var viewContainsToday = view.start <= now && now <= view.end;
+      if (!viewContainsToday && todayBtn.length) {
+        todayBtn.removeClass('ui-state-disabled fc-state-disabled')
+                .prop('disabled', false);
+      }
     },
     eventAfterAllRender: function(view) {
       insert_mobile_previous_events_row(view);
