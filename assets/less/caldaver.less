@@ -1452,12 +1452,12 @@ body.caldaver-sidebar-collapsed .topbar-menu {
 #calendar_view .ui-widget-header,
 #calendar_view .ui-widget-content {
   background: #fff;
-  border-color: #e0e7ef;
+  border: 1px solid #dadce0;
 }
 
 #calendar_view .fc-head td,
 #calendar_view .fc-head th {
-  border-color: #e0e7ef;
+  border: 1px solid #dadce0;
 }
 
 #calendar_view .fc-day-header {
@@ -1477,7 +1477,26 @@ body.caldaver-sidebar-collapsed .topbar-menu {
 
 #calendar_view .fc-time-grid .fc-slats td {
   height: 42px;
-  border-color: #e0e7ef;
+  border-color: #dadce0;
+}
+
+#calendar_view .fc-time-grid .fc-slats .fc-minor td {
+  border-top-style: dotted;
+}
+
+#calendar_view .fc-time-grid .fc-slats .fc-minor td,
+#calendar_view .fc-day-grid .fc-week-number {
+  border-color: #ebeef2;
+}
+
+#calendar_view .fc-time-grid-axis,
+#calendar_view .fc-axis {
+  border-color: #dadce0;
+}
+
+#calendar_view .fc-bg td.fc-day,
+#calendar_view .fc-bg table td {
+  border-color: #dadce0;
 }
 
 #calendar_view .fc-time-grid-event,
