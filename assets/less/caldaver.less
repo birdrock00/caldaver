@@ -433,6 +433,13 @@ div.preferences-container {
 .prefs-radio-group .radio-inline {
   min-height: 36px;
   padding: 6px 12px 6px 0;
+
+  input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin-top: -2px;
+    vertical-align: middle;
+  }
 }
 
 .prefs-accounts-header {
@@ -1208,7 +1215,8 @@ body.caldaver-sidebar-collapsed .topbar-menu {
   display: flex;
   min-height: 58px;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  position: relative;
   margin: 0;
   padding: 8px 20px;
   color: #3c4043;
@@ -1231,20 +1239,18 @@ body.caldaver-sidebar-collapsed .topbar-menu {
 }
 
 #calendar_view .fc-left {
-  order: 1;
-  flex: 1 1 0;
+  position: absolute;
+  left: 20px;
 }
 
 #calendar_view .fc-center {
-  order: 2;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   justify-content: center;
 }
 
 #calendar_view .fc-right {
-  order: 3;
-  flex: 1 1 0;
-  justify-content: flex-end;
+  position: absolute;
+  right: 20px;
   flex-wrap: nowrap;
 }
 
@@ -1499,6 +1505,13 @@ body.caldaver-sidebar-collapsed .topbar-menu {
 #calendar_view .fc-bg td.fc-day,
 #calendar_view .fc-bg table td {
   border-color: #dadce0;
+}
+
+#calendar_view .fc-day.fc-sun,
+#calendar_view .fc-day.fc-sat,
+#calendar_view .fc-bg .fc-sun,
+#calendar_view .fc-bg .fc-sat {
+  background: #f8f9fa;
 }
 
 #calendar_view .fc-time-grid-event,
@@ -1825,12 +1838,12 @@ body.caldaver-sidebar-collapsed .topbar-menu {
   }
 
   &.muted {
-    color: #9aa0a6;
+    color: #5f6368;
     cursor: not-allowed;
     opacity: .78;
 
     i {
-      color: #bdc1c6;
+      color: #80868b;
     }
   }
 }
@@ -1980,6 +1993,7 @@ body.caldaver-sidebar-collapsed .topbar-menu {
   padding: 0 24px;
   color: #202124;
   font-size: 14px;
+  cursor: pointer;
 
   &:hover {
     background: #f8fafd;
