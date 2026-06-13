@@ -394,6 +394,13 @@ $(document).ready(function() {
     },
     true);
 
+  $('.fc-prev-button').attr('aria-label', 'Previous');
+  $('.fc-next-button').attr('aria-label', 'Next');
+  $('.fc-today-button').attr('aria-label', 'Today');
+  $('.fc-month-button').attr('aria-label', 'Month view');
+  $('.fc-agendaWeek-button').attr('aria-label', 'Week view');
+  $('.fc-agendaDay-button').attr('aria-label', 'Day view');
+
 
   /*************************************************************
    * Keyboard shortcuts
