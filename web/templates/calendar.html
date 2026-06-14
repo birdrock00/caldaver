@@ -52,6 +52,14 @@
   <div id="mobile_ptr" class="mobile-ptr" aria-hidden="true" hidden>
     <i class="fa fa-refresh" aria-hidden="true"></i>
   </div>
+
+  {# [B5] Universal "Create event" FAB. Lives at the page top level (not the
+     sidebar) so it stays reachable as a fixed floating action button on every
+     viewport. app.js binds #shortcut_add_event by id. #}
+  <button id="shortcut_add_event" class="create-event-button" aria-label="{% trans %}labels.createevent{% endtrans %}" title="{% trans %}labels.createevent{% endtrans %}">
+    <i class="fa fa-plus" aria-hidden="true"></i>
+    <span class="visually-hidden">{% trans %}labels.createevent{% endtrans %}</span>
+  </button>
 {% endblock %}
 
 {% block bottom %}

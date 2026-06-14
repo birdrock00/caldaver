@@ -1155,6 +1155,58 @@ body.caldaver-sidebar-collapsed .topbar-menu {
   }
 }
 
+// [B8] Universal "Create event" FAB. The button is rendered at the page top
+// level (not inside the sidebar) so it can float at a fixed position over the
+// calendar on every viewport. Round blue FAB bottom-right.
+#shortcut_add_event.create-event-button {
+  position: fixed;
+  right: ~"calc(24px + env(safe-area-inset-right))";
+  bottom: ~"calc(24px + env(safe-area-inset-bottom))";
+  z-index: 900;
+  width: 56px;
+  min-width: 56px;
+  height: 56px;
+  padding: 0;
+  color: transparent;
+  background: #1a73e8;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, .28);
+  overflow: hidden;
+  display: inline-block;
+
+  > i {
+    margin: 0;
+    color: #fff;
+    font-size: 24px;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+  }
+}
+
+// [B8] Hide the universal FAB under modals on every viewport (not only mobile)
+// so it never covers the event editor's Cancel button. Mirrors the mobile-only
+// rule in caldaver-mobile.less.
+body:has(.ui-widget-overlay) #shortcut_add_event.create-event-button,
+body:has(.modal.in) #shortcut_add_event.create-event-button {
+  display: none !important;
+}
+
+// [B8] #shortcut_add_event is now the universal FAB. Suppress the legacy
+// #mobile_fab_add (.mobile-fab) so mobile.js never reveals a second FAB.
+.mobile-fab {
+  display: none !important;
+}
+
 .calendar-sidebar-section.panel {
   margin: 12px 0 0;
   background: #fff;
@@ -3632,10 +3684,12 @@ summary:focus-visible,
     height: 56px;
     padding: 0;
     color: transparent;
-    background: #7e7aa7;
+    background: #1a73e8;
     border-radius: 50%;
     box-shadow: 0 4px 10px rgba(0, 0, 0, .28);
     overflow: hidden;
+    bottom: ~"calc(72px + env(safe-area-inset-bottom))";
+    z-index: 2500;
 
     i {
       margin: 0;

@@ -496,7 +496,7 @@ $(document).ready(function() {
   });
 
   // Create calendar
-  $('#calendar_add')
+  $('#shared_calendar_add')
     .on('click', calendar_create_dialog);
 
   /*************************************************************
@@ -1629,8 +1629,14 @@ var update_calendar_list = function update_calendar_list(maskbody) {
     $('#calendar_view').data('calendar-count', count);
     $('.calendar-list-loading').remove();
 
-    $('#own_calendar_list ul')[0]
-      .appendChild(own_calendars);
+    // [B4] #own_calendar_list was removed from the sidebar; only shared
+    // calendars are listed now. Guard the append so personal calendars still
+    // feed FullCalendar via collected_event_sources without touching a node
+    // that no longer exists.
+    var $ownUl = $('#own_calendar_list ul');
+    if ($ownUl[0]) {
+      $ownUl[0].appendChild(own_calendars);
+    }
 
     // Hide unused block
     if (count_shared === 0) {
