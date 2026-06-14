@@ -1,27 +1,6 @@
 {% include 'parts/sidebrand.html' %}
 {% set active_section = 'calendar' %}
 {% include 'parts/appnav.html' %}
-<div id="shortcuts" class="block">
-   <button id="shortcut_add_event" class="btn btn-default btn-block create-event-button">
-     <i class="fa fa-plus"></i> {% trans %}labels.createevent{% endtrans %}
-   </button>
- </div>
-
- <div class="block calendar_list panel panel-default calendar-sidebar-section" id="own_calendar_list">
-  <div class="panel-heading">
-    <h3 class="panel-title">{% trans %}labels.calendars{% endtrans %}</h3>
-  </div>
-  <div class="panel-body">
-    <ul class="fa-ul">
-     <li class="calendar-list-loading"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Loading calendars...</li>
-    </ul>
-   <div class="buttons">
-   <button type="button" title="{% trans from "labels" %}create{% endtrans %}" aria-label="{% trans from "labels" %}create{% endtrans %}" id="calendar_add" class="pseudobutton">
-     <i class="fa fa-plus" aria-hidden="true"></i>
-   </button>
-   </div>
-  </div><!-- panel-body -->
- </div><!-- panel -->
 
  <div class="block calendar_list panel panel-default shared_calendars calendar-sidebar-section" id="shared_calendar_list">
   <div class="panel-heading">
@@ -32,6 +11,9 @@
      <li class="calendar-list-loading"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> Loading shared calendars...</li>
     </ul>
    <div class="buttons">
+    <button type="button" id="shared_calendar_add" class="pseudobutton" title="{% trans from "labels" %}create{% endtrans %}" aria-label="{% trans from "labels" %}create{% endtrans %}">
+      <i class="fa fa-plus" aria-hidden="true"></i>
+    </button>
     <button type="button" id="toggle_all_shared_calendars" class="pseudobutton hide_all"
       title="{% trans %}labels.toggleallcalendars{% endtrans %}"
       aria-label="{% trans %}labels.toggleallcalendars{% endtrans %}"
@@ -39,9 +21,3 @@
    </div>
   </div><!-- panel-body -->
  </div><!-- panel -->
-
- <div id="footer">
-   {% if footer %}
-   <p>{{ footer|raw }}</p>
-   {% endif %}
- </div> <!-- footer -->

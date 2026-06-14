@@ -22,7 +22,7 @@ async function login(page) {
       return false;
     }
 
-    const calendarAdd = document.querySelector('#calendar_add');
+    const calendarAdd = document.querySelector('#shared_calendar_add');
     const events = calendarAdd && window.jQuery._data(calendarAdd, 'events');
     return !!(events && events.click && events.click.length > 0);
   });
@@ -492,7 +492,7 @@ async function dispatchDoubleTouchTap(page, selector) {
 test('calendar create and event create controls open usable dialogs', async ({ page }) => {
   const pageErrors = await login(page);
 
-  await page.locator('#calendar_add').click();
+  await page.locator('#shared_calendar_add').click();
   await expect(page.locator('#calendar_create_dialog')).toBeVisible();
   await expect(page.locator('#calendar_create_form')).toHaveAttribute('action', /\/calendars\/save$/);
   await page.getByRole('button', { name: /cancel/i }).last().click();
@@ -723,7 +723,7 @@ test('preferences topbar actions stay in one horizontal row with user logout men
   await page.goto(`${baseURL}/preferences`);
 
   const menu = page.locator('.mobile-section-menu');
-  const brand = page.locator('.caldaver-brand-title');
+  const brand = page.locator('.navbar-brand');
   const prefs = page.locator('#usermenu .prefs');
   const user = page.locator('#usermenu .user-pill');
   const logout = page.locator('#usermenu .user-menu-logout');
@@ -767,7 +767,7 @@ test('very narrow mobile topbar keeps menu, logo, preferences, and username on o
 
   const selectors = [
     '.mobile-section-menu',
-    '.caldaver-brand-title',
+    '.navbar-brand',
     '#usermenu .prefs',
     '#usermenu .user-pill'
   ];
@@ -797,7 +797,7 @@ test('login form labels do not overlap input fields', async ({ page }) => {
   await page.setViewportSize({ width: 486, height: 240 });
   await page.goto(`${baseURL}/login`);
 
-  await expect(page.locator('.caldaver-sidebrand')).toHaveText('Caldaver');
+  await expect(page.locator('.caldaver-sidebrand')).toHaveCount(0);
   const userLabel = await visibleBox(page, 'label[for="user"]');
   const userInput = await visibleBox(page, 'input[name="user"]');
   const passwordLabel = await visibleBox(page, 'label[for="password"]');
@@ -820,7 +820,7 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
   await login(page);
   await page.goto(`${baseURL}/`);
 
-  await expect(page.locator('.caldaver-brand-title')).toHaveText('Caldaver');
+  await expect(page.locator('.caldaver-brand-title')).toHaveCount(0);
   await expect(page.locator('.mobile-section-menu')).toBeVisible();
   await expect(page.locator('.caldaver-brand-icon')).toHaveCount(0);
   await expect(page.locator('#usermenu .prefs')).toBeHidden();
@@ -828,7 +828,7 @@ test('mobile layout uses topbar section menu and keeps calendar and contacts scr
   await expect(page.locator('#mobile_calendar_date_action')).toBeVisible();
   await expect(page.locator('#mobile_calendar_more_action')).toBeVisible();
   await expect(page.locator('#sidebar .app-nav')).toBeHidden();
-  await expect(page.locator('#own_calendar_list')).toBeHidden();
+  await expect(page.locator('#own_calendar_list')).toHaveCount(0);
 
   const menuBox = await visibleBox(page, '.mobile-section-menu');
   const brand = await visibleBox(page, '.mobile-calendar-toolbar-title');
@@ -945,7 +945,7 @@ test('desktop layout keeps side navigation after mobile changes', async ({ page 
 
   await expect(page.locator('.mobile-section-menu')).toBeHidden();
   await expect(page.locator('#sidebar .app-nav')).toBeVisible();
-  await expect(page.locator('#sidebar .caldaver-sidebrand')).toHaveText('Caldaver');
+  await expect(page.locator('#sidebar .caldaver-sidebrand')).toHaveCount(0);
 
   const sidebar = await visibleBox(page, '#sidebar');
   const content = await visibleBox(page, '#content');
@@ -954,7 +954,7 @@ test('desktop layout keeps side navigation after mobile changes', async ({ page 
   await page.goto(`${baseURL}/cards`);
   await expect(page.locator('.mobile-section-menu')).toBeHidden();
   await expect(page.locator('.cards-sidebar .app-nav')).toBeVisible();
-  await expect(page.locator('.cards-sidebar .caldaver-sidebrand')).toHaveText('Caldaver');
+  await expect(page.locator('.cards-sidebar .caldaver-sidebrand')).toHaveCount(0);
   await expect(page.locator('#contacts_rows .contact-row')).toHaveCount(8);
 
   const cardsSidebar = await visibleBox(page, '.cards-sidebar');
