@@ -1,156 +1,330 @@
-# Caldaver - CalDAV web client
+# Caldaver
 
-[![Build Status](https://github.com/caldaver-app/caldaver/actions/workflows/ci.yml/badge.svg)](https://github.com/caldaver-app/caldaver/actions)
-[![Made With](https://img.shields.io/badge/made_with-rust-orange)](https://github.com/caldaver-app/caldaver#requirements)
-[![License](https://img.shields.io/badge/license-gpl--3.0--or--later-blue.svg)](https://spdx.org/licenses/GPL-3.0-or-later.html)
+[![CI](https://github.com/caldaver-app/caldaver/actions/workflows/daily-release.yml/badge.svg)](https://github.com/caldaver-app/caldaver/actions/workflows/daily-release.yml)
+[![Made with Rust](https://img.shields.io/badge/made_with-rust-orange)](https://www.rust-lang.org/)
+[![PostgreSQL](https://img.shields.io/badge/postgres-required-336791)](https://www.postgresql.org/)
+[![Capacitor](https://img.shields.io/badge/android-capacitor-1199EE)](https://capacitorjs.com/)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](https://spdx.org/licenses/GPL-3.0-or-later.html)
 
-Caldaver is a CalDAV web client served by a Rust backend with an AJAX interface
-for calendars, contacts, preferences, and mail.
+A CalDAV/CardDAV/IMAP web client served by a Rust backend, packaged as a
+container image and a Capacitor-based Android APK, with PostgreSQL as the
+runtime store for sessions, preferences, share state, account credentials, and
+cached mail metadata.
 
-![Screenshot](./docs/screenshot.png)
+![Caldaver screenshot](./docs/screenshot.png)
 
-## What Changed In This Fork
+The current UI is a clean, mobile-friendly shell: a top app bar with a section
+menu, an application sidebar (Calendar / Contacts / Mail), a Shared Calendars
+panel with a `+` button to add new shared calendars, a fixed blue **Create
+event** floating action button that is reachable on every viewport, and no
+page chrome beyond the workspace itself (no Caldaver logo, no navbar
+wordmark, no footer).
 
-This fork has moved beyond the original AgenDAV codebase:
+## Features
 
-- The backend has been migrated to Rust. The `caldaver-server` crate now serves
-  the web app, static assets, sessions, CalDAV/CardDAV proxy behavior,
-  preferences, calendar sharing, contact lookup, and mail account/message APIs.
-- Shared domain logic lives in `caldaver-core`, including CalDAV filtering and
-  resources, CardDAV parsing, XML generation/parsing, preferences, reminders,
-  shares, and IMAP account validation.
-- PostgreSQL is now the runtime store for sessions, preferences, shares,
-  CalDAV/CardDAV account credentials, mail accounts, and cached mail metadata.
-- The legacy backend, dependency runtime, bundled Ansible example, and old
-  web-server Docker runtime have been removed from the active application path.
-- The Docker image now builds frontend assets, compiles the Rust server, and
-  runs `caldaver-server` directly on port `8080`.
-- Capacitor Android support builds a Caldaver APK from the same web assets and
-  asks for the Caldaver instance URL on first launch.
-- Android Appium and ADB smoke tests validate the installed APK and WebView
-  behavior against a live backend.
-- GitHub releases are produced when release artifacts are published. Each dated
-  release includes source archives, the built Android APK, Docker image tags,
-  and release notes listing the commits since the previous dated release.
+### Calendar (CalDAV)
 
-## Requirements
+- Multiple calendars per user, with calendar create / edit / delete
+- Color picker, display name, and per-calendar timezone
+- **Shared Calendars** sidebar with a `+` button to add a new shared calendar
+  and a show/hide toggle for the full set
+- Calendar sharing UI: invite other users read-only or read-write via
+  jQuery-UI autocomplete wired to `/principals`
+- Read-only badge for calendars that are shared *to* the current user
+- Month, week, day, and list views
+- Recurring events (RRULE) with separate handling for *one instance* vs.
+  *the whole series* on edit and delete
+- Reminders stored with the event (minutes / hours / days / weeks / months
+  before start)
+- Drag-and-drop and resize on the calendar grid
+- All-day and timed events with timezone-aware start/end
+- Public CalDAV URL display in calendar settings
+- Optional calendar sharing (gated by `CALDAVER_CALENDAR_SHARING`)
 
-Caldaver requires:
+### Contacts (CardDAV)
 
-- A CalDAV server like [Baïkal](http://baikal-server.com/),
-  [DAViCal](http://www.davical.org/),
-  [Radicale](https://radicale.org/tutorial/), etc
-- PostgreSQL for sessions, preferences, CalDAV/CardDAV account credentials,
-  mail accounts, and cached mail metadata
-- Rust stable for source builds
-- Optional: nodejs & npm to build assets (releases include a build)
-- Optional: Android SDK, Java 21, and Node.js when building the Android APK
+- CardDAV account discovery with home-set detection
+- Default addressbook auto-provisioning on first connect
+- List view and cards view, with a search field
+- Contact create / edit / delete via the in-page dialog
+- Editable fields: full name, email, phone, organization, job title
+- Avatars with deterministic initial + color
+- Server-side CRUD against the configured CardDAV server (Radicale, Baïkal,
+  DAViCal, etc.)
 
-## Documentation
+### Mail (IMAP)
 
-Current installation and configuration notes are in `doc/source/admin/`.
+- Per-user IMAP accounts, managed from **Preferences &rarr; Accounts**
+- Multi-account sidebar; switch accounts without losing context
+- Cached inbox overview for fast reloads, plus an explicit `sync` endpoint
+  for a fresh IMAP fetch
+- Message reader with plain-text and HTML (sandboxed iframe) bodies
+- Attachment download via `/mail/attachment`
+- Inline-image proxy via `/mail/image` with an SSRF guard
+- Mark unread, navigation to previous/next message
+- Compose and reply UI (To, CC/BCC, subject, body)
+- Refresh interval per account (1 minute – 24 hours)
 
-## Installation
+### Preferences and Accounts
 
-See [doc/source/admin/installation.rst](./doc/source/admin/installation.rst).
+- **General options**: language, date format (`ymd` / `dmy` / `mdy`), time
+  format (`24` / `12`), week start (Sunday / Monday), timezone
+- **Calendars**: default calendar, default view, week numbers, now-line
+  indicator, list-view window (7 / 14 / 31 days), JavaScript toggle for
+  the no-JS fallback
+- **Accounts**: a single combined dialog to add or update a CalDAV, CardDAV,
+  or email account, with per-row display of the server, identifier, home
+  set, and last error
+- Per-user preferences persisted in PostgreSQL; preserved across sessions
 
-### Docker Image
+### Calendar sharing
 
-This fork includes a Docker image published to GitHub Container Registry as
-`ghcr.io/caldaver-app/caldaver`. Daily builds are tagged with the UTC date in
-`YYYY-MM-DD` format and the newest build is also tagged as `latest`.
+- The **Shared Calendars** panel is the primary entry point for new shares
+  (`+` button)
+- Sharing dialog tab exposes the per-calendar share list with read-only and
+  read-write roles
+- Principal lookup via `/principals` for share-recipient autocomplete
+- Calendar payloads expose `is_shared`, `is_owned`, `writable`, and the
+  resolved owner display name
 
-The Docker image builds the frontend assets, compiles `caldaver-server`, and
-runs the Rust backend directly on port `8080`.
+### UI and UX
 
-When the release workflow publishes a Docker image, it also builds the Android
-APK and updates GitHub Releases. The dated release is the durable release record;
-`latest` is updated to point at the newest artifact set.
+- AJAX interface built on jQuery 3, Bootstrap 5, FullCalendar 3, and Dust.js
+  templates compiled to a single JavaScript bundle
+- Less-based theming; CSS minified with `cleancss`
+- UglifyJS minified production bundle (`caldaver.min.js`)
+- Mobile-first layout with a bottom mobile action bar (prev / today / view /
+  refresh / next) and a floating **+** for quick create
+- Pull-to-refresh on the calendar
+- Mobile-aware input hints (`inputmode`, `autocomplete`, `enterkeyhint`,
+  `autocapitalize`, `autocorrect`) on account, mail, and contact forms
+- Accessible: ARIA roles/labels, `aria-describedby` on form fields, focus
+  management on dialogs
+- No-JS fallback: setting `CALDAVER_DISABLE_JAVASCRIPT=true` (or
+  `?nojs=1`) renders a minimal HTML view
 
-Required runtime configuration:
+### Security
 
-- Postgres configuration, either `CALDAVER_DATABASE_URL` or all of `CALDAVER_DB_HOST`, `CALDAVER_DB_NAME`, `CALDAVER_DB_USER`, and `CALDAVER_DB_PASSWORD`
-- `CALDAVER_CSRF_SECRET`, set to a persistent secret value and keep it stable across redeployments
-- `CALDAVER_MAIL_PASSWORD_KEY`, set from a Kubernetes Secret or equivalent
-  runtime secret. Use at least 32 bytes of random material and keep it stable
-  across redeployments.
+- CSRF token issued per session and required on every state-changing form
+- Session cookies with `HttpOnly`, `SameSite=Lax`, `Max-Age`, and conditional
+  `Secure` (controlled by `CALDAVER_COOKIE_SECURE`)
+- AES-256-GCM encryption for stored CalDAV, CardDAV, and IMAP account
+  credentials, with random nonces
+- `CALDAVER_MAIL_PASSWORD_KEY` (&ge; 32 bytes) is the sole source of the
+  encryption key; the server fails closed if the key is missing or short
+- Optional PBKDF2-SHA256 password hash for local login
+  (`CALDAVER_AUTH_PASSWORD_HASH`); constant-time comparison
+- SSRF guard for user-supplied DAV server URLs: rejects loopback, link-local,
+  RFC1918, multicast, and other blocked ranges by default; homelab hosts can
+  be added with `CALDAVER_DAV_HOST_ALLOWLIST`
+- SSRF guard for the mail image proxy
+- HTML mail rendered in a sandboxed iframe with `referrerpolicy="no-referrer"`
+- `x-content-type-options: nosniff` on attachment and image responses
+- Database schema is created and migrated automatically at startup
 
-PostgreSQL stores CalDAV, CardDAV, and email account credentials. Configure
-those accounts from **Preferences > Accounts**. Do not store CalDAV, CardDAV, or email account passwords in Kubernetes secrets or container environment variables.
-Existing DAV credentials found in a login session or legacy runtime configuration
-are migrated once into Postgres and runtime DAV/mail access uses the stored
-account rows after that migration.
-Stored account credentials are encrypted with AES-256-GCM using random nonces.
-The encryption key is derived from `CALDAVER_MAIL_PASSWORD_KEY`; the server
-fails closed when that key is missing or shorter than 32 bytes. The local login
-password must never be used as an encryption-key fallback.
+### Mobile / Android
 
-Common optional runtime configuration:
+- Capacitor 8 wrapper around `web/public` (no native UI of its own)
+- First launch prompts for the Caldaver instance URL; the URL is stored on
+  the device and used on subsequent launches
+- User menu exposes a **Change instance** action that clears the saved URL
+  and returns to the setup screen
+- Bottom mobile action bar and floating create button for thumb reach
+- Android SDK 36, Java 21, Gradle; APK signed via `KEYSTORE_BASE64`,
+  `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` workflow secrets
+- Appium-based smoke test (UIAutomator2 driver) verifies the installed APK
+  and the WebView against a live backend
 
-- `CALDAVER_AUTH_USERNAME` and `CALDAVER_AUTH_PASSWORD`, when local login should be restricted to one account
-- `CALDAVER_CALDAV_SERVER`, optional DAV base URL used only as a bootstrap/default server URL before an account has been saved in Postgres
-- `CALDAVER_CARDDAV_SERVER`, optional CardDAV bootstrap/default server URL that defaults to `CALDAVER_CALDAV_SERVER`
-- `CALDAVER_CALDAV_PUBLIC_URL`, optional public CalDAV URL shown to users
-- `CALDAVER_SESSION_LIFETIME`, defaults to 30 days. Login sessions are persisted in PostgreSQL and survive server restarts. Session cookies include a `Max-Age` matching the configured lifetime, so closing the browser does not require re-authentication.
-- `CALDAVER_TITLE`, defaults to `Caldaver`
-- `CALDAVER_FOOTER`, defaults to `Caldaver`
-- `CALDAVER_BIND`, defaults to `0.0.0.0:8080`
-- `CALDAVER_STATIC_ROOT`, defaults to `/var/www/caldaver/web/public` in the image
-- `CALDAVER_TIMEZONE`, defaults to `UTC`
+### Deployment
 
-Example:
+- Multi-stage `Dockerfile` (Node 22 &rarr; Rust stable &rarr; debian-slim)
+- Published to `ghcr.io/caldaver-app/caldaver`, tagged with the UTC date
+  (`YYYY-MM-DD`), a unique release tag (`YYYY-MM-DD-HHMMSS`), and `latest`
+- Image listens on `0.0.0.0:8080` and runs as the unprivileged `nobody` user
+- Releases also include the Android APK and GitHub-generated source
+  archives (see [Releases](#releases))
+- Health probe: `GET /__rust/health` returns `{"ok": true, "backend": "rust"}`
+- Sessions persist in PostgreSQL and survive server restarts
+- Cookie lifetime is aligned with `CALDAVER_SESSION_LIFETIME` (default 30
+  days); closing the browser does not invalidate the session
+
+## Quick Start
+
+Pull and run the published image with a local PostgreSQL instance. Caldaver
+needs three environment variables at minimum: a database URL, a CSRF secret,
+and a 32-byte-or-longer account-credential encryption key.
 
 ```sh
 docker run -d --name caldaver \
   -p 8080:8080 \
-  -e CALDAVER_DATABASE_URL=postgres://example.test/caldaver \
-  -e CALDAVER_CSRF_SECRET=<SET_ME> \
-  -e CALDAVER_MAIL_PASSWORD_KEY=change-this-32-byte-minimum-secret \
-  -e CALDAVER_TITLE=Caldaver \
-  -e CALDAVER_AUTH_USERNAME=local-user \
-  -e CALDAVER_AUTH_PASSWORD=change-this \
+  -e CALDAVER_DATABASE_URL=postgres://caldaver:secret@db.example.test:5432/caldaver \
+  -e CALDAVER_CSRF_SECRET=$(openssl rand -hex 32) \
+  -e CALDAVER_MAIL_PASSWORD_KEY=$(openssl rand -hex 32) \
   ghcr.io/caldaver-app/caldaver:latest
 ```
 
-### Android APK
+Open <http://localhost:8080/>, sign in, and add your CalDAV, CardDAV, and
+IMAP accounts from **Preferences &rarr; Accounts**. Account credentials are
+encrypted in PostgreSQL &mdash; do not put them in the container environment.
 
-The Android app is a Capacitor wrapper around the Caldaver web UI. The APK does
-not bake in a deployment URL. On first launch, enter the Caldaver instance URL;
-the app saves it on the device and opens that instance on later launches.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `CALDAVER_DATABASE_URL` | yes (or `CALDAVER_DB_*`) | PostgreSQL connection string |
+| `CALDAVER_CSRF_SECRET` | yes | Stable secret for CSRF / session protection |
+| `CALDAVER_MAIL_PASSWORD_KEY` | yes | &ge; 32 bytes; encrypts stored account credentials |
 
-Useful commands:
+See [Configuration](#configuration) for the full list and the [Installation
+guide](./doc/source/admin/installation.rst) for production guidance.
+
+## Installation
+
+Detailed, versioned installation instructions live in
+[`doc/source/admin/installation.rst`](./doc/source/admin/installation.rst). The
+short version:
+
+- **Container** (recommended): pull `ghcr.io/caldaver-app/caldaver:latest`,
+  set the three required environment variables, and point the image at
+  PostgreSQL. The server creates its tables automatically.
+- **From source**: requires Rust stable, Node.js 22 + npm, and PostgreSQL.
+  `npm install && npm run build` builds the frontend assets, then
+  `cargo run --manifest-path rust/Cargo.toml --bin caldaver-server` starts
+  the Rust backend.
+- **Reverse proxy**: put your TLS terminator in front of the bind address
+  (default `0.0.0.0:8080`).
+
+Upgrading between releases is a pull-and-restart; the server applies schema
+updates at startup. See
+[`doc/source/admin/upgrading.rst`](./doc/source/admin/upgrading.rst).
+
+## Configuration
+
+Caldaver is configured through environment variables. The full reference is
+in [`doc/source/admin/configuration.rst`](./doc/source/admin/configuration.rst).
+The high-level groups are:
+
+- **Application** &mdash; `CALDAVER_TITLE`, `CALDAVER_FOOTER`, `CALDAVER_BIND`,
+  `CALDAVER_STATIC_ROOT`, `CALDAVER_TIMEZONE`, `CALDAVER_LANG`,
+  `CALDAVER_WEEKSTART`, `CALDAVER_DEFAULT_VIEW`,
+  `CALDAVER_DISABLE_JAVASCRIPT`
+- **Auth** &mdash; `CALDAVER_AUTH_USERNAME` / `CALDAVER_AUTH_PASSWORD` (or
+  `CALDAVER_AUTH_PASSWORD_HASH` for PBKDF2-SHA256), `CALDAVER_COOKIE_SECURE`,
+  `CALDAVER_SESSION_LIFETIME`, `CALDAVER_LOGOUT_REDIRECTION`
+- **DAV bootstrap** &mdash; `CALDAVER_CALDAV_SERVER`,
+  `CALDAVER_CARDDAV_SERVER`, `CALDAVER_CALDAV_PUBLIC_URL`,
+  `CALDAVER_CALDAV_USERNAME` / `CALDAVER_CALDAV_PASSWORD` (bootstrap only;
+  see *Account credentials* below), `CALDAVER_CALDAV_AUTHMETHOD`,
+  `CALDAVER_CALDAV_CONNECT_TIMEOUT`,
+  `CALDAVER_CALDAV_RESPONSE_TIMEOUT`,
+  `CALDAVER_CALDAV_CERTIFICATE_VERIFY`, `CALDAVER_DAV_HOST_ALLOWLIST`
+- **Sharing** &mdash; `CALDAVER_CALENDAR_SHARING` toggles the share UI
+- **Database** &mdash; `CALDAVER_DATABASE_URL` or `CALDAVER_DB_HOST` /
+  `CALDAVER_DB_NAME` / `CALDAVER_DB_USER` / `CALDAVER_DB_PASSWORD` /
+  `CALDAVER_DB_PORT`
+
+### Account credentials
+
+CalDAV, CardDAV, and email account passwords are **not** read from the
+container environment. PostgreSQL stores them, encrypted with AES-256-GCM
+using the key derived from `CALDAVER_MAIL_PASSWORD_KEY`. Add and maintain
+those accounts from **Preferences &rarr; Accounts**. Legacy credentials
+that were set through environment variables or kept in a login session are
+migrated once into PostgreSQL on first run; after that, all runtime access
+goes through the stored account rows.
+
+## Build from Source
+
+Prerequisites: Rust stable (see `rust-toolchain.toml`), Node.js 22, npm, and
+PostgreSQL 14+.
 
 ```sh
+# 1. Frontend
 npm install
+npm run build           # templates + css + js (minified)
+
+# 2. Backend
+cargo build --release --manifest-path rust/Cargo.toml --bin caldaver-server
+
+# 3. Run
+CALDAVER_DATABASE_URL=postgres://caldaver:secret@localhost:5432/caldaver \
+CALDAVER_CSRF_SECRET=$(openssl rand -hex 32) \
+CALDAVER_MAIL_PASSWORD_KEY=$(openssl rand -hex 32) \
+  cargo run --release --manifest-path rust/Cargo.toml --bin caldaver-server
+```
+
+Frontend tests:
+
+```sh
+npm run test                # node:test unit suite
+npm run test:live-ui        # Playwright against a running server
+```
+
+Backend tests:
+
+```sh
+npm run test:rust           # cargo test for the whole workspace
+```
+
+## Android
+
+The `android/` directory holds a Capacitor 8 project. The build script
+packages `web/public` into a single signed APK that asks for the Caldaver
+instance URL on first launch.
+
+```sh
+# Build a debug APK
 npm run android:apk
+
+# Run the emulator-based Appium smoke test
+npm run android:emulator
 ANDROID_UDID=emulator-5554 npm run android:adb-smoke
 ```
 
-Use the Android user menu's "Change instance" action to clear the saved URL and
-return to setup.
+The APK does **not** bake in a deployment URL. The first launch shows a
+setup screen; the URL is stored on the device and opened on subsequent
+launches. The user menu's **Change instance** action (visible on Android
+only) clears the saved URL and returns to setup.
 
-### Releases
+CI also produces a release APK. Each dated release attaches
+`caldaver-android-<release-tag>.apk` to the matching GitHub release.
 
-The release workflow publishes a complete artifact set from the same commit:
+## Releases
 
-- Git tags: `YYYY-MM-DD` and `latest`
-- Docker images: `ghcr.io/caldaver-app/caldaver:YYYY-MM-DD` and
-  `ghcr.io/caldaver-app/caldaver:latest`
-- Android APK: attached to the dated GitHub release and the `latest` release
-- Source code: GitHub-generated source archives for the release tag
-- Release notes: generated from commits since the previous dated release
+The [daily release workflow](.github/workflows/daily-release.yml) runs
+nightly at `17:10 UTC` and can also be triggered manually. Each run
+publishes a coordinated artifact set from the same commit:
 
-This means every new container release also produces a matching APK release and
+| Artifact | Tag / Location |
+| --- | --- |
+| Git tag | `YYYY-MM-DD-HHMMSS` (unique) and `latest` (force-updated) |
+| Docker image | `ghcr.io/caldaver-app/caldaver:YYYY-MM-DD-HHMMSS`, `…:YYYY-MM-DD`, `…:latest` |
+| Android APK | `caldaver-android-<release-tag>.apk` attached to the GitHub release |
+| Source archives | GitHub-generated `tar.gz` / `zip` for the release tag |
+| Release notes | Auto-generated list of commits since the previous dated release |
+
+This means every container release also produces a matching APK release and
 a GitHub release entry describing what changed.
+
+## Tech Stack
+
+- **Backend** &mdash; Rust (axum, tokio, sqlx, reqwest, quick-xml, chrono,
+  pbkdf2, sha2, base64)
+- **Storage** &mdash; PostgreSQL (sessions, preferences, shares, DAV and
+  IMAP account rows, encrypted credentials, mail message cache, local
+  event/contact fallback)
+- **Frontend** &mdash; jQuery 3, jQuery UI, Bootstrap 5, FullCalendar 3,
+  Dust.js templates, Less, Font Awesome 4
+- **Mobile** &mdash; Capacitor 8 (Android API 36, Java 21, Gradle)
+- **Build** &mdash; `dustc`, `lessc`, `cleancss-cli`, `uglify-js`, npm
+- **Tests** &mdash; `node --test`, Playwright, Appium (UIAutomator2), ADB
 
 ## Upstream Source
 
-https://github.com/agendav/agendav
+Caldaver is forked from AgenDAV: <https://github.com/agendav/agendav>.
 
 ## License
 
-GNU General Public License v3.0 or later
-https://spdx.org/licenses/GPL-3.0-or-later.html
+GNU General Public License v3.0 or later.
+<https://spdx.org/licenses/GPL-3.0-or-later.html>
 
 Older Docker packaging derived from `nagimov/agendav-docker` is covered by
 Ruslan Nagimov's MIT license notice in
@@ -158,8 +332,9 @@ Ruslan Nagimov's MIT license notice in
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md)
+See [CHANGELOG.md](./CHANGELOG.md).
 
-## Contribution
+## Contributing
 
-[Contributions](./CONTRIBUTING.md) are welcome!
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Issues and pull requests are
+welcome on the [issue tracker](https://github.com/caldaver-app/caldaver/issues).
