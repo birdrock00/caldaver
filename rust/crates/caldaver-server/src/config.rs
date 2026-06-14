@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_parse_host_allowlist_trims_lowercases_and_skips_empty_entries() {
         assert_eq!(
-            parse_host_allowlist(" Radicale.example.invalid , dav.example.org ,, "),
+            parse_host_allowlist(" Radicale.Example.Invalid , dav.example.org ,, "),
             vec!["radicale.example.invalid".to_string(), "dav.example.org".to_string()]
         );
         assert!(parse_host_allowlist("").is_empty());

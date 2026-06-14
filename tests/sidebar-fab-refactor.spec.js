@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const repoRoot = '/home/REDACTED/rpi/birdrock00-repos/caldaver';
+const repoRoot = path.resolve(__dirname, '..');
 const distCssPath = `file://${repoRoot}/web/public/dist/css/caldaver.css`;
 const fontAwesomeCssPath = `file://${repoRoot}/node_modules/font-awesome/css/font-awesome.min.css`;
 
