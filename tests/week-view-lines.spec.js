@@ -2,9 +2,9 @@ const { test, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const baseURL = 'https://caldaver.example.invalid';
-const username = 'REDACTED';
-const password = 'REDACTED';
+const baseURL = process.env.CALDAVER_BASE_URL || 'http://localhost:8080';
+const username = process.env.CALDAVER_USERNAME;
+const password = process.env.CALDAVER_PASSWORD;
 const screenshotDir = '/tmp/caldaver-week-view';
 
 test.describe('week view vertical day separators', () => {

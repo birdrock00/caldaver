@@ -31,9 +31,9 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
 
-const BASE_URL = 'https://caldaver.example.invalid';
-const USERNAME = 'REDACTED';
-const PASSWORD = 'REDACTED';
+const BASE_URL = process.env.CALDAVER_BASE_URL || 'http://localhost:8080';
+const USERNAME = process.env.CALDAVER_USERNAME;
+const PASSWORD = process.env.CALDAVER_PASSWORD;
 const SCREENSHOT_DIR = '/tmp/caldaver-audit-loop7';
 const MIN_TOUCH = 44;
 
