@@ -3334,7 +3334,7 @@ mod tests {
     #[test]
     fn allowed_dav_hosts_includes_configured_dav_servers_and_allowlist() {
         let mut config = Config::for_tests("postgres://localhost/caldaver_test".to_string());
-        config.caldav_server = "https://Radicale.example.invalid/radicale/%u/".to_string();
+        config.caldav_server = "https://Radicale.Example.Invalid/radicale/%u/".to_string();
         config.carddav_server = "https://cards.example.org/dav/".to_string();
         config.dav_host_allowlist = vec!["Extra.Example.NET".to_string()];
 
