@@ -784,3 +784,17 @@ test('today highlight targets FullCalendar 3 DOM and compares calendar dates, no
   assert.match(header, /viewName === 'agendaWeek' && date\.format\('YYYY-MM-DD'\) === moment\(\)\.format\('YYYY-MM-DD'\)/);
   assert.match(header, /fc-header-today-circle/);
 });
+
+test('week view time grid has transparent slats background so vertical day separators show through', () => {
+  const less = read('assets/less/caldaver.less');
+
+  // The slats layer sits above the .fc-bg layer. Without an explicit
+  // transparent background the opaque white default paints over the bg
+  // layer's vertical day separators (border-left on .fc-bg td.fc-day).
+  const slatsBlock = cssBlock(less, '#calendar_view .fc-time-grid .fc-slats td');
+  assert.match(slatsBlock, /background:\s*transparent/);
+
+  // The bg layer is what actually draws the vertical separators, so confirm
+  // it carries the separator border color.
+  assert.match(less, /#calendar_view \.fc-bg td\.fc-day,[\s\S]*?border-color:\s*#dadce0/);
+});
