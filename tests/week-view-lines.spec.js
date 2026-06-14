@@ -69,12 +69,30 @@ test.describe('week view vertical day separators', () => {
     expect(styleReport.bgCellsCount, 'expected bg day cells to exist').toBeGreaterThan(0);
     expect(styleReport.bgBordersDrawn, 'every bg day cell must draw a left border').toBe(true);
 
-    // 8-9. Pixel-level check: crop the time-grid screenshot and scan for
-    // vertical lines at each day column boundary. The separators are
-    // #dadce0 (rgb 218,220,224) over a white background, so we count columns
-    // of distinctly non-white pixels spanning most of the grid height.
-    const gridBuffer = await page.locator('.fc-time-grid').first().screenshot();
-    const verticalLineCount = await page.evaluate(async pngBase64 => {
+    // 8-9. Pixel-level check: screenshot the VISIBLE portion of the time grid
+    // (not the full 2000+px element) and scan for vertical day separators.
+    // The separators are #dadce0 (rgb 218,220,224) over a white background.
+    const visibleRect = await page.evaluate(() => {
+      const el = document.querySelector('.fc-time-grid-container') ||
+                 document.querySelector('.fc-time-grid');
+      if (!el) return null;
+      const rect = el.getBoundingClientRect();
+      return { x: Math.round(rect.x), y: Math.round(rect.y),
+               width: Math.round(rect.width), height: Math.round(rect.height) };
+    });
+    expect(visibleRect, 'time grid container must exist').not.toBeNull();
+
+    const clipHeight = Math.min(visibleRect.height, 600);
+    const gridBuffer = await page.screenshot({
+      clip: {
+        x: visibleRect.x,
+        y: visibleRect.y,
+        width: visibleRect.width,
+        height: clipHeight
+      }
+    });
+
+    const verticalLineCount = await page.evaluate(async ({ pngBase64, scanHeight }) => {
       const img = new Image();
       img.src = 'data:image/png;base64,' + pngBase64;
       await img.decode();
@@ -90,31 +108,32 @@ test.describe('week view vertical day separators', () => {
         const r = data[offset];
         const g = data[offset + 1];
         const b = data[offset + 2];
-        // #dadce0 ~ rgb(218,220,224); treat light-but-not-white as a separator.
         return (255 - r) + (255 - g) + (255 - b) >= 18 && r < 250;
       };
 
-      const minRunLength = Math.floor(height * 0.6);
+      // Sample multiple horizontal rows and look for columns where many
+      // sampled rows all have a separator pixel (robust against events).
+      const sampleRows = 40;
+      const rowStep = Math.max(1, Math.floor(height / sampleRows));
+      const minHits = Math.floor(sampleRows * 0.5);
       const lineColumns = [];
       let lastLineX = -10;
 
       for (let x = 0; x < width; x++) {
-        let run = 0;
-        for (let y = 0; y < height; y++) {
+        let hits = 0;
+        for (let y = 0; y < height; y += rowStep) {
           if (isSeparatorPixel((y * width + x) * 4)) {
-            run++;
+            hits++;
           }
         }
-        // A vertical separator column has a long run of separator pixels and
-        // is separated from the previously detected line by several pixels.
-        if (run >= minRunLength && x - lastLineX > 4) {
+        if (hits >= minHits && x - lastLineX > 4) {
           lineColumns.push(x);
           lastLineX = x;
         }
       }
 
       return lineColumns.length;
-    }, gridBuffer.toString('base64'));
+    }, { pngBase64: gridBuffer.toString('base64'), scanHeight: clipHeight });
 
     // A 7-day week has 6 internal boundaries plus edges; require at least 5.
     expect(verticalLineCount, 'expected at least 5 internal vertical separators').toBeGreaterThanOrEqual(5);
