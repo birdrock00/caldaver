@@ -51,11 +51,40 @@ Authentication and DAV settings
 
    Optional local password for ``CALDAVER_AUTH_USERNAME``.
 
+.. confval:: CALDAVER_AUTH_PASSWORD_HASH
+
+   Optional PBKDF2-SHA256 encoded password hash for
+   ``CALDAVER_AUTH_USERNAME``. When set, it takes precedence over
+   ``CALDAVER_AUTH_PASSWORD``. Format:
+   ``pbkdf2-sha256$<iterations>$<base64-salt>$<base64-digest>`` with
+   ``iterations`` between ``1`` and ``2000000``, ``salt`` of at least 16
+   bytes, and ``digest`` of at least 32 bytes.
+
+.. confval:: CALDAVER_COOKIE_SECURE
+
+   When truthy, the session cookie is set with the ``Secure`` attribute.
+   Defaults to ``true``. Set this to ``false`` only when serving Caldaver
+   over plain HTTP (for example, behind a TLS-terminating reverse proxy that
+   is not on the same host).
+
 .. confval:: CALDAVER_CALDAV_SERVER
 
-   Optional CalDAV bootstrap/default server URL used before an account has been
-   saved in Postgres. Do not pair this with DAV credentials in environment
-   variables or Kubernetes secrets.
+   Optional CalDAV bootstrap/default server URL used before an account has
+   been saved in Postgres. Do not pair this with DAV credentials in
+   environment variables or Kubernetes secrets.
+
+.. confval:: CALDAVER_CALDAV_USERNAME
+
+   Optional bootstrap CalDAV username. Migrated to Postgres on first run
+   when ``CALDAVER_CALDAV_PASSWORD`` is also set. Do not use as a long-term
+   credential.
+
+.. confval:: CALDAVER_CALDAV_PASSWORD
+
+   Optional bootstrap CalDAV password. Migrated to Postgres (encrypted) on
+   first run. Do not keep CalDAV passwords in environment variables or
+   Kubernetes secrets; rotate to per-user accounts under
+   **Preferences > Accounts** as soon as the first migration completes.
 
 .. confval:: CALDAVER_CARDDAV_SERVER
 
@@ -64,23 +93,34 @@ Authentication and DAV settings
 
 .. confval:: CALDAVER_CALDAV_PUBLIC_URL
 
-   Optional public CalDAV URL shown to users.
+   Optional public CalDAV URL shown to users. Defaults to
+   ``CALDAVER_CALDAV_SERVER``.
 
 .. confval:: CALDAVER_CALDAV_AUTHMETHOD
 
-   DAV authentication method. Defaults to ``basic``.
+   DAV authentication method. One of ``basic``, ``bearer``, or ``none``.
+   Defaults to ``basic``.
 
 .. confval:: CALDAVER_CALDAV_CONNECT_TIMEOUT
 
-   Connection timeout in seconds. Defaults to ``10``.
+   DAV connection timeout in seconds. Defaults to ``10``.
 
 .. confval:: CALDAVER_CALDAV_RESPONSE_TIMEOUT
 
-   Response timeout in seconds. Defaults to ``30``.
+   DAV response timeout in seconds. Defaults to ``30``.
 
 .. confval:: CALDAVER_CALDAV_CERTIFICATE_VERIFY
 
-   Whether to verify HTTPS certificates. Defaults to ``true``.
+   Whether to verify HTTPS certificates for DAV connections. Defaults to
+   ``true``.
+
+.. confval:: CALDAVER_DAV_HOST_ALLOWLIST
+
+   Comma-separated list of hostnames or IPs that bypass the SSRF guard
+   applied to user-supplied DAV server URLs. The configured CalDAV and
+   CardDAV server hosts are always allowed automatically. Use this for
+   homelab deployments where the DAV server resolves to a private address.
+   Matching is case-insensitive.
 
 Application settings
 --------------------
