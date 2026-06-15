@@ -134,6 +134,8 @@ $translations = [
 
     'labels.preferences' => 'Preferences',
     'labels.return' => 'Return',
+    'labels.save_and_return' => 'Save and return to calendar',
+    'labels.discard_changes' => 'Discard changes',
 
     'labels.defaultcalendar' => 'Default calendar',
     'labels.default_view' => 'Default view',
