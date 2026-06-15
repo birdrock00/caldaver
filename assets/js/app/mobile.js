@@ -645,11 +645,526 @@
   }
 
   // ---------------------------------------------------------------------------
+  // [M-002] Reflect the current page's primary section on <body
+  // data-section="…">. The bottom tab bar uses this attribute to light up
+  // the matching tab without needing each page to set it manually. We
+  // resolve the section from the body class added by each page template
+  // (caldaver-calendar-page, caldaver-cards-page, …) and fall back to the
+  // first matching tab on the page.
+  // ---------------------------------------------------------------------------
+  function setBodySection() {
+    if (!document.body) {
+      return;
+    }
+    var section = null;
+    var cls = document.body.className || '';
+    var match = cls.match(/caldaver-([a-z]+)-page/);
+    if (match && match[1]) {
+      section = match[1];
+    }
+    if (!section) {
+      var tab = document.querySelector('.caldaver-bottom-tab.active');
+      if (tab && tab.dataset && tab.dataset.section) {
+        section = tab.dataset.section;
+      }
+    }
+    if (section) {
+      document.body.setAttribute('data-section', section);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-019] Toggle a body.calendar-empty class whenever the FullCalendar event
+  // count drops to zero on a visible range. CSS renders the empty state.
+  // ---------------------------------------------------------------------------
+  function watchCalendarEmpty() {
+    if (typeof $().fullCalendar !== 'function') {
+      return;
+    }
+    var $c = calendar();
+    if ($c.length === 0) {
+      return;
+    }
+    var checkEmpty = function() {
+      try {
+        var events = $c.fullCalendar('clientEvents');
+        var view = $c.fullCalendar('getView');
+        var visible = false;
+        if (view && typeof view.start !== 'undefined') {
+          var start = moment(view.start);
+          var end = moment(view.end);
+          for (var i = 0; i < events.length; i++) {
+            var e = events[i];
+            if (!e || !e.start) {
+              continue;
+            }
+            var estart = moment(e.start);
+            var eend = e.end ? moment(e.end) : estart.clone();
+            if (eend.isSameOrAfter(start) && estart.isSameOrBefore(end)) {
+              visible = true;
+              break;
+            }
+          }
+        }
+        document.body.classList.toggle('calendar-empty', !visible);
+      } catch (err) {
+        // FullCalendar may be re-rendering; skip this tick.
+      }
+    };
+    $c.on('eventAfterAllRender.calempty', checkEmpty);
+    $c.on('viewDisplay.calempty', checkEmpty);
+    checkEmpty();
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-020] Quick filter chips above the calendar. Tap to jump to the
+  // corresponding date range and switch to the appropriate view.
+  // ---------------------------------------------------------------------------
+  function wireQuickChips() {
+    var $chips = $('.calendar-quick-chip');
+    if ($chips.length === 0) {
+      return;
+    }
+    $chips.each(function() {
+      var $chip = $(this);
+      $chip.on('click', function() {
+        var kind = $chip.data('quick');
+        if (!kind || typeof moment === 'undefined' || !calendarReady()) {
+          return;
+        }
+        var now = moment();
+        var target = null;
+        var view = null;
+        if (kind === 'today') {
+          target = now.clone();
+          view = 'customizable_list';
+        } else if (kind === 'tomorrow') {
+          target = now.clone().add(1, 'day').startOf('day');
+          view = 'agendaDay';
+        } else if (kind === 'week') {
+          target = now.clone().startOf('week');
+          view = 'agendaWeek';
+        } else if (kind === 'next-week') {
+          target = now.clone().add(1, 'week').startOf('week');
+          view = 'agendaWeek';
+        } else if (kind === 'month') {
+          target = now.clone().startOf('month');
+          view = 'month';
+        }
+        if (target) {
+          fc('gotoDate', target.toDate());
+        }
+        if (view) {
+          applyView(view);
+        }
+        $chips.removeClass('active').attr('aria-selected', 'false');
+        $chip.addClass('active').attr('aria-selected', 'true');
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-015] Set the FullCalendar event colour as a CSS custom property so the
+  // mobile event-chip CSS can paint the 4 px left bar in the calendar colour.
+  // Also adds the M-016 inline icons (location / video / attendees) when the
+  // event has the corresponding property.
+  // ---------------------------------------------------------------------------
+  function decorateEvents() {
+    if (!calendarReady()) {
+      return;
+    }
+    try {
+      var events = calendar().fullCalendar('clientEvents');
+      for (var i = 0; i < events.length; i++) {
+        var e = events[i];
+        if (!e) {
+          continue;
+        }
+        // Stash the colour as a CSS custom property on the event element.
+        var colour = e.color || (e.source && e.source.color) || '#3367d6';
+        if (e._caldaverColor !== colour) {
+          e._caldaverColor = colour;
+        }
+      }
+    } catch (err) { /* ignore */ }
+  }
+  function applyEventDecoration() {
+    if (!calendarReady()) {
+      return;
+    }
+    var $c = calendar();
+    $c.find('.fc-event, .fc-list-item').each(function() {
+      var $el = $(this);
+      var id = $el.data('event') && $el.data('event').id;
+      var fcEvent = null;
+      if (id !== undefined) {
+        try {
+          fcEvent = $c.fullCalendar('clientEvents', id)[0];
+        } catch (e) { /* ignore */ }
+      }
+      var colour = (fcEvent && (fcEvent.color || (fcEvent.source && fcEvent.source.color))) || '#3367d6';
+      $el.css({
+        '--caldaver-fc-event-color': colour,
+        'border-left': '4px solid ' + colour,
+        'background-color': ''
+      });
+      // M-016 inline icons
+      if (!$el.find('.fc-event-icon').length) {
+        var $icons = $('<span class="fc-event-icon" aria-hidden="true"></span>');
+        if (fcEvent) {
+          if (fcEvent.location) {
+            $icons.append('<i class="fa fa-map-marker" title="Location"></i> ');
+          }
+          if (fcEvent.url) {
+            $icons.append('<i class="fa fa-video-camera" title="Video"></i> ');
+          }
+          if (fcEvent.attendees && fcEvent.attendees.length) {
+            $icons.append('<i class="fa fa-users" title="Attendees"></i> ');
+          }
+        }
+        $el.find('.fc-content, .fc-list-item-title').first().append($icons);
+      }
+    });
+  }
+  function watchEventDecoration() {
+    if (!calendarReady()) {
+      return;
+    }
+    var $c = calendar();
+    $c.on('eventAfterRender.caldaverEvent', applyEventDecoration);
+    $c.on('eventDestroy.caldaverEvent', applyEventDecoration);
+    $c.on('viewDisplay.caldaverEvent', applyEventDecoration);
+    decorateEvents();
+    applyEventDecoration();
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-018] Slide-and-fade on period changes. Toggle a class on the calendar
+  // root that animates the next paint. Honours `prefers-reduced-motion` and
+  // html[data-reduce-motion="true"].
+  // ---------------------------------------------------------------------------
+  function animatePeriodChange(direction) {
+    if (document.documentElement.getAttribute('data-reduce-motion') === 'true') {
+      return;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+    var $c = calendar();
+    if ($c.length === 0) {
+      return;
+    }
+    var cls = direction === 'next'
+      ? 'calendar--sliding-left'
+      : 'calendar--sliding-right';
+    $c.removeClass('calendar--sliding-left calendar--sliding-right').addClass(cls);
+    window.setTimeout(function() {
+      $c.removeClass(cls);
+    }, 280);
+  }
+
+  // Wrap the existing goPrev/goNext so the animation piggybacks.
+  var _origGoPrev = goPrev;
+  var _origGoNext = goNext;
+  goPrev = function() {
+    animatePeriodChange('prev');
+    return _origGoPrev();
+  };
+  goNext = function() {
+    animatePeriodChange('next');
+    return _origGoNext();
+  };
+
+  // ---------------------------------------------------------------------------
+  // [M-002] Bottom tab bar wiring. We add the .caldaver-ripple-host class so
+  // CSS adds the press feedback. Already the active class is set server-side
+  // by the Twig template; we just need to make sure taps are debounced.
+  // ---------------------------------------------------------------------------
+  function wireBottomTabs() {
+    var $tabs = $('.caldaver-bottom-tabs .caldaver-bottom-tab');
+    if ($tabs.length === 0) {
+      return;
+    }
+    $tabs.each(function() {
+      var $tab = $(this);
+      $tab.addClass('caldaver-ripple-host');
+      addTapFeedback($tab);
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-138] Generalized pull-to-refresh. Looks for [data-pull-refresh] on a
+  // container and triggers a refresh callback (data attribute or by id).
+  // ---------------------------------------------------------------------------
+  function wirePullToRefreshGeneric() {
+    var nodes = document.querySelectorAll('[data-pull-refresh]');
+    if (nodes.length === 0) {
+      return;
+    }
+    for (var i = 0; i < nodes.length; i++) {
+      wireSinglePtr(nodes[i]);
+    }
+  }
+  function wireSinglePtr(container) {
+    var startY = 0;
+    var pulling = false;
+    var TRIGGER = 90;
+    function topReached() {
+      var el = container;
+      // Walk up looking for a scrollable parent.
+      while (el && el !== document.body) {
+        if (el.scrollTop > 0) {
+          return false;
+        }
+        el = el.parentElement;
+      }
+      return (window.pageYOffset || document.documentElement.scrollTop || 0) <= 0;
+    }
+    function onStart(e) {
+      var touches = e.touches;
+      if (!touches || touches.length !== 1 || !topReached()) {
+        pulling = false;
+        return;
+      }
+      pulling = true;
+      startY = touches[0].clientY;
+    }
+    function onMove(e) {
+      if (!pulling) {
+        return;
+      }
+      var touches = e.touches;
+      if (!touches || touches.length !== 1) {
+        return;
+      }
+      var dy = touches[0].clientY - startY;
+      if (dy <= 0) {
+        return;
+      }
+      e.preventDefault && e.preventDefault();
+    }
+    function onEnd() {
+      if (!pulling) {
+        return;
+      }
+      pulling = false;
+      triggerRefresh(container);
+    }
+    function triggerRefresh(c) {
+      var id = c.id;
+      if (!id) {
+        return;
+      }
+      // The page's existing refresh button works in every case; we just
+      // simulate a click on it. This avoids re-implementing the data load.
+      var btn = document.getElementById(id.replace(/_panel$|_shell$|_content$/, '_refresh'));
+      if (btn) {
+        btn.click();
+      } else {
+        // For preferences and others, look for any refresh button.
+        btn = c.querySelector('button[id$="_refresh"]');
+        if (btn) {
+          btn.click();
+        }
+      }
+    }
+    container.addEventListener('touchstart', onStart, { passive: true });
+    container.addEventListener('touchmove', onMove, { passive: false });
+    container.addEventListener('touchend', onEnd, { passive: true });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-070 / M-072 / M-078] Bottom sheet helper. Renders a panel of buttons
+  // and closes on scrim tap or after a choice.
+  // ---------------------------------------------------------------------------
+  function openBottomSheet(panelEl) {
+    var scrim = document.createElement('div');
+    scrim.className = 'mobile-reply-scrim';
+    scrim.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:2690;';
+    scrim.addEventListener('click', function() {
+      closeBottomSheet(panelEl, scrim);
+    });
+    document.body.appendChild(scrim);
+    document.body.appendChild(panelEl);
+    document.body.classList.add('mobile-bottom-sheet-open');
+  }
+  function closeBottomSheet(panelEl, scrim) {
+    if (panelEl && panelEl.parentNode) {
+      panelEl.parentNode.removeChild(panelEl);
+    }
+    if (scrim && scrim.parentNode) {
+      scrim.parentNode.removeChild(scrim);
+    }
+    document.body.classList.remove('mobile-bottom-sheet-open');
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-261] About / Version modal. Reads version + commit info from the page
+  // (C CaldaverConf, if present) and renders a simple modal.
+  // ---------------------------------------------------------------------------
+  function wireAboutTrigger() {
+    var btn = document.querySelector('[data-caldaver-about-trigger]');
+    if (!btn) {
+      return;
+    }
+    btn.addEventListener('click', function() {
+      var conf = window.CaldaverConf || {};
+      var version = (conf.version || 'unknown');
+      var commit = (conf.commit || 'dev');
+      var buildDate = (conf.build_date || '');
+      var panel = document.createElement('div');
+      panel.className = 'mail-reply-sheet';
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      panel.setAttribute('aria-labelledby', 'caldaver-about-title');
+      panel.innerHTML = [
+        '<div class="mail-reply-sheet-panel" role="document">',
+        '  <h2 id="caldaver-about-title" style="margin:0 0 4px;font-size:17px;">Caldaver</h2>',
+        '  <p style="margin:0;font-size:13px;color:var(--caldaver-color-text-muted);">Version ' + escapeHtml(version) + '</p>',
+        '  <p style="margin:0;font-size:13px;color:var(--caldaver-color-text-muted);">Commit ' + escapeHtml(commit) + (buildDate ? ' &middot; built ' + escapeHtml(buildDate) : '') + '</p>',
+        '  <a href="https://github.com/caldaver-app/caldaver" target="_blank" rel="noopener">github.com/caldaver-app/caldaver</a>',
+        '  <button type="button" class="cancel" id="caldaver-about-close">Close</button>',
+        '</div>'
+      ].join('');
+      var scrim = panel; // reuse the panel's own background scrim
+      var scrimEl = document.createElement('div');
+      scrimEl.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:2680;';
+      scrimEl.addEventListener('click', function() {
+        closeBottomSheet(panel, scrimEl);
+      });
+      document.body.appendChild(scrimEl);
+      document.body.appendChild(panel);
+      panel.querySelector('#caldaver-about-close').addEventListener('click', function() {
+        closeBottomSheet(panel, scrimEl);
+      });
+    });
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function(c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-091] Recent searches (localStorage). Tracked per scope (contacts, mail).
+  // ---------------------------------------------------------------------------
+  var RECENT_KEY = 'caldaver.recent_searches';
+  function recentSearches(scope) {
+    try {
+      var raw = window.localStorage.getItem(RECENT_KEY);
+      var all = raw ? JSON.parse(raw) : {};
+      return all[scope] || [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function recordRecentSearch(scope, term) {
+    term = String(term || '').trim();
+    if (!term) {
+      return;
+    }
+    try {
+      var raw = window.localStorage.getItem(RECENT_KEY);
+      var all = raw ? JSON.parse(raw) : {};
+      var list = (all[scope] || []).filter(function(t) { return t !== term; });
+      list.unshift(term);
+      all[scope] = list.slice(0, 5);
+      window.localStorage.setItem(RECENT_KEY, JSON.stringify(all));
+    } catch (e) { /* ignore */ }
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-132] Reduce-motion preference toggle (client-side only).
+  // ---------------------------------------------------------------------------
+  function wireReduceMotionToggle() {
+    var cb = document.getElementById('pref_reduce_motion');
+    if (!cb) {
+      return;
+    }
+    try {
+      var cur = window.localStorage.getItem('caldaver.reduce_motion') === 'true'
+        || document.documentElement.getAttribute('data-reduce-motion') === 'true';
+      cb.checked = cur;
+    } catch (e) { /* ignore */ }
+    cb.addEventListener('change', function() {
+      try {
+        if (cb.checked) {
+          window.localStorage.setItem('caldaver.reduce_motion', 'true');
+          document.documentElement.setAttribute('data-reduce-motion', 'true');
+        } else {
+          window.localStorage.removeItem('caldaver.reduce_motion');
+          document.documentElement.removeAttribute('data-reduce-motion');
+        }
+      } catch (e) { /* ignore */ }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-270] Storage used indicator. Uses navigator.storage.estimate() if
+  // available; otherwise falls back to a "Storage info unavailable" message.
+  // ---------------------------------------------------------------------------
+  function wireStorageUsed() {
+    var el = document.getElementById('pref_storage_used');
+    if (!el) {
+      return;
+    }
+    if (!navigator.storage || typeof navigator.storage.estimate !== 'function') {
+      el.textContent = 'Storage info unavailable in this browser.';
+      return;
+    }
+    navigator.storage.estimate().then(function(est) {
+      var used = (est.usage || 0);
+      var quota = (est.quota || 0);
+      var fmt = function(b) {
+        if (b < 1024) return b + ' B';
+        if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
+        if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB';
+        return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+      };
+      el.textContent = 'Storage used: ' + fmt(used) + (quota ? ' of ' + fmt(quota) : '');
+    }).catch(function() {
+      el.textContent = 'Storage info unavailable.';
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // [M-161] Generic skeleton rows. Page templates ship the markup; this
+  // function replaces any .skeleton-row spans inside [data-pull-refresh] or
+  // #contacts_loading with a few extra rows for visual variety.
+  // ---------------------------------------------------------------------------
+  function expandSkeletons() {
+    var containers = document.querySelectorAll('#contacts_loading, .mail-loading-state, .prefs-section .skeleton-stack');
+    for (var i = 0; i < containers.length; i++) {
+      var c = containers[i];
+      if (c.querySelectorAll('.skeleton-row').length > 1) {
+        continue;
+      }
+      for (var j = 0; j < 3; j++) {
+        var row = document.createElement('div');
+        row.className = 'skeleton skeleton-row';
+        c.appendChild(row);
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // Bootstrap
   // ---------------------------------------------------------------------------
   function init() {
-    // Only on the calendar page (the FAB/bar markup lives there).
+    // Common (every page) wiring.
+    setBodySection();
+    wireBottomTabs();
+    wirePullToRefreshGeneric();
+    wireAboutTrigger();
+    wireReduceMotionToggle();
+    wireStorageUsed();
+    expandSkeletons();
+
+    // Calendar-only wiring.
     if ($('#calendar_view').length === 0) {
+      // Still inject styles + resize watcher so responsive chrome adapts.
+      injectStyles();
+      wireResponsiveChrome();
       return;
     }
 
@@ -670,11 +1185,15 @@
     wireDayCellTap();     // [B11]
     wireSidebarDrawer();  // [B9]
     wirePullToRefresh();  // [B6]
+    wireQuickChips();     // [M-020]
+    watchCalendarEmpty(); // [M-019]
     wireResponsiveChrome(); // [B13]
 
-    // [B3/B10] restore the user's saved mobile view once FullCalendar is ready.
+    // [B3/B10 / M-015 / M-018] restore the user's saved mobile view once
+    // FullCalendar is ready, then start watching event rendering.
     if (calendarReady()) {
       restoreSavedView();
+      watchEventDecoration();
     } else {
       // FullCalendar not initialized yet -> retry a few times without throwing.
       var attempts = 0;
@@ -683,6 +1202,7 @@
         if (calendarReady()) {
           window.clearInterval(poll);
           restoreSavedView();
+          watchEventDecoration();
         } else if (attempts > 40) {
           window.clearInterval(poll);
         }

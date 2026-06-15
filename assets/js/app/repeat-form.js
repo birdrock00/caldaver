@@ -26,6 +26,57 @@ CaldaverRepeat.handleForm = function handleForm($form) {
     CaldaverRepeat.regenerate();
   });
 
+  // [M-035] Repeat preset chip wiring. When a chip is tapped, set the
+  // underlying frequency select, set the by-day checkboxes appropriately,
+  // and trigger the change handlers. "Custom" just unhides the advanced
+  // options without changing the current values.
+  var presetMap = {
+    'none':     { freq: -1, byday: [] },
+    'daily':    { freq: RRule.DAILY, byday: [] },
+    'weekdays': { freq: RRule.WEEKLY, byday: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'] },
+    'weekly':   { freq: RRule.WEEKLY, byday: [] },
+    'monthly':  { freq: RRule.MONTHLY, byday: [] },
+    'yearly':   { freq: RRule.YEARLY, byday: [] }
+  };
+  $form.on('click', '.repeat-preset', function() {
+    var $chip = $(this);
+    var kind = $chip.data('repeat-preset');
+    if (!kind) {
+      return;
+    }
+    if (kind === 'custom') {
+      $form.find('.container_repeat_options').show();
+      $chip.addClass('active').attr('aria-pressed', 'true').siblings().removeClass('active').attr('aria-pressed', 'false');
+      return;
+    }
+    var preset = presetMap[kind];
+    if (!preset) {
+      return;
+    }
+    $repeat_frequency.val(String(preset.freq));
+    // Reset by-day checkboxes
+    $form.find('input[name="repeat_by_day"]').prop('checked', false);
+    if (preset.byday && preset.byday.length) {
+      for (var i = 0; i < preset.byday.length; i++) {
+        $form.find('input[name="repeat_by_day"][value="' + preset.byday[i] + '"]').prop('checked', true);
+      }
+    }
+    // Update active chip
+    $chip.addClass('active').attr('aria-pressed', 'true').siblings().removeClass('active').attr('aria-pressed', 'false');
+    // Trigger downstream change events
+    $repeat_frequency.trigger('change');
+    $repeat_ends.trigger('change');
+  });
+  // Pre-highlight the chip that matches the current value.
+  setTimeout(function() {
+    var currentFreq = parseInt($repeat_frequency.val());
+    if (isNaN(currentFreq) || currentFreq === -1) {
+      $form.find('.repeat-preset[data-repeat-preset="none"]').addClass('active').attr('aria-pressed', 'true');
+    } else {
+      $form.find('.repeat-preset[data-repeat-preset="custom"]').addClass('active').attr('aria-pressed', 'true');
+    }
+  }, 0);
+
   $repeat_frequency.on('change', function() {
     var new_frequency = $(this).val();
     var frequency = parseInt(new_frequency);

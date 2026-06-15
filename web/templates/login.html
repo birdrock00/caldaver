@@ -12,7 +12,7 @@
 {% endif %}
 
 <div class="loginform ui-corner-all">
-  <img src="{{ asset('caldaver_300transp.png', 'img') }}" alt="Caldaver" style="max-width: 200px; margin-bottom: 16px;">
+  <img src="{{ asset('caldaver_logo.svg', 'img') }}" alt="Caldaver" class="login-logo" style="max-width: 220px; margin-bottom: 16px; height: auto;">
   <!-- [C5] autocomplete="on" on the form so mobile credential managers / passkeys offer to fill -->
   <form method="post" action="{{ path('login') }}" class="form-horizontal" autocomplete="on">
     <div class="form-group">
@@ -48,6 +48,13 @@
       aria-label="{% trans %}labels.login{% endtrans %}"
       class="btn btn-primary btn-lg btn-block" style="width:100%;">
   </form>
+
+  {# [M-116] "Change server" link in the login footer. Android-only by default
+     (the Capacitor setup page is reachable via the user menu in-app), but the
+     web equivalent is useful for self-hosted users behind a load balancer. #}
+  <p class="login-footer-links">
+    <a href="/" class="login-change-server" aria-label="Use a different Caldaver instance">{% trans %}labels.change_instance{% endtrans %}</a>
+  </p>
 
 </div>
 </div>

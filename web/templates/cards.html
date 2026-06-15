@@ -45,7 +45,7 @@
       </div>
     </div>
 
-    <section class="contacts-panel">
+    <section class="contacts-panel" data-pull-refresh>
       <div class="contacts-heading">
         <h1>{% trans %}labels.contacts{% endtrans %} <span id="contact_count">Loading...</span></h1>
         <div class="contacts-actions">
@@ -56,12 +56,17 @@
       </div>
 
       <div id="contacts_loading" class="contacts-empty">
-        <h2>Loading contacts...</h2>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
       </div>
 
-      <!-- [D3] empty-state now carries a reachable add affordance so mobile users can create their first contact without the off-canvas sidebar -->
-      <div id="contacts_empty" class="contacts-empty" hidden>
+      <!-- [D3 / M-222] empty-state now carries a reachable add affordance so mobile users can create their first contact without the off-canvas sidebar -->
+      <div id="contacts_empty" class="empty-state" hidden>
+        <div class="empty-state-icon" aria-hidden="true"><i class="fa fa-user-plus"></i></div>
         <h2>{% trans %}labels.nocontacts{% endtrans %}</h2>
+        <p>{% trans %}labels.nocontacts_hint{% endtrans %}</p>
         <button type="button" id="contacts_empty_create" class="btn btn-primary contacts-empty-create" aria-label="{% trans %}labels.createcontact{% endtrans %}">
           <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.createcontact{% endtrans %}
         </button>
@@ -80,9 +85,14 @@
       </div>
 
       <div id="contacts_cards" class="contacts-card-grid" hidden></div>
+
+      {# [M-051] Alphabet jump index. JS populates the letters dynamically. #}
+      <nav class="contacts-alphabet-index" aria-label="Jump to letter" hidden></nav>
     </section>
   </main>
 </div>
+{# [M-001] Shared bottom tab bar. #}
+{% include 'parts/bottom_bar.html' %}
 <script>
 (function() {
   function syncContactViewPressed() {

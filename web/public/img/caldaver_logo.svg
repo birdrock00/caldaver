@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" role="img" aria-label="Caldaver">
   <title>Caldaver</title>
+  <!-- Caldaver wordmark, generated for v3.2.0 to replace the AgenDAV mark. Uses currentColor
+       so the consuming page can recolor the glyphs (light/dark mode). -->
   <g fill="currentColor" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-weight="700" font-size="38" letter-spacing="-1.2">
     <text x="60" y="44">Caldaver</text>
   </g>
+  <!-- Three stacked calendar stripes to the left of the wordmark, evoking
+       CalDAV (calendar), CardDAV (contacts) and IMAP (mail). -->
   <g transform="translate(8,12)">
     <rect x="0" y="0"  width="40" height="9"  rx="2" fill="#1a73e8"/>
     <rect x="0" y="13" width="40" height="9"  rx="2" fill="#34a853"/>

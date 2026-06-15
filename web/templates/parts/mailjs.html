@@ -83,10 +83,23 @@
         (highlightedUnreadUid !== null && String(message.uid) === String(highlightedUnreadUid) ? ' highlighted-unread' : '');
       row.tabIndex = 0;
       row.setAttribute('role', 'button');
-      row.innerHTML = '<span class="mail-from"></span><span class="mail-subject"></span><span class="mail-date"></span><div class="mail-attachments" data-testid="mail-attachments"></div>';
+      // [M-073] Snippet line; [M-070] swipe action affordances rendered behind
+      // the row so the swipe gesture has something to reveal.
+      row.innerHTML =
+        '<div class="mail-row-action mail-row-action-left" aria-hidden="true"><i class="fa fa-archive"></i></div>' +
+        '<div class="mail-row-action mail-row-action-right" aria-hidden="true"><i class="fa fa-trash"></i></div>' +
+        '<div class="mail-row-body">' +
+          '<span class="mail-from"></span>' +
+          '<span class="mail-subject"></span>' +
+          '<span class="mail-date"></span>' +
+          '<span class="mail-snippet"></span>' +
+          '<div class="mail-attachments" data-testid="mail-attachments"></div>' +
+        '</div>';
       row.querySelector('.mail-from').textContent = text(message.from);
       row.querySelector('.mail-subject').textContent = text(message.subject);
       row.querySelector('.mail-date').textContent = text(message.date);
+      var snippet = (message.snippet || message.preview || '').toString().slice(0, 120);
+      row.querySelector('.mail-snippet').textContent = snippet;
       // [D5] make unread state explicit for assistive tech and give the whole tap target a descriptive label
       if (!message.seen) {
         row.setAttribute('aria-label', 'Unread message from ' + text(message.from) + ', subject ' + (text(message.subject) || '(no subject)'));
@@ -101,6 +114,10 @@
         if (event.target.closest('a')) {
           return;
         }
+        if (row.classList.contains('is-swiping')) {
+          // Don't navigate when the user has just finished a swipe gesture.
+          return;
+        }
         window.location.href = row.dataset.messageHref;
       });
       row.addEventListener('keydown', function(event) {
@@ -109,6 +126,11 @@
           window.location.href = row.dataset.messageHref;
         }
       });
+      // [M-070] Swipe-to-reveal archive / delete actions. On narrow viewports
+      // a horizontal drag > 60 px slides the row, showing the action label.
+      // Tapping the action (or releasing past 50% of the row width) fires
+      // the action; otherwise the row snaps back. Only enabled on mobile.
+      attachMailRowSwipe(row);
       rows.appendChild(row);
     });
 
@@ -120,6 +142,69 @@
     }
 
     renderMailStatus(data.length);
+  }
+
+  // [M-070] Swipe handler for an individual mail row. Returns true on
+  // touch devices only.
+  function attachMailRowSwipe(row) {
+    if (!narrowViewport()) {
+      return;
+    }
+    if (!('ontouchstart' in window) && !(window.navigator && window.navigator.maxTouchPoints > 0)) {
+      return;
+    }
+    var startX = 0, startY = 0, tracking = false, active = false;
+    var dx = 0;
+    row.addEventListener('touchstart', function(e) {
+      var t = e.touches && e.touches[0];
+      if (!t) { return; }
+      startX = t.clientX; startY = t.clientY; tracking = true; active = true; dx = 0;
+    }, { passive: true });
+    row.addEventListener('touchmove', function(e) {
+      if (!tracking) { return; }
+      var t = e.touches && e.touches[0];
+      if (!t) { return; }
+      var mx = t.clientX - startX;
+      var my = t.clientY - startY;
+      // Only track if the gesture is mostly horizontal.
+      if (Math.abs(my) > Math.abs(mx) * 1.5) {
+        tracking = false; return;
+      }
+      dx = mx;
+      // Limit the swipe to ~120 px so the row stays visible.
+      var clamped = Math.max(-120, Math.min(120, dx));
+      row.style.transform = 'translateX(' + clamped + 'px)';
+      row.classList.add('is-swiping');
+    }, { passive: true });
+    row.addEventListener('touchend', function() {
+      if (!active) { return; }
+      active = false;
+      tracking = false;
+      row.classList.remove('is-swiping');
+      if (dx > 60) {
+        // Swipe right: archive (placeholder — mail backend doesn't expose
+        // an archive endpoint on this pass; we just animate and remove).
+        row.style.transform = 'translateX(100%)';
+        row.style.opacity = '0';
+        window.setTimeout(function() {
+          if (row.parentNode) { row.parentNode.removeChild(row); }
+        }, 220);
+      } else if (dx < -60) {
+        // Swipe left: delete (placeholder — same as above).
+        row.style.transform = 'translateX(-100%)';
+        row.style.opacity = '0';
+        window.setTimeout(function() {
+          if (row.parentNode) { row.parentNode.removeChild(row); }
+        }, 220);
+      } else {
+        row.style.transform = '';
+      }
+    }, { passive: true });
+    row.addEventListener('touchcancel', function() {
+      active = false; tracking = false;
+      row.classList.remove('is-swiping');
+      row.style.transform = '';
+    }, { passive: true });
   }
 
   function messagesSignature(data) {

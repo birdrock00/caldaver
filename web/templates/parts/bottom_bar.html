@@ -1,0 +1,26 @@
+{# [M-001] Shared bottom navigation bar partial. Included from calendar.html,
+   cards.html, mail.html, preferences.html. The `active_section` Twig
+   variable drives the `active` class on the matching tab. The `body`
+   data-section attribute is set by mobile.js for fine-grained CSS hooks. #}
+<nav class="caldaver-bottom-tabs" aria-label="Sections">
+  <a class="caldaver-bottom-tab{% if active_section|default('calendar') == 'calendar' %} active{% endif %}"
+     href="{{ app.url_generator.generate('calendar') }}" data-section="calendar">
+    <i class="fa fa-calendar" aria-hidden="true"></i>
+    <span>{% trans %}labels.calendar{% endtrans %}</span>
+  </a>
+  <a class="caldaver-bottom-tab{% if active_section|default('calendar') == 'cards' %} active{% endif %}"
+     href="{{ app.url_generator.generate('cards') }}" data-section="cards">
+    <i class="fa fa-book" aria-hidden="true"></i>
+    <span>{% trans %}labels.contacts{% endtrans %}</span>
+  </a>
+  <a class="caldaver-bottom-tab{% if active_section|default('calendar') == 'mail' %} active{% endif %}"
+     href="{{ app.url_generator.generate('mail') }}" data-section="mail">
+    <i class="fa fa-envelope" aria-hidden="true"></i>
+    <span>{% trans %}labels.mail{% endtrans %}</span>
+  </a>
+  <a class="caldaver-bottom-tab{% if active_section|default('calendar') == 'preferences' %} active{% endif %}"
+     href="{{ app.url_generator.generate('preferences') }}" data-section="preferences">
+    <i class="fa fa-cog" aria-hidden="true"></i>
+    <span>{% trans %}labels.preferences{% endtrans %}</span>
+  </a>
+</nav>

@@ -8,13 +8,21 @@
   <div class="container-fluid calendar-shell">
    <div id="wrapper" class="calendar-layout">
 
-    <div id="sidebar">
+    <aside id="sidebar" aria-label="Calendars">
       {% include 'parts/sidebar.html' %}
-    </div>
+    </aside>
 
-    <div id="content">
+    <main id="content" role="main">
+      {# [M-020] Quick filter chips above the calendar list. #}
+      <div class="calendar-quick-chips" role="tablist" aria-label="Jump to">
+        <button type="button" class="calendar-quick-chip" data-quick="today" role="tab" aria-selected="false">Today</button>
+        <button type="button" class="calendar-quick-chip" data-quick="tomorrow" role="tab" aria-selected="false">Tomorrow</button>
+        <button type="button" class="calendar-quick-chip" data-quick="week" role="tab" aria-selected="false">This week</button>
+        <button type="button" class="calendar-quick-chip" data-quick="next-week" role="tab" aria-selected="false">Next week</button>
+        <button type="button" class="calendar-quick-chip" data-quick="month" role="tab" aria-selected="false">This month</button>
+      </div>
       <div id="calendar_view"></div>
-    </div>
+    </main>
 
    </div>
   </div>
@@ -60,6 +68,9 @@
     <i class="fa fa-plus" aria-hidden="true"></i>
     <span class="visually-hidden">{% trans %}labels.createevent{% endtrans %}</span>
   </button>
+
+  {# [M-001] Shared bottom tab bar (mobile only, hidden on desktop by CSS). #}
+  {% include 'parts/bottom_bar.html' %}
 {% endblock %}
 
 {% block bottom %}

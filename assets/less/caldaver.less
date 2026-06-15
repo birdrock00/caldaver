@@ -4835,6 +4835,457 @@ summary:focus-visible,
   transition: background-color 0.15s ease;
 }
 
+// ----------------------------------------------------------------------------
+// [M-133] Design tokens (CSS custom properties). All Caldaver surfaces should
+// read from these variables so the dark-mode override at the bottom of the file
+// can flip every colour in one place. M-130, M-151, M-153, M-135 build on top.
+// ----------------------------------------------------------------------------
+:root {
+  // Colour palette
+  --caldaver-color-primary: #1a73e8;
+  --caldaver-color-primary-strong: #1456b8;
+  --caldaver-color-primary-soft: #e8f0fe;
+  --caldaver-color-on-primary: #ffffff;
+  --caldaver-color-accent: #3367d6;
+  --caldaver-color-accent-soft: #d2e3fc;
+
+  --caldaver-color-bg: #f8fafd;
+  --caldaver-color-bg-elevated: #ffffff;
+  --caldaver-color-bg-hover: #e8f0fe;
+  --caldaver-color-bg-tap: rgba(26, 115, 232, 0.12);
+
+  --caldaver-color-text: #202124;
+  --caldaver-color-text-muted: #5f6368;
+  --caldaver-color-text-on-dark: #f5f7fa;
+  --caldaver-color-text-inverse: #ffffff;
+
+  --caldaver-color-border: #dadce0;
+  --caldaver-color-border-strong: #bdc1c6;
+  --caldaver-color-divider: #e8eaed;
+
+  --caldaver-color-danger: #d93025;
+  --caldaver-color-danger-soft: #fce8e6;
+  --caldaver-color-warning: #f9ab00;
+  --caldaver-color-warning-soft: #fef7e0;
+  --caldaver-color-success: #1e8e3e;
+  --caldaver-color-success-soft: #e6f4ea;
+  --caldaver-color-info: #1967d2;
+
+  // Focus ring + interactive states
+  --caldaver-color-focus: #1a73e8;
+  --caldaver-color-focus-ring: rgba(26, 115, 232, 0.36);
+  --caldaver-color-tap-overlay: rgba(26, 115, 232, 0.12);
+
+  // Typography
+  --caldaver-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --caldaver-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --caldaver-font-size-base: 15px;
+  --caldaver-font-size-sm: 13px;
+  --caldaver-font-size-lg: 17px;
+  --caldaver-font-size-xl: 20px;
+  --caldaver-line-height-base: 1.5;
+
+  // Layout
+  --caldaver-radius-pill: 999px;
+  --caldaver-radius-card: 12px;
+  --caldaver-radius-input: 8px;
+  --caldaver-shadow-elev-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.08);
+  --caldaver-shadow-elev-2: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --caldaver-shadow-elev-3: 0 8px 24px rgba(0, 0, 0, 0.18);
+  --caldaver-touch-target: 44px;
+  --caldaver-mobile-breakpoint: 900px;
+
+  // FullCalendar event colour hook (set inline by app.js)
+  --caldaver-fc-event-color: var(--caldaver-color-primary);
+  --caldaver-fc-event-bg: #ffffff;
+}
+
+html {
+  font-size: 100%;
+}
+
+// [M-134] System font stack applied to the whole app, replacing the legacy
+// Trebuchet MS / Roboto mix. Keep .fontoverride available for the few rules
+// that still need to opt in to a specific weight/size.
+body {
+  font-family: var(--caldaver-font-family);
+}
+
+// [M-151] Visible focus ring on every interactive element. Mirrors what
+// .qtip-close / .contact-dialog-header button already get, but on a global
+// scale so the rest of the app catches up.
+:focus-visible {
+  outline: 3px solid var(--caldaver-color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+// [M-156] Honour data-reduce-motion (M-132) at the document level. The
+// `prefers-reduced-motion: reduce` query was already honoured for spinners;
+// this extends the same idea to slide/scale/ripple animations.
+html[data-reduce-motion="true"] *,
+html[data-reduce-motion="true"] *::before,
+html[data-reduce-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+// [M-130] Dark mode. All non-themed hex values in the rules above are
+// gradually being moved to tokens; until then this block also overrides the
+// most prominent surfaces so a phone with `prefers-color-scheme: dark` no
+// longer renders as full light. Tokens used elsewhere flip automatically.
+@media (prefers-color-scheme: dark) {
+  :root {
+    --caldaver-color-bg: #11161c;
+    --caldaver-color-bg-elevated: #18212b;
+    --caldaver-color-bg-hover: #232f3c;
+    --caldaver-color-bg-tap: rgba(140, 199, 255, 0.18);
+
+    --caldaver-color-text: #f5f7fa;
+    --caldaver-color-text-muted: #b8c0ca;
+    --caldaver-color-text-on-dark: #f5f7fa;
+
+    --caldaver-color-border: #2b3742;
+    --caldaver-color-border-strong: #3a4a5a;
+    --caldaver-color-divider: #1f2a35;
+
+    --caldaver-color-primary: #8cc7ff;
+    --caldaver-color-primary-strong: #b8d8ff;
+    --caldaver-color-primary-soft: #1d2c3a;
+    --caldaver-color-accent: #8cc7ff;
+    --caldaver-color-accent-soft: #1d2c3a;
+
+    --caldaver-color-danger: #ff8983;
+    --caldaver-color-danger-soft: #3b1716;
+    --caldaver-color-warning: #fdd663;
+    --caldaver-color-warning-soft: #3a2c0a;
+    --caldaver-color-success: #81c995;
+    --caldaver-color-success-soft: #14321c;
+    --caldaver-color-info: #8cc7ff;
+
+    --caldaver-color-focus: #8cc7ff;
+    --caldaver-color-focus-ring: rgba(140, 199, 255, 0.32);
+    --caldaver-color-tap-overlay: rgba(140, 199, 255, 0.16);
+
+    --caldaver-shadow-elev-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --caldaver-shadow-elev-2: 0 4px 12px rgba(0, 0, 0, 0.55);
+    --caldaver-shadow-elev-3: 0 8px 24px rgba(0, 0, 0, 0.65);
+  }
+
+  body,
+  .loginform,
+  .calendar-shell,
+  .cards-shell,
+  .mail-shell,
+  .preferences-container,
+  .contact-dialog-panel,
+  .account-dialog .contact-dialog-panel,
+  .ui-dialog .ui-dialog-content,
+  .ui-dialog,
+  .ui-widget-content,
+  .modal-content,
+  .modal-body {
+    background: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+  }
+
+  body {
+    background-color: var(--caldaver-color-bg);
+  }
+
+  // Calendar surfaces
+  #calendar_view,
+  .fc-view,
+  .fc-view > table,
+  .fc-bg,
+  .fc-row,
+  .fc-time-grid,
+  .fc-time-grid-container,
+  .fc-slats,
+  .fc-slats td,
+  .fc-day,
+  .fc-widget-content,
+  .fc-widget-header,
+  .fc-unthemed th,
+  .fc-unthemed td,
+  .fc-unthemed hr.fc-divider,
+  .fc-list,
+  .fc-list-table,
+  .fc-list-day-cushion,
+  .fc-list-item,
+  .fc-list-empty {
+    background-color: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-border);
+  }
+
+  .fc-day-header,
+  .fc-list-day-cushion .fc-list-day-text,
+  .fc-axis,
+  .fc-day-number,
+  .fc-time,
+  .fc-title,
+  .fc-list-item-time,
+  .fc-list-item-title {
+    color: var(--caldaver-color-text);
+  }
+
+  .fc-today,
+  .fc-list-day-cushion.fc-today {
+    background-color: var(--caldaver-color-primary-soft) !important;
+  }
+
+  .fc-day-grid-event,
+  .fc-list-item,
+  .fc-time-grid-event {
+    background-color: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-border);
+  }
+
+  .fc-event {
+    background-color: var(--caldaver-color-bg-elevated);
+    border-left: 4px solid var(--caldaver-fc-event-color, var(--caldaver-color-primary));
+  }
+
+  // Topbar
+  .caldaver-topbar.navbar {
+    background: var(--caldaver-color-bg-elevated);
+    border-bottom-color: var(--caldaver-color-border);
+    color: var(--caldaver-color-text);
+
+    .navbar-brand,
+    #mobile_calendar_toolbar_date,
+    #mobile_calendar_toolbar_day {
+      color: var(--caldaver-color-text);
+    }
+
+    .mobile-calendar-toolbar-action button,
+    .topbar-menu,
+    .mobile-section-menu > summary,
+    .user-pill {
+      color: var(--caldaver-color-text);
+    }
+  }
+
+  body.caldaver-calendar-page .caldaver-topbar.navbar {
+    background: var(--caldaver-color-primary);
+    color: var(--caldaver-color-on-primary);
+
+    .navbar-brand,
+    #mobile_calendar_toolbar_date,
+    #mobile_calendar_toolbar_day,
+    .mobile-calendar-toolbar-action button,
+    .topbar-menu,
+    .mobile-section-menu > summary {
+      color: var(--caldaver-color-on-primary);
+    }
+  }
+
+  // Cards / contacts surfaces
+  .contact-row,
+  .contact-card,
+  .contacts-table-header,
+  .contacts-list-view,
+  .contacts-card-grid {
+    background: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-border);
+  }
+
+  .contact-row:hover,
+  .contact-card:hover,
+  .mail-row:hover {
+    background: var(--caldaver-color-bg-hover);
+  }
+
+  // Mail surfaces
+  .mail-row,
+  .mail-compose-screen,
+  .mail-panel,
+  .mail-toolbar,
+  .mail-reader {
+    background: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-border);
+  }
+
+  // Forms
+  input,
+  select,
+  textarea,
+  .form-control,
+  .loginform .form-control,
+  .contact-dialog input,
+  .contacts-search input,
+  .mail-search input,
+  .prefs-section .form-control,
+  .ui-dialog input,
+  .ui-dialog select,
+  .ui-dialog textarea {
+    background: var(--caldaver-color-bg);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-border);
+  }
+
+  .form-control:focus,
+  input:focus,
+  select:focus,
+  textarea:focus {
+    background: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-primary);
+    box-shadow: 0 0 0 3px var(--caldaver-color-focus-ring);
+  }
+
+  // Buttons
+  .btn-default,
+  .btn {
+    background: var(--caldaver-color-bg);
+    border-color: var(--caldaver-color-border);
+    color: var(--caldaver-color-text);
+  }
+
+  .btn-primary {
+    background: var(--caldaver-color-primary);
+    color: #11161c;
+    border-color: var(--caldaver-color-primary);
+  }
+
+  .btn-success {
+    background: var(--caldaver-color-success);
+    color: #11161c;
+  }
+
+  // Links
+  a,
+  .contact-value-link {
+    color: var(--caldaver-color-primary);
+  }
+
+  // Headings + muted text
+  h1, h2, h3, h4, h5, h6,
+  .panel-title,
+  .prefs-section legend,
+  .legend,
+  legend {
+    color: var(--caldaver-color-text);
+  }
+
+  .help-block,
+  .text-muted,
+  .form-control-static,
+  .contact-row-meta,
+  .prefs-control-label,
+  .mail-empty-state,
+  .mail-compose-status,
+  .mail-empty,
+  .prefs-account-empty {
+    color: var(--caldaver-color-text-muted);
+  }
+
+  // Dialogs (jQuery UI)
+  .ui-dialog,
+  .ui-dialog .ui-dialog-content,
+  .ui-dialog .ui-dialog-titlebar,
+  .ui-widget-header {
+    background: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-border);
+  }
+
+  .ui-widget-overlay {
+    background: rgba(0, 0, 0, 0.65);
+  }
+
+  .ui-tabs .ui-tabs-nav {
+    background: transparent;
+    border-bottom-color: var(--caldaver-color-border);
+  }
+
+  .ui-tabs .ui-tabs-nav li a {
+    color: var(--caldaver-color-text-muted);
+  }
+
+  .ui-tabs .ui-tabs-nav li.ui-tabs-active a {
+    color: var(--caldaver-color-text);
+    background: var(--caldaver-color-bg-elevated);
+  }
+
+  // Qtip popovers
+  .qtip {
+    background: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-text);
+    border-color: var(--caldaver-color-border);
+  }
+
+  .qtip .qtip-content {
+    color: var(--caldaver-color-text);
+  }
+
+  // Mobile bottom bar (injected by mobile.js)
+  body.mobile-chrome-active .mobile-bottom-bar {
+    background: var(--caldaver-color-bg-elevated);
+    border-top-color: var(--caldaver-color-border);
+  }
+
+  body.mobile-chrome-active .mobile-bottom-btn {
+    color: var(--caldaver-color-text);
+  }
+
+  body.mobile-chrome-active .mobile-bottom-btn.is-tapping,
+  body.mobile-chrome-active .mobile-bottom-btn:active {
+    background: var(--caldaver-color-bg-tap);
+  }
+
+  body.mobile-chrome-active .mobile-drawer-toggle {
+    background: var(--caldaver-color-bg-elevated);
+    color: var(--caldaver-color-primary);
+  }
+
+  body.mobile-chrome-active .mobile-fab {
+    background: var(--caldaver-color-primary);
+    color: #11161c;
+  }
+
+  // Empty states
+  .empty-state-icon {
+    color: var(--caldaver-color-text-muted);
+  }
+
+  // Calendar drawer panel
+  body.mobile-drawer-open #sidebar {
+    background: var(--caldaver-color-bg-elevated) !important;
+  }
+}
+
+// [M-153] prefers-contrast: more. Bump every text colour to a pure
+// black/white and require 3:1 border contrast minimum.
+@media (prefers-contrast: more) {
+  :root {
+    --caldaver-color-text: #000000;
+    --caldaver-color-text-muted: #000000;
+    --caldaver-color-border: #000000;
+    --caldaver-color-border-strong: #000000;
+    --caldaver-color-primary: #003ecb;
+    --caldaver-color-focus: #003ecb;
+  }
+
+  :focus-visible {
+    outline-width: 4px;
+  }
+
+  .btn,
+  .form-control,
+  input,
+  select,
+  textarea {
+    border-width: 2px;
+  }
+}
+
 // Mobile-first enhancements (touch targets, responsive layouts, safe areas).
 // Loaded last so its rules override the desktop defaults above.
 @import "caldaver-mobile.less";

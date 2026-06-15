@@ -67,12 +67,32 @@
 </div>
 
 {>form_element_start for="allday" label="alldayform" /}
-<div class="checkbox">
-<label>
-<input type="checkbox" name="allday" class="allday" value="true" {?allDay}checked="checked"{/allDay} />
+<div class="all-day-switch">
+<label for="allday_checkbox">
+<input id="allday_checkbox" type="checkbox" name="allday" class="allday" value="true" {?allDay}checked="checked"{/allDay} />
+<span>{@i18n type="labels" name="alldayform" /}</span>
 </label>
 </div>
+{! [M-036] All-day range quick-pick row. Hidden by default; visible when
+   allday is on. JS toggles visibility on change. !}
+<div class="all-day-range" id="event_all_day_range" hidden>
+<button type="button" data-range="1">1 day</button>
+<button type="button" data-range="7">All week</button>
+<button type="button" data-range="14">2 weeks</button>
+</div>
 {>form_element_end/}
+
+{! [M-033] Duration pill with quick adjusters, shown between start and end
+   for non-allday events. JS in app.js updates the end time when tapped. !}
+<div class="event-duration-pills" id="event_duration_pills" aria-label="Adjust duration">
+  <button type="button" class="event-duration-pill" data-delta="-60">-1h</button>
+  <button type="button" class="event-duration-pill" data-delta="-30">-30m</button>
+  <button type="button" class="event-duration-pill" data-delta="-15">-15m</button>
+  <span class="event-duration-pill" id="event_duration_label" aria-live="polite">1h 0m</span>
+  <button type="button" class="event-duration-pill" data-delta="15">+15m</button>
+  <button type="button" class="event-duration-pill" data-delta="30">+30m</button>
+  <button type="button" class="event-duration-pill" data-delta="60">+1h</button>
+</div>
 
 {>form_element_start for="description" label="description" /}
 <textarea name="description" class="form-control" rows="4">{description}</textarea>
