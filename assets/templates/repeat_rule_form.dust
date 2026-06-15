@@ -17,6 +17,19 @@
 
 {^fixed_repeat_rule}
 
+{! [M-035] Repeat preset chips. JS in repeat-form.js toggles the underlying
+   frequency select when a chip is tapped. "Custom…" leaves the existing
+   RRule form in control. !}
+<div class="repeat-presets" role="group" aria-label="Repeat preset">
+  <button type="button" class="repeat-preset" data-repeat-preset="none" aria-pressed="false">Does not repeat</button>
+  <button type="button" class="repeat-preset" data-repeat-preset="daily" aria-pressed="false">Daily</button>
+  <button type="button" class="repeat-preset" data-repeat-preset="weekdays" aria-pressed="false">Weekdays</button>
+  <button type="button" class="repeat-preset" data-repeat-preset="weekly" aria-pressed="false">Weekly</button>
+  <button type="button" class="repeat-preset" data-repeat-preset="monthly" aria-pressed="false">Monthly</button>
+  <button type="button" class="repeat-preset" data-repeat-preset="yearly" aria-pressed="false">Yearly</button>
+  <button type="button" class="repeat-preset" data-repeat-preset="custom" aria-pressed="false">Custom…</button>
+</div>
+
 {>form_element_start for="frequency" label="repeat" /}
  <select name="repeat_frequency" class="form-control" id="repeat_frequency">
   <option value="-1">{@i18n type="labels" name="repeatno"/}</option>

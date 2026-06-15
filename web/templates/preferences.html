@@ -6,7 +6,7 @@
 {% include 'parts/navbar.html' %}
   <div id="content" class="container">
 
-    <div class="preferences-container">
+    <div class="preferences-container" data-pull-refresh>
     <form method="post" id="prefs_form">
     <input type="hidden" name="_token" value="{{ csrf_token.getValue() }}">
 
@@ -175,11 +175,33 @@
         <a href="{{ app.url_generator.generate('calendar') }}" id="return_button" class="btn btn-default btn-block" style="width:100%;"><i class="fa fa-calendar" aria-hidden="true"></i> {% trans %}labels.return{% endtrans %}</a>
     </div>
 
+    {# [M-132] Reduce-motion toggle (client-side only, localStorage). #}
+    <fieldset class="prefs-section">
+      <legend>{% trans %}labels.accessibility{% endtrans %}</legend>
+      <div class="form-group">
+        <label class="all-day-switch" for="pref_reduce_motion">
+          <input id="pref_reduce_motion" type="checkbox" name="reduce_motion">
+          <span>{% trans %}labels.reduce_motion{% endtrans %}</span>
+        </label>
+        <span class="help-block">{% trans %}messages.help_reduce_motion{% endtrans %}</span>
+      </div>
+    </fieldset>
+
+    {# [M-270] Storage used indicator. JS fills the value via navigator.storage.estimate(). #}
+    <fieldset class="prefs-section">
+      <legend>{% trans %}labels.storage{% endtrans %}</legend>
+      <div class="form-group">
+        <span id="pref_storage_used" class="help-block">{% trans %}messages.storage_checking{% endtrans %}</span>
+      </div>
+    </fieldset>
+
     </form>
 
 
     </div>
   </div>
+  {# [M-001] Shared bottom tab bar. #}
+  {% include 'parts/bottom_bar.html' %}
 
 <div id="mail_account_dialog" class="contact-dialog account-dialog" role="dialog" aria-modal="true" aria-labelledby="mail_account_dialog_title" hidden>
   <form id="mail_account_form" action="/accounts/save" method="post">
@@ -217,6 +239,7 @@
           <option value="bearer">{% trans %}labels.auth_bearer{% endtrans %}</option>
           <option value="none">{% trans %}labels.auth_none{% endtrans %}</option>
         </select>
+        <span class="help-block">{% trans %}messages.help_auth_method{% endtrans %}</span>
       </label>
       <!-- [C7] Email address: email keyboard layout, no autocapitalize/correct -->
       <label data-account-field="email" for="account_email_address">

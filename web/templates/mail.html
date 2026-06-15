@@ -27,24 +27,40 @@
       </div>
     </div>
 
-    <section class="mail-panel">
+    <section class="mail-panel" data-pull-refresh>
       <div class="mail-toolbar">
         <h1 id="mail_account_title">{% trans %}labels.mail{% endtrans %}</h1>
         <button type="button" id="mail_refresh" title="{% trans %}labels.refresh{% endtrans %}">
           <i class="fa fa-refresh"></i>
         </button>
       </div>
-      <!-- [D9] empty-state for users with no mail accounts now offers a clear way to add one from the phone -->
-      <div id="mail_empty" class="mail-empty mail-empty-state" hidden>
-        <p>{% trans %}labels.noaccounts{% endtrans %}</p>
+      <!-- [D9 / M-223] empty-state for users with no mail accounts now offers a clear way to add one from the phone -->
+      <div id="mail_empty" class="empty-state" hidden>
+        <div class="empty-state-icon" aria-hidden="true"><i class="fa fa-envelope-open"></i></div>
+        <h2>{% trans %}labels.noaccounts{% endtrans %}</h2>
+        <p>{% trans %}labels.noaccounts_hint{% endtrans %}</p>
         <a href="{{ app.url_generator.generate('preferences') }}" class="btn btn-primary mail-empty-add-account">
           <i class="fa fa-plus" aria-hidden="true"></i> {% trans %}labels.addaccount{% endtrans %}
         </a>
       </div>
-      <div id="mail_loading" class="mail-empty mail-loading-state"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i> {% trans %}labels.loadingmessages{% endtrans %}</div>
-      <div id="mail_no_messages" class="mail-empty mail-empty-state" hidden>{% trans %}labels.nomessages{% endtrans %}</div>
-      <div id="mail_error" class="mail-error" hidden></div>
-      <div id="mail_rows" class="mail-rows"></div>
+      <!-- [M-221] Inbox zero empty-state. -->
+      <div id="mail_no_messages" class="empty-state" hidden>
+        <div class="empty-state-icon" aria-hidden="true"><i class="fa fa-inbox"></i></div>
+        <h2>{% trans %}labels.nomessages{% endtrans %}</h2>
+        <p>{% trans %}labels.nomessages_hint{% endtrans %}</p>
+        <button type="button" id="mail_compose_empty" class="btn btn-primary" aria-label="{% trans %}labels.compose{% endtrans %}">
+          <i class="fa fa-pencil" aria-hidden="true"></i> {% trans %}labels.compose{% endtrans %}
+        </button>
+      </div>
+      <div id="mail_loading" class="mail-loading-state" aria-live="polite">
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+        <div class="skeleton skeleton-row"></div>
+      </div>
+      <div id="mail_error" class="mail-error" role="alert" aria-live="assertive" hidden></div>
+      <div id="mail_rows" class="mail-rows" data-mail-rows></div>
     </section>
     <section id="mail_compose_screen" class="mail-compose-screen" hidden aria-label="Compose email">
       <div class="mail-compose-toolbar">
@@ -87,6 +103,18 @@
           <!-- [D7] body keyboard returns a normal newline rather than a submit hint -->
           <textarea id="mail_compose_body" rows="12" aria-label="Message" enterkeyhint="enter" autocapitalize="sentences"></textarea>
         </label>
+        {# [M-076] Format / Attach / More compose action buttons (previously disabled). #}
+        <div class="mail-compose-toolbar" role="toolbar" aria-label="Compose actions">
+          <button type="button" id="mail_compose_format" class="mail-compose-action" aria-label="{% trans %}labels.format{% endtrans %}" title="{% trans %}labels.format{% endtrans %}">
+            <i class="fa fa-font" aria-hidden="true"></i>
+          </button>
+          <button type="button" id="mail_compose_attach" class="mail-compose-action" aria-label="{% trans %}labels.attach{% endtrans %}" title="{% trans %}labels.attach{% endtrans %}">
+            <i class="fa fa-paperclip" aria-hidden="true"></i>
+          </button>
+          <button type="button" id="mail_compose_more" class="mail-compose-action" aria-label="{% trans %}labels.more{% endtrans %}" title="{% trans %}labels.more{% endtrans %}">
+            <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
+          </button>
+        </div>
         <div class="mail-compose-footer">
           <button type="button" id="mail_compose_discard" class="mail-compose-discard" aria-label="Discard draft">
             <i class="fa fa-trash" aria-hidden="true"></i>
@@ -98,6 +126,8 @@
     </section>
   </main>
 </div>
+{# [M-001] Shared bottom tab bar. #}
+{% include 'parts/bottom_bar.html' %}
 {% endblock %}
 
 {% block bottom %}

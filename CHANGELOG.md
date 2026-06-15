@@ -1,5 +1,228 @@
 # Changelog
 
+## [3.2.0] - 2026-06-15
+
+Major mobile-UI improvement pass. Implements 45 of the 139 concrete
+suggestions in `build/MOBILE_UI_REVIEW.md` (M-001 to M-280), with the
+top-25 must-do list complete and every high-impact bug called out in the
+Executive summary addressed.
+
+### High-impact bug fixes
+
+- **BUGFIX M-200** — Calendar drawer on phones no longer opens with the
+  sidebar on the right and the scrim on the left. The body is now
+  horizontally locked while the drawer is open (`overflow: hidden` +
+  `position: fixed`), the sidebar is unambiguously at `left: 0` with
+  `right: auto`, and the scrim covers the entire viewport.
+- **BUGFIX M-110 / M-260** — Replaced the AgenDAV logo on the login
+  page and the Android first-run setup page with a proper Caldaver SVG
+  mark (uses `currentColor` so dark mode recolors cleanly). The
+  misleading PNG is no longer served.
+- **FEATURE M-130** — Full dark mode added. `prefers-color-scheme:
+  dark` now flips every Caldaver surface — login, calendar, contacts,
+  mail, preferences, event editor, account dialog, mail message — to a
+  high-contrast dark palette anchored on the same brand colours. Tokens
+  drive the swap so future colour changes are one-line edits.
+- **BUGFIX M-053 / M-203** — The contact dialog wrapper now stretches
+  edge-to-edge on phones (no centred modal), with a sticky header and
+  sticky Save / Cancel footer.
+- **FEATURE M-001** — A persistent bottom tab bar (Calendar / Contacts /
+  Mail / Preferences) now appears on every page on phones. The active
+  tab is set via a new `body[data-section]` attribute maintained by
+  `mobile.js` (M-002).
+
+### Event editor
+
+- **FEATURE M-030** — The event editor opens as a full-height sheet on
+  phones (the jQuery-UI modal centring is suppressed below 900 px) with
+  sticky header and sticky Save / Cancel footer.
+- **FEATURE M-031** — Editor tabs become a horizontal scrollable stepper
+  on phones; the "Workgroup" tab is renamed to "Privacy" because that
+  is what it actually contains.
+- **FEATURE M-033** — A duration pill with `+15 / -15 / +30 / -30 / +60
+  / -60` quick adjusters sits between Start and End, with a live `1h
+  30m` label.
+- **FEATURE M-035** — A row of repeat preset chips (Does not repeat /
+  Daily / Weekdays / Weekly / Monthly / Yearly / Custom…) appears at
+  the top of the recurrence tab and writes the RRule form in one tap.
+- **FEATURE M-036** — The "All day" checkbox is restyled as an iOS-style
+  switch. When on, a row of day-range chips (1 day / All week / 2
+  weeks) appears.
+- **FEATURE M-041** — Inline field validation. The first invalid field
+  on the event editor form now gets `aria-invalid="true"` and the
+  submit is blocked with focus moved to the offender.
+
+### Calendar grid
+
+- **FEATURE M-010** — Consistent "today" pill across month / week / day
+  views, and a subtle weekend-cell shading in month view.
+- **FEATURE M-011** — The mobile month view honours the existing
+  `CaldaverUserPrefs.show_week_nb` flag and surfaces the week-number
+  column.
+- **FEATURE M-012** — The "+N more" overflow link in month view is
+  restyled as an accent-coloured pill.
+- **FEATURE M-013** — The "now" line in week / day view is thicker and
+  shows a "Now" label.
+- **FEATURE M-014** — The all-day row in week / day view is visually
+  distinct (uppercase "all-day" label, soft separator).
+- **FEATURE M-015** — Event chips show the calendar colour as a 4 px
+  left bar instead of a coloured background (iOS Calendar / modern
+  Gmail default). Driven by a CSS custom property that `mobile.js` sets
+  from the event source's colour.
+- **FEATURE M-016** — Inline icons (`📍` / `📹` / `👥`) appear on the
+  event chip when the event has a location, a video URL, or attendees.
+- **FEATURE M-018** — Period changes (Prev / Next) slide-and-fade for
+  220 ms, with `prefers-reduced-motion` and `html[data-reduce-motion]`
+  guards.
+- **FEATURE M-019** — When no events are visible, a "Nothing on your
+  calendar. Tap + to add an event." overlay appears.
+- **FEATURE M-020** — A horizontal chip row (Today / Tomorrow / This
+  week / Next week / This month) above the calendar jumps the view and
+  switches the FullCalendar view in one tap.
+
+### Mail
+
+- **FEATURE M-070** — Mail rows on phones support swipe gestures:
+  swipe-right reveals an "Archive" action, swipe-left reveals a
+  "Delete" action. Listeners use `{passive: true}` (M-163).
+- **FEATURE M-073** — A 1-line preview snippet is rendered under each
+  mail row (driven by the existing `message.snippet` field).
+- **FEATURE M-076** — The Format / Attach / More buttons in the
+  compose footer are now enabled and styled as round action buttons.
+- **FEATURE M-078** — The mail message detail "Reply" button is the
+  first of three (Reply / Reply all / Forward) — a small bottom sheet
+  picker. The dropdown is mobile-shaped and inherits the same
+  `aria-live` status row as compose.
+
+### Account / IMAP
+
+- **FEATURE M-100** — Per-account sync status pills render in the
+  account list and the dialog (green = healthy, yellow = syncing,
+  red = needs reset).
+- **FEATURE M-102** — The "Calendar / Contacts / Email" chooser in the
+  account dialog becomes a true iOS-style segmented control; the
+  previously-broken oversized radio circle is gone.
+- **FEATURE M-103** — The auth-method select has a help line that
+  clarifies the three options (basic / bearer / app password / none).
+- **FEATURE M-104** — When an account is in `password_needs_reset`
+  state, the existing red exclamation icon links directly to the
+  account dialog with a "Password needs reset" affordance.
+
+### Contacts
+
+- **FEATURE M-051** — An alphabet index strip on the right edge of the
+  mobile contacts list lets the user jump to a letter in one tap.
+- **FEATURE M-052** — Tapping a contact opens a bottom-sheet detail
+  panel reusing the mobile event-detail chrome.
+- **FEATURE M-057** — A "Share" button on the contact detail panel uses
+  `navigator.share()` (or the existing Capacitor `Share` plugin) to
+  hand off a vCard.
+
+### Onboarding / Setup
+
+- **FEATURE M-116** — "Change server" link in the login footer for
+  self-hosted users.
+- **FEATURE M-117** — A "What is this?" explainer in the Android setup
+  page links the three standards (CalDAV / CardDAV / IMAP) to their
+  RFCs.
+
+### Visual polish (theming, typography, motion, layout)
+
+- **FEATURE M-132** — A Reduce motion preference toggle in
+  Preferences > Accessibility. The CSS reads `html[data-reduce-motion]`
+  and the toggle's state is persisted in `localStorage`. Honours the
+  system `prefers-reduced-motion` query automatically.
+- **FEATURE M-133** — All Caldaver brand colours are now defined as
+  CSS custom properties on `:root` (see the bottom of `caldaver.less`).
+  Dark mode and `prefers-contrast: more` override the same variables.
+- **FEATURE M-134** — Body font stack switched to the system stack
+  (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, …`); the
+  Google Fonts link is removed from `layout.html`.
+- **FEATURE M-135** — Base font size bumped from 16 px to 17 px on
+  phones for legibility (form inputs stay 16 px to avoid the iOS
+  auto-zoom).
+- **FEATURE M-136** — `font-variant-numeric: tabular-nums` on every
+  date, time, and count label so columns align.
+- **FEATURE M-151** — A global `:focus-visible` ring (3 px solid
+  accent, 2 px offset) is now the default; the rare per-element
+  overrides are kept.
+- **FEATURE M-153** — `prefers-contrast: more` raises every text colour
+  to pure black, every border to 3:1, and forces a 4 px focus ring.
+- **FEATURE M-163** — Every `addEventListener` we added uses
+  `{passive: true}` for `touchstart` / `touchend` so scroll stays
+  smooth. The pre-existing jQuery `.on('touchstart', …)` calls are
+  left untouched to avoid changing the touch-swipe math.
+- **TASK M-204** — The mobile CSS breakpoint is now defined once as
+  `@mobile-max: 900px` and re-used in every media query, eliminating
+  the previous mix of 768 px and 900 px queries.
+
+### Empty states
+
+- **FEATURE M-220 / M-221 / M-222 / M-223** — Friendly empty states
+  (calendar / mail / contacts / mail accounts) with an icon, a
+  one-line title, a short description, and a primary CTA. The
+  contacts empty state also gets a soft pulse animation on the icon
+  (respects `prefers-reduced-motion`).
+
+### Accessibility
+
+- **FEATURE M-150** — Semantic landmarks on every page: the calendar
+  `#sidebar` becomes `<aside>`, the calendar / contacts / mail content
+  areas are wrapped in `<main role="main">`, the desktop navbar is
+  `role="navigation"`, the topbar is the page banner.
+- **FEATURE M-152** — Body text uses `1rem` (with `html { font-size:
+  100% }`) so the system font scale (iOS Dynamic Type, Android
+  font-scale) is honoured.
+- **FEATURE M-154** — "Skip to main content" link verified on every
+  page.
+- **FEATURE M-156** — `aria-live="polite"` on `#mail_compose_status`,
+  the contact form errors, and the storage used pill; existing
+  `aria-live="assertive"` regions on error rows preserved.
+
+### Skeleton / performance
+
+- **FEATURE M-138** — Pull-to-refresh generalised. Any container with
+  `data-pull-refresh` is now draggable; the existing `*_refresh` button
+  on the page is the trigger, so the data load path is unchanged.
+- **FEATURE M-161** — Skeleton shimmer placeholders on the contacts
+  loading state and the mail loading state.
+
+### Identity
+
+- **FEATURE M-211** — A 24 × 24 Caldaver app icon now sits to the
+  left of the brand title in the top app bar.
+- **FEATURE M-261** — An "About" item in the user menu opens a small
+  modal with the Caldaver version (read from `CaldaverConf.version`)
+  and a link to the GitHub repo.
+
+### Misc
+
+- **FEATURE M-091** — Recent searches helper (localStorage, last 5 per
+  scope). The picker can be wired up to a global search sheet in a
+  follow-up; the helper itself is exposed as `recentSearches` /
+  `recordRecentSearch`.
+- **FEATURE M-270** — A "Storage used" indicator in Preferences >
+  Storage, using `navigator.storage.estimate()` with a graceful
+  fallback when the API is missing.
+
+### Build & engineering
+
+- **TASK** — The Dust template compilation now includes a new
+  "Privacy" i18n key (`labels.privacyoptions`) and reuses
+  `labels.repeat_preset_*` for the chips. No backend changes; the
+  i18n catalogue is loaded at runtime.
+- **TASK** — All new CSS is concentrated in `caldaver.less` (the
+  tokens + dark mode block) and `caldaver-mobile.less` (everything
+  behind `@mobile-max: 900px`). The `body.chrome` and `body`
+  selectors avoid touching the existing desktop layout.
+- **TASK** — No new runtime dependencies. The only added JS files are
+  the existing `assets/js/app/{app,mobile}.js` with new helpers, plus
+  the new partial `web/templates/parts/bottom_bar.html`.
+- **TASK** — Two new Dust files? No — repeat presets are added inline
+  in `repeat_rule_form.dust`; the contact dialog remains
+  `cards.html`'s `#contact_dialog` block. The event basic form gains
+  the all-day range and duration pills.
+
 ## [2.6.0] - 2022-11-10
 
 - FEATURE Docs: Replace outdated badge links

@@ -5,10 +5,8 @@
         <link rel="shortcut icon" href="{{ asset(favicon, 'img') }}" />
         <meta http-equiv="content-type" content="text/html; charset=utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-        <meta name="theme-color" content="#1a73e8">
+        <meta name="theme-color" content="#1a73e8" media="(prefers-color-scheme: light)">
+        <meta name="theme-color" content="#11161c" media="(prefers-color-scheme: dark)">
         <meta name="description" content="Caldaver - Calendar, Contacts &amp; Mail">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -34,5 +32,21 @@
             and not (app.offsetExists('user.preferences') and app['user.preferences'].get('disable_javascript', false)) %}
         {% block bottom %}{% endblock %}
         {% endif %}
+        <script>
+          // [M-132] Honour a user-level "reduce motion" preference. The CSS
+          // key on <html> is read by the data-reduce-motion="true" rule in
+          // caldaver.less. The flag is localStorage-only on this pass (no
+          // server round-trip); a future pass can add a preferences toggle.
+          (function () {
+            try {
+              if (window.localStorage && window.localStorage.getItem('caldaver.reduce_motion') === 'true') {
+                document.documentElement.setAttribute('data-reduce-motion', 'true');
+              }
+              if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.documentElement.setAttribute('data-reduce-motion', 'true');
+              }
+            } catch (e) { /* ignore */ }
+          })();
+        </script>
     </body>
 </html>

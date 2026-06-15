@@ -899,6 +899,49 @@ var send_form = function send_form(params) {
 
 
 /**
+ * [M-041] Inline field validation. Walks the form looking for the first
+ * invalid field (per HTML5 + a few custom checks) and applies aria-invalid
+ * + a .form-error helper. Returns true if valid, false otherwise.
+ */
+var validateFormInline = function validateFormInline($form) {
+  if (!$form || $form.length === 0) {
+    return true;
+  }
+  // Clear any previous error state.
+  $form.find('input, select, textarea').removeAttr('aria-invalid');
+  $form.find('.form-error').remove();
+  var firstInvalid = null;
+  $form.find('input, select, textarea').each(function() {
+    var $el = $(this);
+    if ($el.prop('disabled')) {
+      return;
+    }
+    // Skip hidden fields and types we don't validate client-side.
+    var type = ($el.attr('type') || '').toLowerCase();
+    if (type === 'hidden' || type === 'submit' || type === 'button') {
+      return;
+    }
+    var value = ($el.val() || '').toString().trim();
+    var required = $el.prop('required') || $el.attr('aria-required') === 'true';
+    if (required && !value) {
+      $el.attr('aria-invalid', 'true');
+      firstInvalid = firstInvalid || $el;
+      return;
+    }
+    if (type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+      $el.attr('aria-invalid', 'true');
+      firstInvalid = firstInvalid || $el;
+    }
+  });
+  if (firstInvalid) {
+    try { firstInvalid.focus(); } catch (e) { /* ignore */ }
+    return false;
+  }
+  return true;
+};
+
+
+/**
  * Generates a dialog
  *
  * Parameters:
@@ -1137,6 +1180,11 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
     'text': t('labels', 'save'),
     'class': 'addicon btn-icon-event-edit',
     'click': function() {
+      // [M-041] Inline field validation. Falls through to the network
+      // submit when all required fields are present.
+      if (typeof validateFormInline === 'function' && !validateFormInline($('#event_edit_form'))) {
+        return;
+      }
       var event_fields = $('#event_edit_form').serializeObject();
 
       event_fields.timezone = event_fields.timezone || calendar_timezone();
@@ -1237,19 +1285,120 @@ var handle_date_and_time = function handle_date_and_time(where, data) {
 
       $start_time.hide();
       $end_time.hide();
+      // [M-036] Show the all-day range row.
+      var $range = $(where).find('#event_all_day_range');
+      if ($range.length) {
+        $range.prop('hidden', false);
+      }
+      // [M-033] Hide the duration pill row when allday is on.
+      var $pills = $(where).find('#event_duration_pills');
+      if ($pills.length) {
+        $pills.prop('hidden', true);
+      }
     } else {
       $start_time.prop('required', true);
       $end_time.prop('required', true);
 
       $start_time.show();
       $end_time.show();
+      var $range = $(where).find('#event_all_day_range');
+      if ($range.length) {
+        $range.prop('hidden', true);
+      }
+      var $pills = $(where).find('#event_duration_pills');
+      if ($pills.length) {
+        $pills.prop('hidden', false);
+      }
     }
 
     generate_iso8601_values($(where));
   });
 
+  // [M-033] Duration pill quick-adjusters. Each button shifts the end
+  // time by the given delta and re-renders. The label between the buttons
+  // reflects the current duration.
+  function formatDuration(mins) {
+    if (typeof mins !== 'number' || isNaN(mins) || mins < 0) {
+      mins = 0;
+    }
+    var h = Math.floor(mins / 60);
+    var m = Math.floor(mins % 60);
+    if (h > 0) {
+      return h + 'h ' + m + 'm';
+    }
+    return m + 'm';
+  }
+  function refreshDurationLabel() {
+    var $label = $(where).find('#event_duration_label');
+    if ($label.length === 0) {
+      return;
+    }
+    var mins = calculate_event_duration();
+    $label.text(formatDuration(mins));
+  }
+  $(where).on('click', '.event-duration-pill[data-delta]', function() {
+    var delta = parseInt($(this).attr('data-delta'), 10);
+    if (!delta || isNaN(delta)) {
+      return;
+    }
+    var $start_time = $(where).find('input.start_time');
+    var $end_time = $(where).find('input.end_time');
+    var $start_date = $(where).find('input.start_date');
+    var $end_date = $(where).find('input.end_date');
+    // Parse current start with date and time
+    var startStr = ($start_date.val() || '') + ' ' + ($start_time.val() || '');
+    var endStr = ($end_date.val() || '') + ' ' + ($end_time.val() || '');
+    var tz = form_timezone(where);
+    var start = CaldaverDateAndTime.getMoment(startStr, tz);
+    var end = CaldaverDateAndTime.getMoment(endStr, tz);
+    if (!start || !end) {
+      return;
+    }
+    // Apply delta to the end, preserve duration
+    end.add(delta, 'minutes');
+    // If new end is before start, also bump start
+    if (end.isBefore(start)) {
+      start.add(delta, 'minutes');
+    }
+    $end_date.val(CaldaverDateAndTime.extractDate(end));
+    $end_time.val(CaldaverDateAndTime.extractTime(end));
+    $start_date.val(CaldaverDateAndTime.extractDate(start));
+    $start_time.val(CaldaverDateAndTime.extractTime(start));
+    generate_iso8601_values($(where));
+    refreshDurationLabel();
+  });
+  // Update the duration label whenever start or end time changes.
+  $(where).on('change', 'input.start_time, input.end_time, input.start_date, input.end_date', function() {
+    window.setTimeout(refreshDurationLabel, 0);
+  });
+
+  // [M-036] All-day range quick-pick. Tapping a chip sets the end date to
+  // start_date + (range - 1) days. All-day events use exclusive ends in
+  // FullCalendar, so +1 day is "same day".
+  $(where).on('click', '.all-day-range button[data-range]', function() {
+    var days = parseInt($(this).attr('data-range'), 10);
+    if (!days || isNaN(days)) {
+      return;
+    }
+    var $start_date = $(where).find('input.start_date');
+    var $end_date = $(where).find('input.end_date');
+    var startStr = $start_date.val();
+    if (!startStr) {
+      return;
+    }
+    var tz = form_timezone(where);
+    var start = CaldaverDateAndTime.getMoment(startStr, tz);
+    if (!start) {
+      return;
+    }
+    var end = start.clone().add(days - 1, 'days');
+    $end_date.val(CaldaverDateAndTime.extractDate(end));
+    generate_iso8601_values($(where));
+  });
+
   // Update status
   $allday.trigger('change');
+  refreshDurationLabel();
 
   // Preserve start->end duration
   $(where)

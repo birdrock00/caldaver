@@ -15,8 +15,8 @@
      {@i18n type="labels" name="remindersoptions" /}</a>
     </li>
     <li role="presentation"><a role="tab" href="#tabs-workgroup" data-toggle="tab">
-    <i class="tab-icon fa fa-group"></i>
-     {@i18n type="labels" name="workgroupoptions" /}</a>
+    <i class="tab-icon fa fa-eye"></i>
+     {@i18n type="labels" name="privacyoptions" /}</a>
     </li>
 </ul>
 
