@@ -13,5 +13,12 @@
     "captureInput": true,
     "backgroundColor": "#ffffff",
     "webContentsDebuggingEnabled": false
+  },
+  "ios": {
+    "backgroundColor": "#ffffff",
+    "allowsLinkPreview": false,
+    "preferredContentMode": "mobile",
+    "webContentsDebuggingEnabled": false,
+    "contentInset": "never"
   }
 }

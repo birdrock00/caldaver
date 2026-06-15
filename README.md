@@ -54,7 +54,7 @@ wordmark, no footer).
 
 ### Mail (IMAP)
 
-- Per-user IMAP accounts, managed from **Preferences &rarr; Accounts**
+- Per-user IMAP accounts, managed from **Preferences > Accounts**
 - Multi-account sidebar; switch accounts without losing context
 - Cached inbox overview for fast reloads, plus an explicit `sync` endpoint
   for a fresh IMAP fetch
@@ -164,7 +164,7 @@ docker run -d --name caldaver \
 ```
 
 Open <http://localhost:8080/>, sign in, and add your CalDAV, CardDAV, and
-IMAP accounts from **Preferences &rarr; Accounts**. Account credentials are
+IMAP accounts from **Preferences > Accounts**. Account credentials are
 encrypted in PostgreSQL &mdash; do not put them in the container environment.
 
 | Variable | Required | Purpose |
@@ -224,12 +224,18 @@ The high-level groups are:
 ### Account credentials
 
 CalDAV, CardDAV, and email account passwords are **not** read from the
-container environment. PostgreSQL stores them, encrypted with AES-256-GCM
-using the key derived from `CALDAVER_MAIL_PASSWORD_KEY`. Add and maintain
-those accounts from **Preferences &rarr; Accounts**. Legacy credentials
-that were set through environment variables or kept in a login session are
-migrated once into PostgreSQL on first run; after that, all runtime access
-goes through the stored account rows.
+container environment. PostgreSQL stores CalDAV, CardDAV, and email account credentials,
+encrypted with AES-256-GCM using the key derived from
+`CALDAVER_MAIL_PASSWORD_KEY`. Use at least 32 bytes of random material
+and keep it stable across redeployments. The server fails closed when
+that key is missing or shorter than 32 bytes. The local login password
+must never be used as an encryption-key fallback. Add and maintain those
+accounts from **Preferences > Accounts**. Legacy credentials that were
+set through environment variables or kept in a login session are migrated
+once into PostgreSQL on first run; after that, all runtime access goes
+through the stored account rows.
+
+Do not store CalDAV, CardDAV, or email account passwords in Kubernetes secrets or container environment variables.
 
 ## Build from Source
 
