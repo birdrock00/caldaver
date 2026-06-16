@@ -493,6 +493,26 @@ body.mobile-drawer-open .preferences-container {
 
   .caldaver-bottom-tabs .caldaver-bottom-tab.active {
     color: var(--caldaver-color-primary);
+    // [E46] Add a 3px top accent bar so the active tab reads at a glance
+    // even when only the icon is visible.
+    position: relative;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 25%;
+      right: 25%;
+      height: 3px;
+      background: var(--caldaver-color-primary);
+      border-radius: 0 0 2px 2px;
+    }
+
+    i {
+      // [E46] Use the filled (solid) variant colour for the active icon.
+      color: var(--caldaver-color-primary);
+      font-weight: 700;
+    }
   }
 
   .caldaver-bottom-tabs .caldaver-bottom-tab:focus-visible {
@@ -678,8 +698,10 @@ body.calendar-empty #calendar_view::after {
   .calendar-quick-chips::-webkit-scrollbar { display: none; }
   .calendar-quick-chip {
     flex: 0 0 auto;
-    min-height: 32px;
-    padding: 0 14px;
+    // [C5] Touch target raised from 32px to 44px (Apple HIG / Material
+    // minimum) and given comfortable horizontal padding.
+    min-height: 44px;
+    padding: 10px 12px;
     border-radius: var(--caldaver-radius-pill);
     border: 1px solid var(--caldaver-color-border);
     background: var(--caldaver-color-bg-elevated);
@@ -733,12 +755,24 @@ body.calendar-empty #calendar_view::after {
     padding: 12px 16px !important;
     border-radius: 0 !important;
     border-bottom: 1px solid var(--caldaver-color-divider);
+    // [E8] Pin the title bar so it stays reachable while the long event
+    // form scrolls underneath it on phones.
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff;
   }
 
   body .ui-dialog .ui-dialog-buttonpane {
     padding: 12px 16px !important;
     border-top: 1px solid var(--caldaver-color-divider);
     margin: 0 !important;
+    // [E9] Pin the action bar so the Save/Cancel buttons are always within
+    // thumb reach at the bottom of the dialog.
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    background: #fff;
   }
 
   body .ui-dialog .ui-dialog-buttonpane .ui-button {
@@ -1216,12 +1250,14 @@ body.calendar-empty #calendar_view::after {
     border-radius: var(--caldaver-radius-pill);
   }
   .contacts-alphabet-index button {
-    width: 20px;
-    height: 18px;
+    // [C6] Touch target raised to 44x44 with a readable 14px label so the
+    // jump-to-letter strip is comfortably tappable.
+    min-width: 44px;
+    min-height: 44px;
     border: 0;
     background: transparent;
     color: var(--caldaver-color-text-muted);
-    font-size: 10px;
+    font-size: 14px;
     font-weight: 700;
     padding: 0;
     cursor: pointer;

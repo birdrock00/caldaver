@@ -3872,7 +3872,9 @@ summary:focus-visible,
   .mail-mobile-compose-button {
     position: fixed;
     right: ~"calc(18px + env(safe-area-inset-right))";
-    bottom: ~"calc(18px + env(safe-area-inset-bottom))";
+    // [C2] Lift above the 56px shared bottom tab bar plus safe area so the
+    // compose FAB does not sit underneath the bottom navigation.
+    bottom: ~"calc(72px + env(safe-area-inset-bottom))";
     z-index: 2400;
     display: inline-flex;
     width: auto;
@@ -4334,8 +4336,10 @@ summary:focus-visible,
   }
 
   body.caldaver-calendar-page .ui-datepicker-header {
-    min-height: 96px;
-    padding: 18px 24px;
+    // [C13] Tightened from 96px to 56px; the previous value left a large
+    // empty band above the calendar grid below the title.
+    min-height: 56px;
+    padding: 12px 24px;
     color: #fff;
     background: #7e7aa7;
     border: 0;
@@ -4344,7 +4348,8 @@ summary:focus-visible,
 
   body.caldaver-calendar-page .ui-datepicker-title {
     margin: 0;
-    padding-top: 26px;
+    // [C13] Padding tightened from 26px to 12px to match the new header.
+    padding-top: 12px;
     color: #fff;
     font-size: 32px;
     font-weight: 400;
@@ -4354,7 +4359,8 @@ summary:focus-visible,
 
   body.caldaver-calendar-page .ui-datepicker-prev,
   body.caldaver-calendar-page .ui-datepicker-next {
-    top: 106px;
+    // [C13] Anchor the prev/next buttons below the tightened header.
+    top: 66px;
     width: 44px;
     height: 44px;
     border: 0;
@@ -5286,8 +5292,113 @@ html[data-reduce-motion="true"] *::after {
   }
 }
 
+// [C3] iOS zoom guard for the contact/account dialog inputs. The desktop
+// rule above sets 14px which triggers the auto-zoom on focus on iOS; bump
+// to 16px at the mobile breakpoint.
+@media (max-width: 900px) {
+  .contact-dialog-panel input[type="text"],
+  .contact-dialog-panel input[type="email"],
+  .contact-dialog-panel input[type="tel"],
+  .contact-dialog-panel input[type="url"],
+  .contact-dialog-panel input[type="password"],
+  .contact-dialog-panel input[type="number"],
+  .contact-dialog-panel input:not([type]),
+  .contact-dialog-panel select,
+  .contact-dialog-panel textarea {
+    font-size: 16px;
+  }
+}
+
+// [C4] Same iOS-zoom guard for the mail reply composer inputs and body. The
+// desktop rule at 3087 inherits a 13px label/13px-input style; 16px on
+// touch viewports prevents the focus-zoom.
+@media (max-width: 900px) {
+  .mail-reply-composer input,
+  .mail-reply-composer textarea,
+  .mail-compose-form input,
+  .mail-compose-form textarea {
+    font-size: 16px;
+  }
+}
+
+// [E24] Visible close affordance on the event details popup (qTip). The
+// default jQuery UI close button is a tiny "×" that is hard to spot on
+// touch devices. Enlarge it and give it a circular tap target.
+.view_event_details .qtip-titlebar .ui-state-close,
+#qtip-event_details .qtip-titlebar .ui-state-close {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  color: #5f6368;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.view_event_details .qtip-titlebar .ui-state-close:hover,
+#qtip-event_details .qtip-titlebar .ui-state-close:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #202124;
+}
+
+@media (max-width: 900px) {
+  .view_event_details .qtip-titlebar .ui-state-close,
+  #qtip-event_details .qtip-titlebar .ui-state-close {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    font-size: 22px;
+  }
+}
+
+// [E17] Danger button styling for destructive actions (delete calendar,
+// discard draft, etc.) so they are visually distinct from default buttons.
+.btn-danger {
+  background: #d93025;
+  color: #fff;
+  border-color: #b3261e;
+
+  &:hover,
+  &:focus {
+    background: #b3261e;
+    color: #fff;
+  }
+}
+
+// [E38] Active tab icon color: when a jQuery UI tab is active, lift its
+// icon to the same primary blue used elsewhere so the open tab reads at a
+// glance.
+.nav-tabs > li.active .tab-icon,
+.ui-tabs-nav > li.ui-tabs-active .tab-icon,
+.ui-tabs-nav > li.ui-tabs-selected .tab-icon {
+  color: #174ea6;
+}
+
+// [E44] Stronger active calendar view button: FullCalendar's default
+// active state is a faint blue tint. Override with the brand primary so
+// the selected view (month/week/day/list) is unmistakable.
+#calendar_view .fc-button-group .fc-button.fc-state-active,
+#calendar_view .fc-button-group .fc-button.ui-state-active {
+  background: #1a73e8;
+  color: #fff;
+  border-color: #1a73e8;
+}
+
 // Mobile-first enhancements (touch targets, responsive layouts, safe areas).
 // Loaded last so its rules override the desktop defaults above.
 @import "caldaver-mobile.less";
+
+// [C1] Hide the shared bottom tab bar whenever a modal overlay is on screen.
+// Matches the existing :has() pattern in caldaver-mobile.less for other
+// floating chrome; lives here so it applies unconditionally (not only at
+// the mobile breakpoint) for the in-app WebView.
+body:has(.ui-widget-overlay) .caldaver-bottom-tabs,
+body:has(.modal.in) .caldaver-bottom-tabs {
+  display: none !important;
+}
 
 // vim: ft=css sw=2 tabstop=2 expandtab

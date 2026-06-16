@@ -1,5 +1,11 @@
 <div id="event_edit_recurrent_dialog">
 
+{?readable_dates}
+{! [E20] Show the date of the instance the user is acting on so it's clear
+   which event will be modified by "this repetition" vs "all repetitions". !}
+<p class="recurrent-dialog-date"><strong>{readable_dates}</strong></p>
+{/readable_dates}
+
 <p>{@i18n type="messages" name="info_edit_recurrent_event"/}</p>
 
 {?has_exceptions}

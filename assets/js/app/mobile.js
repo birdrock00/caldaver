@@ -606,7 +606,7 @@
         'padding:env(safe-area-inset-bottom,0) 0 0 0;}',
       'body.mobile-chrome-active .mobile-bottom-btn{flex:1 1 0;min-height:56px;border:0;background:transparent;',
         'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;',
-        'font-size:11px;color:#444;padding:6px 2px;cursor:pointer;-webkit-tap-highlight-color:transparent;}',
+        'font-size:12px;color:#444;padding:6px 2px;cursor:pointer;-webkit-tap-highlight-color:transparent;}',
       'body.mobile-chrome-active .mobile-bottom-btn .fa{font-size:18px;}',
       'body.mobile-chrome-active .mobile-bottom-btn.is-tapping{background:rgba(51,103,214,.15);}',
       'body.mobile-chrome-active .mobile-bottom-btn:active{background:rgba(51,103,214,.15);}',

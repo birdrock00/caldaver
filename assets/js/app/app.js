@@ -52,6 +52,15 @@ var calendar_default_view_for_viewport = function calendar_default_view_for_view
     return 'customizable_list';
   }
 
+  // [E42] Restore the last user-selected view on desktop. Falls back to
+  // the user preference if no saved value exists.
+  try {
+    var saved = window.localStorage && window.localStorage.getItem('caldaver.last_calendar_view');
+    if (saved && fullcalendar_views[saved] !== undefined) {
+      return fullcalendar_views[saved];
+    }
+  } catch (e) { /* ignore */ }
+
   return fullcalendar_views[CaldaverUserPrefs.default_view];
 };
 
@@ -266,6 +275,17 @@ $(document).ready(function() {
         todayBtn.removeClass('ui-state-disabled fc-state-disabled')
                 .prop('disabled', false);
       }
+
+      // [E42] Persist the user's selected view name so it survives page
+      // reloads. Skip the customizable_list view on mobile (that's the
+      // default there anyway).
+      if (view && view.name && view.name !== 'customizable_list') {
+        try {
+          if (window.localStorage) {
+            window.localStorage.setItem('caldaver.last_calendar_view', view.name);
+          }
+        } catch (e) { /* ignore */ }
+      }
     },
     eventAfterAllRender: function(view) {
       insert_mobile_previous_events_row(view);
@@ -282,6 +302,39 @@ $(document).ready(function() {
 
     eventResize: event_resize_callback,
     eventDrop: event_drop_callback
+  });
+
+  // [E45] Number-key shortcuts for the four primary calendar views. Only
+  // fires on the calendar page when no dialog or input is focused so we
+  // don't hijack typing. 1=month, 2=week, 3=day, 4=list.
+  $(document).on('keydown.calendarShortcuts', function(e) {
+    if (e.altKey || e.ctrlKey || e.metaKey) {
+      return;
+    }
+    if (e.key !== '1' && e.key !== '2' && e.key !== '3' && e.key !== '4') {
+      return;
+    }
+    // Skip when a dialog overlay is open or focus is in a form field.
+    if ($('.ui-widget-overlay:visible').length > 0) {
+      return;
+    }
+    var $active = $(document.activeElement);
+    if ($active.is('input, textarea, select, [contenteditable="true"]')) {
+      return;
+    }
+    var view_map = { '1': 'month', '2': 'agendaWeek', '3': 'agendaDay', '4': 'customizable_list' };
+    var target = view_map[e.key];
+    if (!target) {
+      return;
+    }
+    if (is_mobile_viewport() && target !== 'customizable_list') {
+      // List view is the only one that makes sense on phones; ignore the
+      // other shortcuts there.
+      return;
+    }
+    try {
+      $('#calendar_view').fullCalendar('changeView', target);
+    } catch (err) { /* ignore */ }
   });
 
   // Event details popup
@@ -1015,6 +1068,26 @@ var show_dialog = function show_dialog(params) {
             }
           }
         });
+
+        // [E1] Enter-to-save: when the user presses Enter (without Shift)
+        // inside a single-line input within the dialog, trigger the primary
+        // button. Skip textareas (Enter should insert a newline), buttons
+        // themselves (their default click fires), and links.
+        $widget.on('keydown.enterSave', 'input:not([type="button"]):not([type="submit"]):not(button)', function(e) {
+          if (e.keyCode !== $.ui.keyCode.ENTER) {
+            return;
+          }
+          if (e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) {
+            return;
+          }
+          var $pane = $widget.find('.ui-dialog-buttonpane .ui-dialog-buttonset');
+          var $primary = $pane.children().first();
+          if ($primary.length === 0) {
+            return;
+          }
+          e.preventDefault();
+          $primary.trigger('click');
+        });
       },
       close: function(ev, ui) {
         $(this).dialog('widget').off('keydown.focusTrap');
@@ -1237,7 +1310,88 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
 
       // Reminders
       reminders_manager();
+
+      // [E35] [E10] Wire the summary input to toggle the Save button's
+      // disabled state and to drive the character counter.
+      bind_event_summary_guard('#event_edit_dialog');
+
+      // [E34] Auto-grow the description textarea.
+      bind_autogrow_textarea('#event_edit_dialog textarea.autogrow');
+
+      // [E36] Alt+A toggles the all-day checkbox from anywhere in the
+      // dialog (helpful on small screens where the checkbox is far below
+      // the summary input).
+      $('#event_edit_dialog').on('keydown.altA', function(e) {
+        if (e.altKey && (e.key === 'a' || e.key === 'A' || e.keyCode === 65)) {
+          var $allday = $(this).find('input.allday');
+          if ($allday.length) {
+            e.preventDefault();
+            $allday.prop('checked', !$allday.prop('checked')).trigger('change');
+          }
+        }
+      });
     }
+  });
+};
+
+
+/*
+ * [E35] [E10] Disables the primary Save button (first button in the dialog's
+ * button pane) while the summary input is empty, and keeps any
+ * <span class="char-counter" data-for="summary"> in sync with the input's
+ * remaining character count. No-op when the elements aren't present.
+ */
+var bind_event_summary_guard = function bind_event_summary_guard(dialog_selector) {
+  var $dialog = $(dialog_selector);
+  if ($dialog.length === 0) {
+    return;
+  }
+  var $summary = $dialog.find('input.summary');
+  if ($summary.length === 0) {
+    return;
+  }
+  var $widget = $dialog.dialog('widget');
+  var $primary = $widget.find('.ui-dialog-buttonset').children().first();
+  var $counter = $dialog.find('.char-counter[data-for="summary"]');
+  var maxLength = parseInt($summary.attr('maxlength'), 10) || 0;
+
+  var sync = function sync() {
+    var val = ($summary.val() || '').toString();
+    if ($primary.length) {
+      $primary.prop('disabled', val.trim().length === 0)
+              .toggleClass('ui-state-disabled', val.trim().length === 0)
+              .attr('aria-disabled', val.trim().length === 0 ? 'true' : 'false');
+    }
+    if ($counter.length) {
+      if (maxLength > 0) {
+        $counter.text((maxLength - val.length) + ' / ' + maxLength);
+      } else {
+        $counter.text(val.length);
+      }
+    }
+  };
+
+  $summary.on('input.summaryGuard', sync);
+  sync();
+};
+
+/*
+ * [E34] Auto-grows a textarea to fit its contents up to a sensible max.
+ * Listens to 'input' events and adjusts the height attribute. No-op if
+ * jQuery or the element isn't present.
+ */
+var bind_autogrow_textarea = function bind_autogrow_textarea(selector) {
+  $(selector).each(function() {
+    var $ta = $(this);
+    var maxHeight = 400;
+    var adjust = function adjust() {
+      $ta.css('height', 'auto');
+      var proposed = $ta[0].scrollHeight;
+      $ta.css('height', Math.min(proposed, maxHeight) + 'px');
+    };
+    $ta.on('input.autogrow', adjust);
+    // Run once on init to size to existing content.
+    try { adjust(); } catch (e) { /* ignore */ }
   });
 };
 
@@ -1478,6 +1632,10 @@ var calendar_create_dialog = function calendar_create_dialog() {
     'text': t('labels', 'create'),
     'class': 'addicon btn-icon-calendar-add',
     'click': function() {
+      // [E14] Inline field validation before submitting the create form.
+      if (typeof validateFormInline === 'function' && !validateFormInline($('#calendar_create_form'))) {
+        return;
+      }
       var calendar_data = $('#calendar_create_form').serialize();
 
       send_form({
@@ -1546,6 +1704,11 @@ var calendar_modify_dialog = function calendar_modify_dialog(calendar_obj) {
         'text': t('labels', 'save'),
         'class': 'addicon btn-icon-calendar-edit',
         'click': function() {
+
+          // [E15] Inline field validation before submitting the modify form.
+          if (typeof validateFormInline === 'function' && !validateFormInline($('#calendar_modify_form'))) {
+            return;
+          }
 
           var calendar_data = $('#calendar_modify_form').serialize();
 
@@ -2204,7 +2367,26 @@ var reminders_manager = function reminders_manager() {
   reminders_manager_no_entries_placeholder();
 
   manager.on('click', '.remove', function(event) {
-      $(this).closest('.reminder').remove();
+      var $row = $(this).closest('.reminder');
+      // [E29] If this reminder has a non-zero count, confirm before
+      // discarding it so the user doesn't lose a configured alert with a
+      // stray tap.
+      var countVal = 0;
+      var $count = $row.find('input[name="reminders[count][]"]');
+      if ($count.length) {
+        countVal = parseInt(($count.val() || '0').toString(), 10) || 0;
+      }
+      if (countVal > 0) {
+        var msg = t('messages', 'confirm_remove_reminder');
+        if (msg === 'messages.confirm_remove_reminder') {
+          msg = 'Remove this reminder?';
+        }
+        var ok = window.confirm(msg);
+        if (!ok) {
+          return;
+        }
+      }
+      $row.remove();
       reminders_manager_no_entries_placeholder();
   });
 
@@ -3133,6 +3315,46 @@ var handle_expired_session = function handle_expired_session() {
     }
   });
 };
+
+
+/*
+ * [E50] Preferences dirty-state guard. Snapshots the prefs form on load and
+ * warns the user via a beforeunload prompt if they navigate away with
+ * unsaved changes. Self-contained and no-op when the form isn't on the page
+ * (i.e. every page other than /preferences).
+ */
+(function preferencesDirtyGuard() {
+  $(function() {
+    var $form = $('#prefs_form');
+    if ($form.length === 0) {
+      return;
+    }
+
+    var snapshot = $form.serialize();
+
+    var isDirty = function isDirty() {
+      return $form.serialize() !== snapshot;
+    };
+
+    var submitted = false;
+    $form.on('submit', function() {
+      submitted = true;
+    });
+
+    $(window).on('beforeunload', function(e) {
+      if (submitted) {
+        return undefined;
+      }
+      if (isDirty()) {
+        e.preventDefault();
+        // returnValue must be set for the browser to show the prompt.
+        e.originalEvent.returnValue = '';
+        return '';
+      }
+      return undefined;
+    });
+  });
+})();
 
 
 // vim: sw=2 tabstop=2
