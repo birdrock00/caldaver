@@ -993,6 +993,23 @@
       });
   }
 
+  function archiveMessage() {
+    var reader = $('#mail_reader');
+    navigateTo(reader.dataset.inboxUrl +
+      '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
+      '&archived_uid=' + encodeURIComponent(reader.dataset.uid));
+  }
+
+  function deleteMessage() {
+    if (!window.confirm('Delete this message?')) {
+      return;
+    }
+    var reader = $('#mail_reader');
+    navigateTo(reader.dataset.inboxUrl +
+      '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
+      '&deleted_uid=' + encodeURIComponent(reader.dataset.uid));
+  }
+
   // [D8] apply mobile keyboard hints to the reply recipient field (markup lives in a template
   // owned by another agent, so we enhance it defensively from here at runtime).
   function applyReplyMobileInputHints() {
@@ -1019,6 +1036,10 @@
     applyReplyMobileInputHints();
     $('#mail_reader_refresh').addEventListener('click', loadMessage);
     $('#mail_reader_unread').addEventListener('click', markUnread);
+    var archiveBtn = $('#mail_reader_archive');
+    if (archiveBtn) { archiveBtn.addEventListener('click', archiveMessage); }
+    var deleteBtn = $('#mail_reader_delete');
+    if (deleteBtn) { deleteBtn.addEventListener('click', deleteMessage); }
     $('#mail_reader_previous').addEventListener('click', function() {
       navigateBySwipe('newer');
     });
