@@ -514,3 +514,25 @@ test('E34: event_basic_form_part.dust description textarea has the autogrow clas
   // JS must wire the autogrow behaviour onto that selector.
   assert.match(appJs, /bind_autogrow_textarea\('#event_edit_dialog textarea\.autogrow'\)/);
 });
+
+test('mail-row-action divs are absolutely positioned (not in grid flow)', () => {
+  const less = read('assets/less/caldaver.less');
+  const actionBlock = cssBlock(less, '.mail-row-action');
+  assert.match(actionBlock, /position:\s*absolute/);
+  assert.match(actionBlock, /z-index:\s*0/);
+});
+
+test('mail-row-body spans all grid columns with its own internal grid', () => {
+  const less = read('assets/less/caldaver.less');
+  const bodyBlock = cssBlock(less, '.mail-row-body');
+  assert.match(bodyBlock, /grid-column:\s*1\s*\/\s*-1/);
+  assert.match(bodyBlock, /display:\s*grid/);
+  assert.match(bodyBlock, /z-index:\s*1/);
+});
+
+test('mail-row has position relative and overflow hidden for swipe layering', () => {
+  const less = read('assets/less/caldaver.less');
+  const rowBlock = cssBlock(less, '.mail-row');
+  assert.match(rowBlock, /position:\s*relative/);
+  assert.match(rowBlock, /overflow:\s*hidden/);
+});
