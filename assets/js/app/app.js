@@ -867,6 +867,41 @@ var should_ignore_event_load_error = function should_ignore_event_load_error(jqX
   return textStatus === 'abort' || (jqXHR !== undefined && jqXHR.status === 0);
 };
 
+// Defect 2 resilience: surfaces a per-calendar partial-data warning through
+// the existing freeow toast container without breaking the calendar view.
+// De-duplicates by calendar+message so a re-fetch does not stack toasts.
+var calendar_partial_error_keys = {};
+var show_calendar_partial_errors = function show_calendar_partial_errors(calendar, errors) {
+  if (!errors || !errors.length) {
+    return;
+  }
+  errors.forEach(function(entry) {
+    var href = (entry && entry.calendar) || calendar;
+    var message = (entry && entry.message) || 'Calendar unavailable';
+    var status = entry && entry.status ? ' (HTTP ' + entry.status + ')' : '';
+    var key = href + '|' + message + status;
+    if (calendar_partial_error_keys[key]) {
+      return;
+    }
+    calendar_partial_error_keys[key] = true;
+    var label = href;
+    // Shorten common radicale-style hrefs to the trailing path segment for readability.
+    var trimmed = href.replace(/\/+$/, '').split('/').pop();
+    if (trimmed) {
+      label = decodeURIComponent(trimmed);
+    }
+    $('#popup').freeow('Calendar partial load',
+      'Some events could not be loaded for "' + label + '"' + status + ': ' + message,
+      {
+        classes: ['popup_error'],
+        autoHide: true,
+        autoHideDelay: 6000,
+        showStyle: { opacity: 1, left: 0 },
+        hideStyle: { opacity: 0, left: '400px' }
+      });
+  });
+};
+
 /**
  * Sends a form via AJAX.
  *
@@ -2047,6 +2082,28 @@ var generate_event_source = function generate_event_source(calendar) {
           calendar: calendar,
           timezone: calendar_timezone()
         };
+      },
+      // Defect 2: the server returns {events: [...], errors: [...]} so that a
+      // single malformed calendar does not abort the whole request. FullCalendar
+      // expects a plain JSON array, so we unwrap `events` here and surface the
+      // per-calendar `errors` list via a non-blocking toast. Plain-array
+      // responses (older servers / cached payloads) pass through unchanged.
+      dataFilter: function(data) {
+        if (!data) {
+          return data;
+        }
+        try {
+          var parsed = JSON.parse(data);
+        } catch (error) {
+          return data;
+        }
+        if (parsed && Array.isArray(parsed.events)) {
+          if (parsed.errors && parsed.errors.length) {
+            show_calendar_partial_errors(calendar, parsed.errors);
+          }
+          return JSON.stringify(parsed.events);
+        }
+        return data;
       },
       error: function (jqXHR, textStatus, errorThrown) {
         if (should_ignore_event_load_error(jqXHR, textStatus)) {

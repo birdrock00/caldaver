@@ -60,7 +60,7 @@
         <div class="skeleton skeleton-row"></div>
       </div>
       <div id="mail_error" class="mail-error" role="alert" aria-live="assertive" hidden></div>
-      <div id="mail_rows" class="mail-rows" data-mail-rows></div>
+      <div id="mail_rows" class="mail-rows" data-mail-rows data-csrf-token="{{ csrf_token.getValue() }}"></div>
     </section>
     <section id="mail_compose_screen" class="mail-compose-screen" hidden aria-label="Compose email">
       <div class="mail-compose-toolbar">

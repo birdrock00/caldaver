@@ -263,7 +263,7 @@
   // sticky header/footer so the title and Save/Cancel stay reachable while
   // scrolling a long form. The wrapper itself stretches to the viewport
   // (no centering, no rounded outer corners).
-  .contact-dialog[aria-modal="true"] {
+  .contact-dialog[aria-modal="true"]:not([hidden]) {
     display: flex !important;
     align-items: stretch !important;
     justify-content: stretch !important;
@@ -1174,6 +1174,7 @@ body.calendar-empty #calendar_view::after {
     z-index: 1;
     background: var(--caldaver-color-bg-elevated);
     display: block;
+    padding: 0;
   }
   .mail-row .mail-row-action {
     position: absolute;
