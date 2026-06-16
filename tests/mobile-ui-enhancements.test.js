@@ -536,3 +536,26 @@ test('mail-row has position relative and overflow hidden for swipe layering', ()
   assert.match(rowBlock, /position:\s*relative/);
   assert.match(rowBlock, /overflow:\s*hidden/);
 });
+
+test('mail reader toolbar has archive and delete buttons (both renderers)', () => {
+  const twig = read('web/templates/mail_message.html');
+  const rust = read('rust/crates/caldaver-server/src/lib.rs');
+  assert.match(twig, /id="mail_reader_archive"/);
+  assert.match(twig, /id="mail_reader_delete"/);
+  assert.match(rust, /id="mail_reader_archive"/);
+  assert.match(rust, /id="mail_reader_delete"/);
+});
+
+test('mail reader JS wires archive and delete click handlers', () => {
+  const js = read('web/templates/parts/mailmessagejs.html');
+  assert.match(js, /archiveMessage/);
+  assert.match(js, /deleteMessage/);
+  assert.match(js, /mail_reader_archive/);
+  assert.match(js, /mail_reader_delete/);
+});
+
+test('mail-row-action is hidden on desktop (display:none in base CSS)', () => {
+  const less = read('assets/less/caldaver.less');
+  const actionBlock = cssBlock(less, '.mail-row-action');
+  assert.match(actionBlock, /display:\s*none/);
+});
