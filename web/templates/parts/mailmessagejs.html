@@ -78,14 +78,14 @@
   }
 
   function formFetch(url, data, fallbackMessage) {
-    var form = new FormData();
+    var params = new URLSearchParams();
     Object.keys(data).forEach(function(key) {
-      form.append(key, data[key]);
+      params.append(key, data[key]);
     });
 
     return jsonFetch(url, {
       method: 'POST',
-      body: form
+      body: params
     }, fallbackMessage);
   }
 
