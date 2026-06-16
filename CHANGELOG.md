@@ -1,5 +1,63 @@
 # Changelog
 
+## [3.3.0] - 2026-06-16
+
+Follow-up to the 3.2.0 mobile pass focused on honest mail actions and
+calendar resilience. Mail swipe/reader delete and archive now perform real
+IMAP operations (and report real failures), a single bad calendar no longer
+blanks the whole calendar view, and two mobile CSS regressions are fixed.
+
+### Mail — real delete/archive (IMAP)
+
+- **FEATURE** — Swipe-left delete and swipe-right archive in the inbox, plus
+  the reader Delete/Archive buttons, now call new authenticated backend
+  routes (`POST /mail/message/delete`, `POST /mail/message/archive`) instead
+  of just animating the row away and pretending it succeeded.
+- Delete moves the message to the IMAP `\Trash` special-use mailbox when the
+  server advertises one; otherwise it falls back to `\Deleted` + `EXPUNGE`.
+- Archive uses IMAP `MOVE` (RFC 6851) into the `\Archive` mailbox, with a
+  `COPY` + `\Deleted` + `EXPUNGE` fallback for servers without `MOVE`.
+- Special-use mailboxes are discovered via `LIST` (`\Trash` / `\Archive`
+  attributes first, then common lowercase name fallbacks).
+- On any backend failure the mail row snaps back and a non-blocking error is
+  shown — the user is never told an action succeeded when it did not. If no
+  Archive folder exists the server returns an honest error instead of
+  faking success.
+- The cached message row is dropped from Postgres on success so it does not
+  reappear on the next sync. The inbox page exposes the CSRF token the new
+  POST routes require (`data-csrf-token` on `#mail_rows`).
+- Added `imap-proto` dependency for typed `\Trash` / `\Archive` name
+  attributes. Bumped `caldaver-server` / `caldaver-core` crates to `0.2.0`.
+
+### Calendar — partial-error resilience
+
+- **FEATURE** — `GET /events` now returns `{"events": [...], "errors": [...]}`.
+  A per-calendar upstream failure (HTTP 400/404/5xx, network or XML parsing
+  error from the CalDAV server) is softened into an HTTP 200 with an empty
+  event list plus an entry in `errors`, so one bad calendar no longer 502s
+  the entire calendar view. Auth-related failures (401/403) and
+  bad-configuration errors stay hard so the client can react.
+- The FullCalendar event source uses a `dataFilter` to unwrap `events` for
+  older servers / cached payloads, and surfaces per-calendar `errors` as
+  de-duplicated freeow toasts.
+
+### Bug fixes
+
+- **BUGFIX** — Mobile mail rows no longer show a blue/red colour leak: the
+  grid wrapper now carries `padding: 0` so the row background fills the
+  panel cleanly.
+- **BUGFIX** — The Create-contact / Add-account dialog no longer
+  auto-opens on mobile. The full-bleed `.contact-dialog[aria-modal="true"]`
+  rule is now scoped with `:not([hidden])` so it only applies when the
+  dialog is actually visible.
+
+### Tests
+
+- Added `tests/ui-regressions.test.js` coverage for the new mail swipe/reader
+  backend wiring, the `{events, errors}` envelope, and the CSRF token
+  attribute; fixed two stale assertions (session cookie `Max-Age` and the
+  timezone-aware "today" comparison).
+
 ## [3.2.0] - 2026-06-15
 
 Major mobile-UI improvement pass. Implements 45 of the 139 concrete

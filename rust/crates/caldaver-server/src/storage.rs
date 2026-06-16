@@ -921,6 +921,28 @@ WHERE owner=$1 AND account_id=$2 AND uid=$3
         Ok(())
     }
 
+    // Drops a single cached message after the backend confirms it has been
+    // deleted or archived on the IMAP server. Best-effort: callers surface the
+    // backend result to the user, so a cache-miss here is logged and ignored.
+    pub async fn delete_cached_message(
+        &self,
+        owner: &str,
+        account_id: u64,
+        uid: u64,
+    ) -> Result<(), StorageError> {
+        let account_id = account_id as i64;
+        let uid = uid as i64;
+        self.pool
+            .get()
+            .await?
+            .execute(
+                "DELETE FROM mail_message_cache WHERE owner=$1 AND account_id=$2 AND uid=$3",
+                &[&owner, &account_id, &uid],
+            )
+            .await?;
+        Ok(())
+    }
+
     fn open(&self, value: &str) -> String {
         if value.is_empty() {
             return String::new();

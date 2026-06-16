@@ -993,21 +993,36 @@
       });
   }
 
-  function archiveMessage() {
+  function performMailAction(action, confirmMessage, fallbackMessage) {
     var reader = $('#mail_reader');
-    navigateTo(reader.dataset.inboxUrl +
-      '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
-      '&archived_uid=' + encodeURIComponent(reader.dataset.uid));
+    if (!reader) { return; }
+    if (confirmMessage && !window.confirm(confirmMessage)) {
+      return;
+    }
+    $('#mail_reader_error').hidden = true;
+    formFetch('/mail/message/' + action, {
+      _token: reader.dataset.csrfToken,
+      account_id: reader.dataset.accountId,
+      mailbox: 'INBOX',
+      uid: reader.dataset.uid
+    }, fallbackMessage)
+      .then(function() {
+        navigateTo(reader.dataset.inboxUrl +
+          '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
+          '&' + (action === 'delete' ? 'deleted_uid' : 'archived_uid') + '=' + encodeURIComponent(reader.dataset.uid));
+      })
+      .catch(function(error) {
+        $('#mail_reader_error').textContent = error.message;
+        $('#mail_reader_error').hidden = false;
+      });
+  }
+
+  function archiveMessage() {
+    performMailAction('archive', null, 'Unable to archive message');
   }
 
   function deleteMessage() {
-    if (!window.confirm('Delete this message?')) {
-      return;
-    }
-    var reader = $('#mail_reader');
-    navigateTo(reader.dataset.inboxUrl +
-      '?account_id=' + encodeURIComponent(reader.dataset.accountId) +
-      '&deleted_uid=' + encodeURIComponent(reader.dataset.uid));
+    performMailAction('delete', 'Delete this message?', 'Unable to delete message');
   }
 
   // [D8] apply mobile keyboard hints to the reply recipient field (markup lives in a template

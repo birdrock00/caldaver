@@ -107,6 +107,12 @@
         row.setAttribute('aria-label', 'Message from ' + text(message.from) + ', subject ' + (text(message.subject) || '(no subject)'));
       }
       renderAttachments(row.querySelector('.mail-attachments'), message);
+      row.dataset.accountId = activeAccountId;
+      row.dataset.uid = message.uid;
+      // Caldaver only fetches INBOX today, so the swipe action targets it
+      // explicitly. Future code that surfaces other mailboxes can override
+      // this attribute without changing the swipe handler.
+      row.dataset.mailbox = 'INBOX';
       row.dataset.messageHref = '{{ app.url_generator.generate('mail.read') }}' +
         '?account_id=' + encodeURIComponent(activeAccountId) +
         '&uid=' + encodeURIComponent(message.uid);
@@ -146,6 +152,55 @@
 
   // [M-070] Swipe handler for an individual mail row. Returns true on
   // touch devices only.
+  // Fires the requested backend action (delete/archive). On success the row is
+  // removed from the DOM and the in-memory list. On failure the row snaps back
+  // to its original position and a non-blocking error is shown, so the user is
+  // never lied to about whether the server-side action actually happened.
+  function runMailRowSwipe(row, action, exitTransform) {
+    var uid = row.dataset.uid;
+    var accountId = row.dataset.accountId;
+    var mailbox = row.dataset.mailbox || 'INBOX';
+    var previousTransition = row.style.transition || '';
+    var inFlight = true;
+
+    row.classList.add('is-swiping');
+    // Animate the exit (no CSS rule owns this transition, so it's set inline
+    // and restored on both success and failure paths).
+    row.style.transition = 'transform 220ms ease-out, opacity 220ms ease-out';
+    row.style.transform = exitTransform;
+    row.style.opacity = '0';
+
+    function restoreRow(message) {
+      inFlight = false;
+      row.classList.remove('is-swiping');
+      // Animate from the off-screen position back to neutral.
+      row.style.transform = '';
+      row.style.opacity = '';
+      window.setTimeout(function() {
+        if (!inFlight) {
+          row.style.transition = previousTransition;
+        }
+      }, 240);
+      if (message) {
+        showTransientMailError(message);
+      }
+    }
+
+    postMailSwipeAction(action, accountId, mailbox, uid)
+      .then(function() {
+        if (!inFlight) { return; }
+        inFlight = false;
+        removeMessageFromState(uid);
+        if (row.parentNode) {
+          row.parentNode.removeChild(row);
+        }
+        renderMailStatus();
+      })
+      .catch(function(error) {
+        restoreRow(error && error.message ? error.message : 'Unable to complete mail action');
+      });
+  }
+
   function attachMailRowSwipe(row) {
     if (!narrowViewport()) {
       return;
@@ -182,20 +237,11 @@
       tracking = false;
       row.classList.remove('is-swiping');
       if (dx > 60) {
-        // Swipe right: archive (placeholder — mail backend doesn't expose
-        // an archive endpoint on this pass; we just animate and remove).
-        row.style.transform = 'translateX(100%)';
-        row.style.opacity = '0';
-        window.setTimeout(function() {
-          if (row.parentNode) { row.parentNode.removeChild(row); }
-        }, 220);
+        // Swipe right: archive.
+        runMailRowSwipe(row, 'archive', 'translateX(100%)');
       } else if (dx < -60) {
-        // Swipe left: delete (placeholder — same as above).
-        row.style.transform = 'translateX(-100%)';
-        row.style.opacity = '0';
-        window.setTimeout(function() {
-          if (row.parentNode) { row.parentNode.removeChild(row); }
-        }, 220);
+        // Swipe left: delete.
+        runMailRowSwipe(row, 'delete', 'translateX(-100%)');
       } else {
         row.style.transform = '';
       }
@@ -321,6 +367,57 @@
       container.appendChild(link);
     }
     container.hidden = false;
+  }
+
+  function csrfToken() {
+    var rows = $('#mail_rows');
+    return rows ? (rows.dataset.csrfToken || '') : '';
+  }
+
+  // POSTs a swipe action (delete/archive) to the backend and resolves when the
+  // server confirms. Throws an Error with the server's message on any failure
+  // so the caller can restore the row and surface a non-blocking error.
+  function postMailSwipeAction(action, accountId, mailbox, uid) {
+    var params = new URLSearchParams();
+    params.append('_token', csrfToken());
+    params.append('account_id', String(accountId));
+    params.append('mailbox', mailbox || 'INBOX');
+    params.append('uid', String(uid));
+
+    return jsonFetch(
+      '/mail/message/' + action,
+      {
+        method: 'POST',
+        body: params,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      },
+      action === 'delete' ? 'Unable to delete message' : 'Unable to archive message'
+    );
+  }
+
+  function removeMessageFromState(uid) {
+    messages = messages.filter(function(message) {
+      return String(message.uid) !== String(uid);
+    });
+    messagesFingerprint = messagesSignature(messages);
+  }
+
+  function showTransientMailError(message) {
+    if (!message) { return; }
+    var host = document.querySelector('.mail-panel') || document.body;
+    var toast = document.createElement('div');
+    // Reuse the existing .mail-error visual treatment so the warning matches
+    // the rest of the mail UI without introducing new CSS.
+    toast.className = 'mail-error mail-row-action-error';
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.textContent = message;
+    host.appendChild(toast);
+    window.setTimeout(function() {
+      if (toast.parentNode) {
+        toast.parentNode.removeChild(toast);
+      }
+    }, 4000);
   }
 
   function narrowViewport() {

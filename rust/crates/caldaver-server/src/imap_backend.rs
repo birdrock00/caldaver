@@ -255,6 +255,28 @@ pub(crate) trait MailBackend: Send + Sync {
         part: &str,
     ) -> Result<AttachmentDownload, MailBackendError>;
     fn mark_seen(&self, account: &MailAccount, uid: u64, seen: bool) -> Result<(), MailBackendError>;
+    // Moves or permanently deletes the message identified by (`mailbox`, `uid`).
+    // When the IMAP account exposes a `\Trash` special-use mailbox the message is
+    // moved there; otherwise it is flagged `\Deleted` and expunged from the source
+    // mailbox. `mailbox` is currently expected to be `INBOX` because that is the
+    // only mailbox Caldaver fetches, but the parameter is accepted for future use.
+    fn delete_message(
+        &self,
+        account: &MailAccount,
+        mailbox: &str,
+        uid: u64,
+    ) -> Result<(), MailBackendError>;
+    // Moves the message identified by (`mailbox`, `uid`) into the account's
+    // `\Archive` special-use mailbox when one is configured. Returns
+    // `MailBackendError::NotFound` when no archive folder can be located so the
+    // caller can surface an honest error instead of pretending the action
+    // succeeded.
+    fn archive_message(
+        &self,
+        account: &MailAccount,
+        mailbox: &str,
+        uid: u64,
+    ) -> Result<(), MailBackendError>;
 }
 
 #[derive(Default)]
@@ -322,6 +344,47 @@ impl MailBackend for ImapMailBackend {
             Ok(())
         })
     }
+
+    fn delete_message(
+        &self,
+        account: &MailAccount,
+        mailbox: &str,
+        uid: u64,
+    ) -> Result<(), MailBackendError> {
+        let uid = uid32(uid)?;
+        let mailbox = if mailbox.trim().is_empty() { "INBOX" } else { mailbox };
+        self.with_session_on_mailbox(account, mailbox, move |session| {
+            if let Some(trash) = lookup_special_use_mailbox(session, SpecialUse::Trash)? {
+                move_or_fallback(session, uid, &trash)?;
+            } else {
+                // No \Trash folder advertised by the server: fall back to the
+                // universal IMAP delete semantics (\Deleted + EXPUNGE).
+                session.uid_store(uid.to_string(), "+FLAGS.SILENT (\\Deleted)")?;
+                session.expunge()?;
+            }
+            Ok(())
+        })
+    }
+
+    fn archive_message(
+        &self,
+        account: &MailAccount,
+        mailbox: &str,
+        uid: u64,
+    ) -> Result<(), MailBackendError> {
+        let uid = uid32(uid)?;
+        let mailbox = if mailbox.trim().is_empty() { "INBOX" } else { mailbox };
+        self.with_session_on_mailbox(account, mailbox, move |session| {
+            let archive = lookup_special_use_mailbox(session, SpecialUse::Archive)?
+                .ok_or_else(|| {
+                    MailBackendError::NotFound(
+                        "No Archive folder is configured on this IMAP account".to_string(),
+                    )
+                })?;
+            move_or_fallback(session, uid, &archive)?;
+            Ok(())
+        })
+    }
 }
 
 pub(crate) fn message_navigation_from_uids<I>(uids: I, current_uid: u64) -> MailMessageNavigation
@@ -346,6 +409,15 @@ impl ImapMailBackend {
     fn with_session<T>(
         &self,
         account: &MailAccount,
+        op: impl FnOnce(&mut imap::Session<imap::Connection>) -> Result<T, MailBackendError>,
+    ) -> Result<T, MailBackendError> {
+        self.with_session_on_mailbox(account, "INBOX", op)
+    }
+
+    fn with_session_on_mailbox<T>(
+        &self,
+        account: &MailAccount,
+        mailbox: &str,
         op: impl FnOnce(&mut imap::Session<imap::Connection>) -> Result<T, MailBackendError>,
     ) -> Result<T, MailBackendError> {
         validate_account(account)?;
@@ -383,7 +455,7 @@ impl ImapMailBackend {
                 return Err(MailBackendError::Credentials(error.to_string()));
             }
         };
-        session.select("INBOX")?;
+        session.select(mailbox)?;
 
         let result = op(&mut session);
         let logout = session.logout().map_err(MailBackendError::from);
@@ -401,6 +473,70 @@ pub(crate) fn validate_account(account: &MailAccount) -> Result<(), MailBackendE
         imap_port: account.imap_port,
     })
     .map_err(|error| MailBackendError::InvalidAccount(error.legacy_message().to_string()))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SpecialUse {
+    Trash,
+    Archive,
+}
+
+impl SpecialUse {
+    fn matches_attribute(self, attr: &imap_proto::NameAttribute<'_>) -> bool {
+        match self {
+            SpecialUse::Trash => matches!(attr, imap_proto::NameAttribute::Trash),
+            SpecialUse::Archive => matches!(attr, imap_proto::NameAttribute::Archive),
+        }
+    }
+
+    fn matches_name_lower(self, name_lower: &str) -> bool {
+        match self {
+            SpecialUse::Trash => name_lower == "trash" || name_lower.ends_with("/trash"),
+            SpecialUse::Archive => name_lower == "archive" || name_lower.ends_with("/archive"),
+        }
+    }
+}
+
+// Locates a special-use mailbox (RFC 6154) by LIST-ing every mailbox the
+// server exposes and matching first on the typed `\Trash` / `\Archive`
+// attribute, then on common lowercase names as a fallback for servers that
+// do not advertise special-use attributes.
+fn lookup_special_use_mailbox(
+    session: &mut imap::Session<imap::Connection>,
+    special_use: SpecialUse,
+) -> Result<Option<String>, MailBackendError> {
+    let names = session.list(None, Some("*"))?;
+    let mut fallback: Option<String> = None;
+    for name in names.iter() {
+        if name.attributes().iter().any(|attr| special_use.matches_attribute(attr)) {
+            return Ok(Some(name.name().to_string()));
+        }
+        if fallback.is_none() && special_use.matches_name_lower(&name.name().to_lowercase()) {
+            fallback = Some(name.name().to_string());
+        }
+    }
+    Ok(fallback)
+}
+
+// Moves a message by UID into `target_mailbox`, preferring the IMAP `MOVE`
+// extension (RFC 6851) and falling back to COPY + \Deleted + EXPUNGE when the
+// server does not advertise MOVE. The fallback preserves the no-data-loss
+// invariant: COPY succeeds before \Deleted is applied.
+fn move_or_fallback(
+    session: &mut imap::Session<imap::Connection>,
+    uid: u32,
+    target_mailbox: &str,
+) -> Result<(), MailBackendError> {
+    match session.uid_mv(uid.to_string(), target_mailbox) {
+        Ok(()) => Ok(()),
+        Err(move_err) => {
+            tracing::warn!(%move_err, uid, target_mailbox, "UID MOVE failed; falling back to COPY + STORE + EXPUNGE");
+            session.uid_copy(uid.to_string(), target_mailbox)?;
+            session.uid_store(uid.to_string(), "+FLAGS.SILENT (\\Deleted)")?;
+            session.expunge()?;
+            Ok(())
+        }
+    }
 }
 
 fn uid32(uid: u64) -> Result<u32, MailBackendError> {
@@ -743,5 +879,20 @@ mod tests {
                 size: 9,
             }]
         );
+    }
+
+    #[test]
+    fn special_use_matches_rfc6154_attributes_and_common_names() {
+        assert!(SpecialUse::Trash.matches_attribute(&imap_proto::NameAttribute::Trash));
+        assert!(!SpecialUse::Trash.matches_attribute(&imap_proto::NameAttribute::Archive));
+        assert!(SpecialUse::Archive.matches_attribute(&imap_proto::NameAttribute::Archive));
+        assert!(!SpecialUse::Archive.matches_attribute(&imap_proto::NameAttribute::Sent));
+
+        assert!(SpecialUse::Trash.matches_name_lower("trash"));
+        assert!(SpecialUse::Trash.matches_name_lower("inbox/trash"));
+        assert!(!SpecialUse::Trash.matches_name_lower("drafts"));
+        assert!(SpecialUse::Archive.matches_name_lower("archive"));
+        assert!(SpecialUse::Archive.matches_name_lower("personal/archive"));
+        assert!(!SpecialUse::Archive.matches_name_lower("archives"));
     }
 }

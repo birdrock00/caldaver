@@ -1,6 +1,6 @@
 [package]
 name = "caldaver-server"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -15,6 +15,7 @@ chrono-tz = "0.10"
 deadpool-postgres = "0.14"
 http = "1"
 imap = "3.0.0-alpha.15"
+imap-proto = "0.16"
 mailparse = "0.16"
 mime_guess = "2"
 rand = "0.9"

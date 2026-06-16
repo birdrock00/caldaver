@@ -97,6 +97,8 @@ test('Rust server exposes the web route surface', () => {
     'route("/mail/message", get(mail_message))',
     'route("/mail/message/navigation", get(mail_message_navigation))',
     'route("/mail/message/unread", post(mail_mark_unread))',
+    'route("/mail/message/delete", post(mail_message_delete))',
+    'route("/mail/message/archive", post(mail_message_archive))',
     'route("/mail/attachment", get(mail_attachment))',
     'route("/preferences", get(preferences_page).post(preferences_save))',
     'route("/calendars", get(calendars_list).post(calendar_save))',
@@ -737,7 +739,7 @@ test('Rust server handles sessions, CSRF, no-JS mail, and unread updates', () =>
   const storage = read('rust/crates/caldaver-server/src/storage.rs');
   const mailMessageJs = read('web/templates/parts/mailmessagejs.html');
 
-  assert.match(server, /caldaver_sess=\{id\}; Path=\/; HttpOnly; SameSite=Lax/);
+  assert.match(server, /caldaver_sess=\{id\}; Path=\/; Max-Age=\{\}; HttpOnly; SameSite=Lax/);
   assert.match(server, /caldaver_sess=; Path=\/; Max-Age=0; HttpOnly; SameSite=Lax/);
   assert.match(server, /cookie_value\(&headers, "caldaver_sess"\)/);
   assert.match(server, /storage:\s*Storage/);
@@ -779,9 +781,12 @@ test('today highlight targets FullCalendar 3 DOM and compares calendar dates, no
   // moments, so deciding "today" with isSame() against a local moment puts the
   // circle on the wrong day near UTC midnight. Compare date strings instead,
   // and only week view headers get the circle (not day or list views).
+  // The "now" reference must be timezone-aware (moment.tz(calendar_timezone()))
+  // so the comparison matches the user's calendar day, not the browser's local day.
   const header = sourceBetween(appJs, /columnHeaderHtml: function\(date\)/, /defaultView:/);
   assert.doesNotMatch(header, /date\.isSame\(/);
-  assert.match(header, /viewName === 'agendaWeek' && date\.format\('YYYY-MM-DD'\) === moment\(\)\.format\('YYYY-MM-DD'\)/);
+  assert.match(header, /var now = moment\.tz\(calendar_timezone\(\)\);/);
+  assert.match(header, /viewName === 'agendaWeek' && date\.format\('YYYY-MM-DD'\) === now\.format\('YYYY-MM-DD'\)/);
   assert.match(header, /fc-header-today-circle/);
 });
 
@@ -797,4 +802,67 @@ test('week view time grid has transparent slats background so vertical day separ
   // The bg layer is what actually draws the vertical separators, so confirm
   // it carries the separator border color.
   assert.match(less, /#calendar_view \.fc-bg td\.fc-day,[\s\S]*?border-color:\s*#dadce0/);
+});
+
+test('mail swipe handler wires archive and delete to authenticated backend endpoints', () => {
+  const mailJs = read('web/templates/parts/mailjs.html');
+  const rustServer = read('rust/crates/caldaver-server/src/lib.rs');
+
+  // The placeholder "removeChild" only path is gone — the swipe now POSTs.
+  assert.doesNotMatch(mailJs, /placeholder[^)]*archive/);
+  assert.doesNotMatch(mailJs, /placeholder[^)]*delete/);
+  assert.match(mailJs, /runMailRowSwipe\(row, 'archive'/);
+  assert.match(mailJs, /runMailRowSwipe\(row, 'delete'/);
+  assert.match(mailJs, /\/mail\/message\/' \+ action/);
+  assert.match(mailJs, /postMailSwipeAction\(action, accountId, mailbox, uid\)/);
+
+  // Rows carry the data the swipe needs to call the backend.
+  assert.match(mailJs, /row\.dataset\.accountId = activeAccountId/);
+  assert.match(mailJs, /row\.dataset\.uid = message\.uid/);
+  assert.match(mailJs, /row\.dataset\.mailbox/);
+
+  // Failure path must restore the row (no silent data loss / no fake success).
+  assert.match(mailJs, /restoreRow/);
+  assert.match(mailJs, /showTransientMailError/);
+
+  // Inbox page exposes the CSRF token the POST routes require.
+  const mailHtml = read('web/templates/mail.html');
+  assert.match(mailHtml, /id="mail_rows"[^>]*data-csrf-token=/);
+  assert.match(rustServer, /id="mail_rows"[^>]*data-csrf-token="\{csrf\}"/);
+
+  // Backend routes exist and follow the same conventions as /mail/message/unread.
+  assert.match(rustServer, /route\("\/mail\/message\/delete", post\(mail_message_delete\)\)/);
+  assert.match(rustServer, /route\("\/mail\/message\/archive", post\(mail_message_archive\)\)/);
+  assert.match(rustServer, /async fn mail_message_delete\(/);
+  assert.match(rustServer, /async fn mail_message_archive\(/);
+});
+
+test('mail reader archive and delete buttons call the backend instead of just navigating', () => {
+  const mailMessageJs = read('web/templates/parts/mailmessagejs.html');
+
+  // performMailAction is the shared helper invoked by both buttons.
+  assert.match(mailMessageJs, /function performMailAction\(action, confirmMessage, fallbackMessage\)/);
+  assert.match(mailMessageJs, /formFetch\('\/mail\/message\/' \+ action/);
+  // Delete still confirms; archive does not (matches prior UX).
+  assert.match(mailMessageJs, /performMailAction\('delete', 'Delete this message\?'/);
+  assert.match(mailMessageJs, /performMailAction\('archive', null,/);
+  // Failure surfaces an error rather than silently navigating away.
+  assert.match(mailMessageJs, /\$\('#mail_reader_error'\)\.textContent = error\.message/);
+});
+
+test('events route returns {events, errors} so a per-calendar 400 does not 502 the whole request', () => {
+  const rustServer = read('rust/crates/caldaver-server/src/lib.rs');
+  const appJs = read('assets/js/app/app.js');
+
+  // Backend wraps the events list and includes an errors array; both success
+  // and the radicale-400 path return HTTP 200.
+  assert.match(rustServer, /json!\(\{"events": events, "errors": \[\]\}\)/);
+  assert.match(rustServer, /"events": \[\],\s*"errors":\s*\[\{[\s\S]*?"calendar": calendar[\s\S]*?"status": status\.as_u16\(\)/);
+  // Auth-related failures stay hard.
+  assert.match(rustServer, /fn soft_calendar_failure_status\(error: &CalDavError\) -> Option<StatusCode>/);
+
+  // Frontend event source unwraps `events` for FullCalendar and surfaces errors.
+  assert.match(appJs, /dataFilter: function\(data\)/);
+  assert.match(appJs, /Array\.isArray\(parsed\.events\)/);
+  assert.match(appJs, /show_calendar_partial_errors\(calendar, parsed\.errors\)/);
 });

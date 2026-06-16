@@ -420,6 +420,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/mail/message", get(mail_message))
         .route("/mail/message/navigation", get(mail_message_navigation))
         .route("/mail/message/unread", post(mail_mark_unread))
+        .route("/mail/message/delete", post(mail_message_delete))
+        .route("/mail/message/archive", post(mail_message_archive))
         .route("/mail/attachment", get(mail_attachment))
         .route("/mail/image", get(mail_image))
         .route("/preferences", get(preferences_page).post(preferences_save))
@@ -929,22 +931,63 @@ async fn events_list(State(state): State<AppState>, headers: HeaderMap, Query(qu
             .map(|value| caldav_datetime(value))
             .unwrap_or_else(|| "29991231T235959Z".to_string());
         return match client.list_events_by_time_range(&calendar, start, end).await {
-            Ok(objects) => Json(
-                objects
+            Ok(objects) => {
+                let events = objects
                     .iter()
                     .filter_map(|object| event_payload_from_object(object, &calendar))
-                    .collect::<Vec<_>>(),
-            )
-            .into_response(),
-            Err(error) => caldav_response(error),
+                    .collect::<Vec<_>>();
+                Json(json!({"events": events, "errors": []})).into_response()
+            }
+            Err(error) => {
+                // Defect 2 resilience: a per-calendar upstream error (HTTP 400,
+                // 404, 5xx, network or XML parsing failure from radicale) is
+                // surfaced to the client as HTTP 200 with an empty event list
+                // and an entry in the `errors` array, so one bad calendar does
+                // not blank out the whole calendar view. Auth-related failures
+                // (401/403) and bad-configuration errors stay hard so the
+                // frontend can prompt for re-auth or fixup.
+                if let Some(status) = soft_calendar_failure_status(&error) {
+                    tracing::warn!(%error, calendar, status = status.as_u16(), "upstream calendar error softened into partial response");
+                    Json(json!({
+                        "events": [],
+                        "errors": [{
+                            "calendar": calendar,
+                            "status": status.as_u16(),
+                            "message": error.to_string()
+                        }]
+                    }))
+                    .into_response()
+                } else {
+                    caldav_response(error)
+                }
+            }
         };
     }
     match state.storage.events(&calendar).await {
-        Ok(events) => Json(events).into_response(),
+        Ok(events) => Json(json!({"events": events, "errors": []})).into_response(),
         Err(error) => {
             tracing::error!(%error, "failed to load events from Postgres");
             json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to load events")
         }
+    }
+}
+
+// Classifies a per-calendar CalDAV failure into a "soft" upstream status that
+// should be returned as HTTP 200 + an `errors` array entry instead of a hard
+// 5xx. Returns `None` for failures (auth, config) that should keep their
+// existing hard status so the client can react appropriately.
+fn soft_calendar_failure_status(error: &CalDavError) -> Option<StatusCode> {
+    match error {
+        CalDavError::UnexpectedStatus { status, .. } => {
+            let code = status.as_u16();
+            if code == 400 || code == 404 || (500..600).contains(&code) {
+                Some(*status)
+            } else {
+                None
+            }
+        }
+        CalDavError::Http(_) | CalDavError::Xml(_) => Some(StatusCode::BAD_GATEWAY),
+        _ => None,
     }
 }
 
@@ -1871,6 +1914,99 @@ async fn mail_mark_unread(State(state): State<AppState>, headers: HeaderMap, For
     Json(json!({"result": "SUCCESS", "data": {"uid": uid, "seen": false}})).into_response()
 }
 
+// Moves the message to the IMAP `\Trash` mailbox (or permanently expunges it
+// when no Trash is advertised). The cache row is dropped on success so the
+// message does not silently reappear on the next sync.
+async fn mail_message_delete(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
+    let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
+    };
+    if !valid_csrf(&session, &form) {
+        return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
+    }
+    let account_id = form.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let uid = form.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let mailbox = form
+        .get("mailbox")
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "INBOX".to_string());
+    if uid == 0 {
+        return json_error(StatusCode::BAD_REQUEST, "Missing message uid");
+    }
+    let account = match mail_account_for(&state, &session.username, account_id).await {
+        Ok(account) => account,
+        Err(response) => return response,
+    };
+    if let Err(error) =
+        run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
+            backend.delete_message(account, &mailbox, uid)
+        })
+        .await
+    {
+        return mail_backend_response(error);
+    }
+    if let Err(error) = state
+        .storage
+        .delete_cached_message(&session.username, account_id, uid)
+        .await
+    {
+        tracing::error!(%error, "failed to drop deleted cached message from Postgres");
+    }
+    Json(json!({"result": "SUCCESS", "data": {"uid": uid}})).into_response()
+}
+
+// Moves the message to the IMAP `\Archive` mailbox when the account exposes
+// one. Returns an honest 400/404 (routed through `mail_backend_response`) when
+// no archive folder is configured so the UI can surface the failure rather
+// than fake success.
+async fn mail_message_archive(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
+    let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
+    };
+    if !valid_csrf(&session, &form) {
+        return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
+    }
+    let account_id = form.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let uid = form.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let mailbox = form
+        .get("mailbox")
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "INBOX".to_string());
+    if uid == 0 {
+        return json_error(StatusCode::BAD_REQUEST, "Missing message uid");
+    }
+    let account = match mail_account_for(&state, &session.username, account_id).await {
+        Ok(account) => account,
+        Err(response) => return response,
+    };
+    if let Err(error) =
+        run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
+            backend.archive_message(account, &mailbox, uid)
+        })
+        .await
+    {
+        return mail_backend_response(error);
+    }
+    if let Err(error) = state
+        .storage
+        .delete_cached_message(&session.username, account_id, uid)
+        .await
+    {
+        tracing::error!(%error, "failed to drop archived cached message from Postgres");
+    }
+    Json(json!({"result": "SUCCESS", "data": {"uid": uid}})).into_response()
+}
+
 async fn mail_attachment(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
@@ -2732,10 +2868,11 @@ fn render_cards(state: &AppState, session: &Session) -> String {
 
 fn render_mail(state: &AppState, session: &Session, no_js: bool) -> String {
     let content = format!(
-        r#"{navbar}<div class="container-fluid mail-shell"><aside class="mail-sidebar">{sidebrand}{appnav}<button type="button" id="mail_compose" class="mail-mobile-compose-button" aria-label="Compose mail" hidden><i class="fa fa-pencil" aria-hidden="true"></i><span>Compose</span></button><nav id="mail_accounts" class="mail-accounts" aria-label="Mail accounts"></nav></aside><main class="mail-content"><div class="mail-search-row"><div class="mail-search"><i class="fa fa-search"></i><input id="mail_search" type="search" placeholder="Search mail" aria-label="Search mail"></div></div><section class="mail-panel"><div class="mail-toolbar"><h1 id="mail_account_title">Mail</h1><button type="button" id="mail_refresh" title="Refresh"><i class="fa fa-refresh"></i></button></div><div id="mail_empty" class="mail-empty" hidden>Add an IMAP account to download mail.</div><div id="mail_loading" class="mail-empty" hidden>Checking the IMAP server for mail...</div><div id="mail_no_messages" class="mail-empty" hidden>Checking the IMAP server for mail...</div><div id="mail_error" class="mail-error" hidden></div><div id="mail_rows" class="mail-rows"></div></section><section id="mail_compose_screen" class="mail-compose-screen" hidden aria-label="Compose email"><div class="mail-compose-toolbar"><button type="button" id="mail_compose_back" aria-label="Back"><i class="fa fa-arrow-left" aria-hidden="true"></i></button><h1>New message</h1><button type="button" id="mail_compose_send" aria-label="Send" aria-disabled="true"><i class="fa fa-send" aria-hidden="true"></i></button></div><form id="mail_compose_form" class="mail-compose-form"><div class="mail-compose-fields"><label class="mail-compose-from"><span>From</span><input id="mail_compose_from" type="email" readonly aria-label="From"></label><label><span>To</span><input id="mail_compose_to" type="email" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" multiple><button type="button" id="mail_compose_ccbcc" class="mail-compose-ccbcc" aria-expanded="false" aria-controls="mail_compose_cc mail_compose_bcc">Cc/Bcc</button></label><label id="mail_compose_cc_row" hidden><span>Cc</span><input id="mail_compose_cc" type="email" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" multiple></label><label id="mail_compose_bcc_row" hidden><span>Bcc</span><input id="mail_compose_bcc" type="email" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" multiple></label><label><span>Subject</span><input id="mail_compose_subject" type="text" autocomplete="off" autocapitalize="sentences" enterkeyhint="next"></label></div><label class="mail-compose-body-label"><span>Message</span><textarea id="mail_compose_body" rows="12" aria-label="Message" enterkeyhint="enter"></textarea></label><div class="mail-compose-footer"><button type="button" class="mail-compose-unavailable-action" aria-label="Formatting options unavailable" aria-disabled="true" disabled><i class="fa fa-font" aria-hidden="true"></i></button><button type="button" class="mail-compose-unavailable-action" aria-label="Attach file unavailable" aria-disabled="true" disabled><i class="fa fa-paperclip" aria-hidden="true"></i></button><button type="button" class="mail-compose-unavailable-action" aria-label="More compose actions unavailable" aria-disabled="true" disabled><i class="fa fa-ellipsis-v" aria-hidden="true"></i></button><button type="button" id="mail_compose_discard" class="mail-compose-discard" aria-label="Discard draft"><i class="fa fa-trash" aria-hidden="true"></i></button></div><div id="mail_compose_status" class="mail-compose-status" aria-live="polite"></div><div id="mail_compose_error" class="mail-error mail-compose-error" aria-live="assertive" hidden></div></form></section></main></div>"#,
+        r#"{navbar}<div class="container-fluid mail-shell"><aside class="mail-sidebar">{sidebrand}{appnav}<button type="button" id="mail_compose" class="mail-mobile-compose-button" aria-label="Compose mail" hidden><i class="fa fa-pencil" aria-hidden="true"></i><span>Compose</span></button><nav id="mail_accounts" class="mail-accounts" aria-label="Mail accounts"></nav></aside><main class="mail-content"><div class="mail-search-row"><div class="mail-search"><i class="fa fa-search"></i><input id="mail_search" type="search" placeholder="Search mail" aria-label="Search mail"></div></div><section class="mail-panel"><div class="mail-toolbar"><h1 id="mail_account_title">Mail</h1><button type="button" id="mail_refresh" title="Refresh"><i class="fa fa-refresh"></i></button></div><div id="mail_empty" class="mail-empty" hidden>Add an IMAP account to download mail.</div><div id="mail_loading" class="mail-empty" hidden>Checking the IMAP server for mail...</div><div id="mail_no_messages" class="mail-empty" hidden>Checking the IMAP server for mail...</div><div id="mail_error" class="mail-error" hidden></div><div id="mail_rows" class="mail-rows" data-csrf-token="{csrf}"></div></section><section id="mail_compose_screen" class="mail-compose-screen" hidden aria-label="Compose email"><div class="mail-compose-toolbar"><button type="button" id="mail_compose_back" aria-label="Back"><i class="fa fa-arrow-left" aria-hidden="true"></i></button><h1>New message</h1><button type="button" id="mail_compose_send" aria-label="Send" aria-disabled="true"><i class="fa fa-send" aria-hidden="true"></i></button></div><form id="mail_compose_form" class="mail-compose-form"><div class="mail-compose-fields"><label class="mail-compose-from"><span>From</span><input id="mail_compose_from" type="email" readonly aria-label="From"></label><label><span>To</span><input id="mail_compose_to" type="email" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" multiple><button type="button" id="mail_compose_ccbcc" class="mail-compose-ccbcc" aria-expanded="false" aria-controls="mail_compose_cc mail_compose_bcc">Cc/Bcc</button></label><label id="mail_compose_cc_row" hidden><span>Cc</span><input id="mail_compose_cc" type="email" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" multiple></label><label id="mail_compose_bcc_row" hidden><span>Bcc</span><input id="mail_compose_bcc" type="email" autocomplete="email" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="next" multiple></label><label><span>Subject</span><input id="mail_compose_subject" type="text" autocomplete="off" autocapitalize="sentences" enterkeyhint="next"></label></div><label class="mail-compose-body-label"><span>Message</span><textarea id="mail_compose_body" rows="12" aria-label="Message" enterkeyhint="enter"></textarea></label><div class="mail-compose-footer"><button type="button" class="mail-compose-unavailable-action" aria-label="Formatting options unavailable" aria-disabled="true" disabled><i class="fa fa-font" aria-hidden="true"></i></button><button type="button" class="mail-compose-unavailable-action" aria-label="Attach file unavailable" aria-disabled="true" disabled><i class="fa fa-paperclip" aria-hidden="true"></i></button><button type="button" class="mail-compose-unavailable-action" aria-label="More compose actions unavailable" aria-disabled="true" disabled><i class="fa fa-ellipsis-v" aria-hidden="true"></i></button><button type="button" id="mail_compose_discard" class="mail-compose-discard" aria-label="Discard draft"><i class="fa fa-trash" aria-hidden="true"></i></button></div><div id="mail_compose_status" class="mail-compose-status" aria-live="polite"></div><div id="mail_compose_error" class="mail-error mail-compose-error" aria-live="assertive" hidden></div></form></section></main></div>"#,
         navbar = navbar(state, session, "mail"),
         sidebrand = sidebrand(),
-        appnav = appnav("mail")
+        appnav = appnav("mail"),
+        csrf = escape(&session.csrf)
     );
     let bottom = if no_js { String::new() } else { part_js("mailjs") };
     layout(state, "caldaver-mail-page", &content, &bottom)
@@ -3166,6 +3303,9 @@ mod tests {
     struct FakeMailBackend {
         messages: Mutex<Vec<MailMessage>>,
         seen_updates: Mutex<Vec<(u64, bool)>>,
+        deleted: Mutex<Vec<(String, u64)>>,
+        archived: Mutex<Vec<(String, u64)>>,
+        archive_fails: bool,
     }
 
     impl FakeMailBackend {
@@ -3173,11 +3313,27 @@ mod tests {
             Self {
                 messages: Mutex::new(messages),
                 seen_updates: Mutex::new(Vec::new()),
+                deleted: Mutex::new(Vec::new()),
+                archived: Mutex::new(Vec::new()),
+                archive_fails: false,
             }
+        }
+
+        fn with_archive_failure(mut self) -> Self {
+            self.archive_fails = true;
+            self
         }
 
         fn seen_updates(&self) -> Vec<(u64, bool)> {
             self.seen_updates.lock().unwrap().clone()
+        }
+
+        fn deleted_messages(&self) -> Vec<(String, u64)> {
+            self.deleted.lock().unwrap().clone()
+        }
+
+        fn archived_messages(&self) -> Vec<(String, u64)> {
+            self.archived.lock().unwrap().clone()
         }
     }
 
@@ -3216,6 +3372,37 @@ mod tests {
 
         fn mark_seen(&self, _account: &MailAccount, uid: u64, seen: bool) -> Result<(), MailBackendError> {
             self.seen_updates.lock().unwrap().push((uid, seen));
+            Ok(())
+        }
+
+        fn delete_message(
+            &self,
+            _account: &MailAccount,
+            mailbox: &str,
+            uid: u64,
+        ) -> Result<(), MailBackendError> {
+            self.deleted
+                .lock()
+                .unwrap()
+                .push((mailbox.to_string(), uid));
+            Ok(())
+        }
+
+        fn archive_message(
+            &self,
+            _account: &MailAccount,
+            mailbox: &str,
+            uid: u64,
+        ) -> Result<(), MailBackendError> {
+            if self.archive_fails {
+                return Err(MailBackendError::NotFound(
+                    "No Archive folder is configured on this IMAP account".to_string(),
+                ));
+            }
+            self.archived
+                .lock()
+                .unwrap()
+                .push((mailbox.to_string(), uid));
             Ok(())
         }
     }
@@ -3527,6 +3714,45 @@ mod tests {
         assert_eq!(fake.seen_updates(), vec![(9, false)]);
     }
 
+    #[tokio::test]
+    async fn fake_mail_backend_routes_delete_and_archive_through_backend_with_mailbox_and_uid() {
+        let fake = Arc::new(FakeMailBackend::new(vec![fake_message(7, false)]));
+        let backend: Arc<dyn MailBackend> = fake.clone();
+        let account = fake_account();
+
+        run_mail_backend(backend.clone(), account.clone(), |backend, account| {
+            backend.delete_message(account, "INBOX", 7)
+        })
+        .await
+        .unwrap();
+
+        run_mail_backend(backend, account, |backend, account| {
+            backend.archive_message(account, "INBOX", 7)
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(fake.deleted_messages(), vec![("INBOX".to_string(), 7)]);
+        assert_eq!(fake.archived_messages(), vec![("INBOX".to_string(), 7)]);
+    }
+
+    #[tokio::test]
+    async fn fake_mail_backend_reports_honest_error_when_archive_is_unavailable() {
+        let fake = Arc::new(FakeMailBackend::new(vec![fake_message(7, false)]).with_archive_failure());
+        let backend: Arc<dyn MailBackend> = fake.clone();
+        let account = fake_account();
+
+        let result = run_mail_backend(backend, account, |backend, account| {
+            backend.archive_message(account, "INBOX", 7)
+        })
+        .await;
+
+        let error = result.unwrap_err();
+        assert!(matches!(error, MailBackendError::NotFound(_)),
+            "expected NotFound when archive is unavailable, got {error:?}");
+        assert!(fake.archived_messages().is_empty());
+    }
+
     #[test]
     fn caldav_event_serialization_preserves_properties_and_all_day_dates() {
         let event = fake_event(true);
@@ -3705,6 +3931,44 @@ mod tests {
         assert!(html.contains(r#"id="mail_reader_back""#));
         assert!(html.contains(r#"id="mail_reader_unread""#));
         assert!(!html.contains("compose-button"));
+    }
+
+    #[test]
+    fn soft_calendar_failure_status_softens_per_calendar_400_404_and_5xx() {
+        let unexpected = |status: StatusCode| CalDavError::UnexpectedStatus {
+            method: Method::from_bytes(b"REPORT").unwrap(),
+            url: "https://radicale.test/cal/work/".to_string(),
+            status,
+            body: String::new(),
+        };
+
+        assert_eq!(
+            soft_calendar_failure_status(&unexpected(StatusCode::BAD_REQUEST)),
+            Some(StatusCode::BAD_REQUEST)
+        );
+        assert_eq!(
+            soft_calendar_failure_status(&unexpected(StatusCode::NOT_FOUND)),
+            Some(StatusCode::NOT_FOUND)
+        );
+        assert_eq!(
+            soft_calendar_failure_status(&unexpected(StatusCode::INTERNAL_SERVER_ERROR)),
+            Some(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+        assert_eq!(
+            soft_calendar_failure_status(&unexpected(StatusCode::BAD_GATEWAY)),
+            Some(StatusCode::BAD_GATEWAY)
+        );
+
+        // Auth-related and configuration statuses stay hard so the client can react.
+        assert_eq!(soft_calendar_failure_status(&unexpected(StatusCode::UNAUTHORIZED)), None);
+        assert_eq!(soft_calendar_failure_status(&unexpected(StatusCode::FORBIDDEN)), None);
+        assert_eq!(soft_calendar_failure_status(&unexpected(StatusCode::CONFLICT)), None);
+
+        // Bad-config errors surface as hard errors, not partial responses.
+        assert_eq!(
+            soft_calendar_failure_status(&CalDavError::InvalidBaseUrl("bad".to_string())),
+            None
+        );
     }
 
     fn test_session_without_storage() -> Session {
