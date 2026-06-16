@@ -39,8 +39,8 @@
         <button type="button" id="mail_reader_delete" class="mail-reader-action-button mail-reader-action-danger" title="{% trans %}labels.delete{% endtrans %}" aria-label="{% trans %}labels.delete{% endtrans %}">
           <i class="fa fa-trash"></i>
         </button>
-        <button type="button" id="mail_reader_unread" title="{% trans %}labels.mark_unread{% endtrans %}" hidden>
-          <i class="fa fa-envelope"></i>
+        <button type="button" id="mail_reader_unread" class="mail-reader-action-button mail-reader-action-with-label" title="{% trans %}labels.mark_unread{% endtrans %}" aria-label="{% trans %}labels.mark_unread{% endtrans %}" hidden>
+          <i class="fa fa-envelope"></i><span>{% trans %}labels.mark_unread{% endtrans %}</span>
         </button>
         <div class="mail-reader-toolbar-nav" aria-label="{% trans %}labels.mail{% endtrans %}">
           <button type="button" id="mail_reader_previous" title="{% trans %}labels.previous_message{% endtrans %}" aria-label="{% trans %}labels.previous_message{% endtrans %}" disabled>

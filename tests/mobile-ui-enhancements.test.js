@@ -559,3 +559,24 @@ test('mail-row-action is hidden on desktop (display:none in base CSS)', () => {
   const actionBlock = cssBlock(less, '.mail-row-action');
   assert.match(actionBlock, /display:\s*none/);
 });
+
+test('hidden attribute works on mail reader toolbar (CSS specificity fix)', () => {
+  const less = read('assets/less/caldaver.less');
+  assert.match(less, /\[hidden\][\s\S]*?display:\s*none\s*!important/);
+});
+
+test('mail reader unread button has visible label and styling class', () => {
+  const twig = read('web/templates/mail_message.html');
+  const rust = read('rust/crates/caldaver-server/src/lib.rs');
+  assert.match(twig, /id="mail_reader_unread"[^>]*mail-reader-action-with-label/);
+  assert.match(twig, /<span>[^<]*[Mm]ark[^<]*unread[^<]*<\/span>/);
+  assert.match(rust, /id="mail_reader_unread"[^>]*mail-reader-action-with-label/);
+  assert.match(rust, /<span>Mark unread<\/span>/);
+});
+
+test('mail reader unread button starts hidden in both renderers', () => {
+  const twig = read('web/templates/mail_message.html');
+  const rust = read('rust/crates/caldaver-server/src/lib.rs');
+  assert.match(twig, /id="mail_reader_unread"[^>]*hidden/);
+  assert.match(rust, /id="mail_reader_unread"[^>]*hidden/);
+});
