@@ -13,11 +13,14 @@
 {/uid}
 
 {>form_element_start for="summary" label="summary" /}
-<input required name="summary" type="text" size="25" maxlength="255" value="{title}" class="summary form-control" />
+<input required name="summary" type="text" size="25" maxlength="255" value="{title}" class="summary form-control" enterkeyhint="next" />
+{! [E10] Character counter for the summary input; JS in app.js fills this span
+   and updates it on input. Falls back silently if the span is absent. !}
+<span class="char-counter" data-for="summary" aria-live="polite"></span>
 {>form_element_end/}
 
 {>form_element_start for="location" label="location" /}
-<input name="location" type="text" size="25" maxlength="255" value="{location}" class="location form-control" />
+<input name="location" type="text" size="25" maxlength="255" value="{location}" class="location form-control" enterkeyhint="next" />
 {>form_element_end/}
 
 {>form_element_start for="calendar" label="calendar" /}
@@ -95,5 +98,5 @@
 </div>
 
 {>form_element_start for="description" label="description" /}
-<textarea name="description" class="form-control" rows="4">{description}</textarea>
+<textarea name="description" class="form-control autogrow" rows="4">{description}</textarea>
 {>form_element_end/}

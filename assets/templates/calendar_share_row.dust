@@ -11,7 +11,7 @@
             </p>
             {/new}
             {?new}
-            <input name="filter" class="form-control" id="calendar_share_filter" value="" maxlength="255" size="10" />
+            <input name="filter" class="form-control" id="calendar_share_filter" value="" maxlength="255" size="20" />
             {/new}
         </div>
         <div class="col-md-4">
