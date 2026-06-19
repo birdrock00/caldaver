@@ -1842,6 +1842,26 @@ async fn mail_message(State(state): State<AppState>, headers: HeaderMap, Query(q
         Ok(account) => account,
         Err(response) => return response,
     };
+
+    if let Ok(Some(mut cached)) = state.storage.cached_message(&session.username, account_id, uid).await {
+        if !cached.body.is_empty() || !cached.html_body.is_empty() {
+            if !cached.seen {
+                if let Err(error) = run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
+                    backend.mark_seen(account, uid, true)
+                })
+                .await
+                {
+                    return mail_backend_response(error);
+                }
+                cached.seen = true;
+                if let Err(error) = state.storage.mark_cached_seen(&session.username, account_id, uid, true).await {
+                    tracing::error!(%error, "failed to mark cached mail message as seen in Postgres");
+                }
+            }
+            return Json(json!({"result": "SUCCESS", "data": cached, "cached": true})).into_response();
+        }
+    }
+
     let mut message = match run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
         let message = backend.fetch_message(account, uid)?;
         backend.mark_seen(account, uid, true)?;
@@ -1856,7 +1876,7 @@ async fn mail_message(State(state): State<AppState>, headers: HeaderMap, Query(q
     if let Err(error) = state.storage.cache_message(&session.username, account_id, &message).await {
         tracing::error!(%error, "failed to cache fetched mail message in Postgres");
     }
-    Json(json!({"result": "SUCCESS", "data": message})).into_response()
+    Json(json!({"result": "SUCCESS", "data": message, "cached": false})).into_response()
 }
 
 async fn mail_message_navigation(
@@ -3306,6 +3326,7 @@ mod tests {
         deleted: Mutex<Vec<(String, u64)>>,
         archived: Mutex<Vec<(String, u64)>>,
         archive_fails: bool,
+        fetch_message_calls: Mutex<Vec<u64>>,
     }
 
     impl FakeMailBackend {
@@ -3316,6 +3337,7 @@ mod tests {
                 deleted: Mutex::new(Vec::new()),
                 archived: Mutex::new(Vec::new()),
                 archive_fails: false,
+                fetch_message_calls: Mutex::new(Vec::new()),
             }
         }
 
@@ -3326,6 +3348,10 @@ mod tests {
 
         fn seen_updates(&self) -> Vec<(u64, bool)> {
             self.seen_updates.lock().unwrap().clone()
+        }
+
+        fn fetch_message_calls(&self) -> Vec<u64> {
+            self.fetch_message_calls.lock().unwrap().clone()
         }
 
         fn deleted_messages(&self) -> Vec<(String, u64)> {
@@ -3345,6 +3371,7 @@ mod tests {
         }
 
         fn fetch_message(&self, _account: &MailAccount, uid: u64) -> Result<MailMessage, MailBackendError> {
+            self.fetch_message_calls.lock().unwrap().push(uid);
             self.messages
                 .lock()
                 .unwrap()
@@ -3605,6 +3632,14 @@ mod tests {
         })
     }
 
+    async fn test_state_with_backend(backend: Arc<dyn MailBackend>) -> Option<AppState> {
+        imap_backend::install_test_password_key();
+        let database_url = std::env::var("CALDAVER_TEST_DATABASE_URL").ok()?;
+        let config = Config::for_tests(database_url);
+        let storage = Storage::connect(&config.database_url, config.csrf_secret.clone()).await.ok()?;
+        Some(AppState { config, storage, mail_backend: backend })
+    }
+
     async fn logged_in_cookie(app: &Router) -> String {
         let response = app
             .clone()
@@ -3751,6 +3786,51 @@ mod tests {
         assert!(matches!(error, MailBackendError::NotFound(_)),
             "expected NotFound when archive is unavailable, got {error:?}");
         assert!(fake.archived_messages().is_empty());
+    }
+
+    #[tokio::test]
+    async fn mail_message_serves_cache_on_second_open_without_refetching_body() {
+        let fake = Arc::new(FakeMailBackend::new(vec![fake_message(31, false)]));
+        let Some(state) = test_state_with_backend(fake.clone()).await else { return; };
+        let mut account = fake_account();
+        account.id = 0;
+        let saved = state.storage.save_mail_account("demo", &account).await.unwrap();
+        let app = build_router(state);
+        let cookie = logged_in_cookie(&app).await;
+        let url = format!("/mail/message?account_id={}&uid=31", saved.id);
+
+        let first = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(&url)
+                    .header(header::COOKIE, &cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(first.status(), StatusCode::OK);
+
+        let second = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(&url)
+                    .header(header::COOKIE, &cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(second.status(), StatusCode::OK);
+
+        assert_eq!(fake.fetch_message_calls(), vec![31]);
+        assert_eq!(fake.seen_updates(), vec![(31, true)]);
+
+        let body = axum::body::to_bytes(second.into_body(), usize::MAX).await.unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(payload["cached"], serde_json::json!(true));
     }
 
     #[test]

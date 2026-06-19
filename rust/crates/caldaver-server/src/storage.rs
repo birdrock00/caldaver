@@ -845,6 +845,32 @@ RETURNING id::BIGINT AS id
             .collect()
     }
 
+    pub async fn cached_message(
+        &self,
+        owner: &str,
+        account_id: u64,
+        uid: u64,
+    ) -> Result<Option<MailMessage>, StorageError> {
+        let account_id = account_id as i64;
+        let uid = uid as i64;
+        let rows = self
+            .pool
+            .get()
+            .await?
+            .query(
+                "SELECT message::JSONB AS message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 AND uid=$3",
+                &[&owner, &account_id, &uid],
+            )
+            .await?;
+        rows.into_iter()
+            .next()
+            .map(|row| {
+                let message: Value = row.try_get("message")?;
+                serde_json::from_value(message).map_err(Into::into)
+            })
+            .transpose()
+    }
+
     pub async fn replace_message_cache(
         &self,
         owner: &str,
@@ -854,21 +880,53 @@ RETURNING id::BIGINT AS id
         let mut client = self.pool.get().await?;
         let tx = client.transaction().await?;
         let account_id = account_id as i64;
-        tx.execute(
-            "DELETE FROM mail_message_cache WHERE owner=$1 AND account_id=$2",
-            &[&owner, &account_id],
-        )
-        .await?;
+        let mut incoming_uids: Vec<i64> = Vec::with_capacity(messages.len());
         for message in messages {
             let uid = message.uid as i64;
+            incoming_uids.push(uid);
             let value = serde_json::to_value(message)?;
             tx.execute(
-                "INSERT INTO mail_message_cache (owner, account_id, uid, message) VALUES ($1,$2,$3,$4)
-                 ON CONFLICT (owner, account_id, uid) DO UPDATE SET message=EXCLUDED.message, updated_at=now()",
+                r#"
+INSERT INTO mail_message_cache (owner, account_id, uid, message)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (owner, account_id, uid) DO UPDATE SET
+  message =
+    EXCLUDED.message
+    || jsonb_build_object(
+      'body',
+      CASE
+        WHEN COALESCE(EXCLUDED.message->>'body', '') = ''
+          THEN COALESCE(mail_message_cache.message->>'body', '')
+        ELSE EXCLUDED.message->>'body'
+      END,
+      'html_body',
+      CASE
+        WHEN COALESCE(EXCLUDED.message->>'html_body', '') = ''
+          THEN COALESCE(mail_message_cache.message->>'html_body', '')
+        ELSE EXCLUDED.message->>'html_body'
+      END,
+      'attachments',
+      CASE
+        WHEN COALESCE(jsonb_array_length(EXCLUDED.message->'attachments'), 0) = 0
+          THEN COALESCE(mail_message_cache.message->'attachments', '[]'::jsonb)
+        ELSE EXCLUDED.message->'attachments'
+      END
+    ),
+  updated_at = now()
+"#,
                 &[&owner, &account_id, &uid, &value],
             )
             .await?;
         }
+        tx.execute(
+            r#"
+DELETE FROM mail_message_cache
+WHERE owner=$1 AND account_id=$2
+  AND NOT (uid = ANY($3::bigint[]))
+"#,
+            &[&owner, &account_id, &incoming_uids],
+        )
+        .await?;
         tx.commit().await?;
         Ok(())
     }
@@ -1176,6 +1234,19 @@ mod tests {
         }
     }
 
+    fn overview_message(uid: u64, seen: bool) -> MailMessage {
+        MailMessage {
+            uid,
+            from_header: "Ada <ada@example.test>".to_string(),
+            subject: format!("Overview {uid}"),
+            date: "Sat, 30 May 2026 10:00:00 +0000".to_string(),
+            seen,
+            attachments: Vec::new(),
+            body: String::new(),
+            html_body: String::new(),
+        }
+    }
+
     #[tokio::test]
     async fn rejects_non_postgres_database_urls() {
         match Storage::connect("mysql://example.test/caldaver", "secret").await {
@@ -1272,6 +1343,31 @@ mod tests {
             storage.save_mail_account(&owner, &missing).await,
             Err(StorageError::NotFound)
         ));
+    }
+
+    #[tokio::test]
+    async fn postgres_preserves_cached_bodies_and_drops_stale_uids_during_overview_sync() {
+        let Some(storage) = test_storage().await else { return; };
+        let owner = unique_name("cache-merge");
+        let saved = storage.save_mail_account(&owner, &test_account()).await.unwrap();
+
+        storage.cache_message(&owner, saved.id, &overview_message(20, true)).await.unwrap();
+        storage.cache_message(&owner, saved.id, &test_message(21, false)).await.unwrap();
+
+        storage
+            .replace_message_cache(&owner, saved.id, &[overview_message(21, false), overview_message(22, false)])
+            .await
+            .unwrap();
+
+        let cached = storage.cached_messages(&owner, saved.id).await.unwrap();
+        assert!(cached.iter().all(|m| m.uid != 20), "stale uid absent from overview must be removed");
+        let m21 = cached.iter().find(|m| m.uid == 21).unwrap();
+        assert_eq!(m21.body, "Body", "previously-cached full body must survive overview sync");
+        assert!(cached.iter().any(|m| m.uid == 22));
+
+        let lookup = storage.cached_message(&owner, saved.id, 21).await.unwrap().unwrap();
+        assert_eq!(lookup.body, "Body");
+        assert!(storage.cached_message(&owner, saved.id, 999).await.unwrap().is_none());
     }
 
     #[tokio::test]
