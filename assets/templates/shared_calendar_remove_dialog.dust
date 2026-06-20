@@ -1,0 +1,10 @@
+<div id="shared_calendar_remove_dialog">
+{>form_open/}
+<input type="hidden" name="calendar" value="{calendar}" />
+
+<p>
+{@i18n type="messages" name="confirm_remove_shared_calendar" displayname="{displayname}" /}
+</p>
+
+{>form_close/}
+</div>

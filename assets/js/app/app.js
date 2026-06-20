@@ -500,6 +500,11 @@ $(document).ready(function() {
     var calentry = $(this).closest('li.available_calendar');
     calendar_modify_dialog($(calentry[0]).data());
   })
+  .on('click', '.delete_shared_calendar', function(e) {
+    e.stopPropagation();
+    var calentry = $(this).closest('li.available_calendar');
+    shared_calendar_remove_dialog($(calentry[0]).data());
+  })
   .on('click', 'li.available_calendar', function(e) {
     if ($(e.target).closest('.cfg').length > 0) {
       return;
@@ -1853,6 +1858,88 @@ var calendar_delete_dialog = function calendar_delete_dialog(calendar_obj) {
     title: title,
     buttons: buttons,
     divname: 'calendar_delete_dialog',
+    width: 500
+  });
+
+};
+
+
+/**
+ * Shows the 'Remove shared calendar' dialog
+ */
+var shared_calendar_remove_dialog = function shared_calendar_remove_dialog(calendar_obj) {
+  destroy_dialog('#calendar_modify_dialog');
+  destroy_dialog('#calendar_delete_dialog');
+
+  var calendar_url = calendar_obj.calendar || calendar_obj.url;
+  var title = t('labels', 'delete_shared_calendar_title');
+
+  var data = $.extend({}, calendar_obj, {
+    calendar: calendar_url,
+    csrf: csrf_value,
+    csrf_token_name: csrf_id,
+    csrf_token_value: csrf_value,
+    applyid: 'shared_calendar_remove_form',
+    frm: {
+      action: CaldaverConf.base_app_url + 'calendars/shared/remove',
+      method: 'post'
+    }
+  });
+
+  var buttons = [
+  {
+    'text': t('labels', 'delete'),
+    'class': 'addicon btn-icon-calendar-delete',
+    'click': function() {
+      var fake_form = {
+        url: CaldaverConf.base_app_url + 'calendars/shared/remove',
+        data: {
+          calendar: calendar_url,
+          csrf: csrf_value
+        }
+      };
+
+      destroy_dialog('#shared_calendar_remove_dialog');
+
+      send_form({
+        form_object: fake_form,
+        success: function() {
+          var $row = $('#shared_calendar_list li.available_calendar').filter(function() {
+            var thiscal = $(this).data();
+            return thiscal && (thiscal.calendar === calendar_url || thiscal.url === calendar_url);
+          }).first();
+
+          if ($row.length) {
+            var evsrc = $row.data().eventsource;
+            if (evsrc && $('#calendar_view').data('fullCalendar')) {
+              $('#calendar_view').fullCalendar('removeEventSource', evsrc);
+            }
+            $row.remove();
+          }
+
+          if ($('#shared_calendar_list li.available_calendar').length === 0) {
+            $('#shared_calendar_list').hide();
+          }
+        },
+        exception: function(err) {
+          show_error(t('messages', 'error_caldelete'), err);
+        }
+      });
+    }
+  },
+  {
+    'text': t('labels', 'cancel'),
+    'class': 'addicon btn-icon-cancel',
+    'click': function() { destroy_dialog('#shared_calendar_remove_dialog'); }
+  }
+  ];
+
+  show_dialog({
+    template: 'shared_calendar_remove_dialog',
+    data: data,
+    title: title,
+    buttons: buttons,
+    divname: 'shared_calendar_remove_dialog',
     width: 500
   });
 
