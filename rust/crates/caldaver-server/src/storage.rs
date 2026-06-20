@@ -833,7 +833,7 @@ RETURNING id::BIGINT AS id
             .get()
             .await?
             .query(
-                "SELECT message::JSONB AS message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 AND message IS NOT NULL ORDER BY (message->>'date') DESC, uid DESC",
+                "SELECT message::JSONB AS message FROM mail_message_cache WHERE owner=$1 AND account_id=$2 AND message IS NOT NULL ORDER BY uid DESC",
                 &[&owner, &account_id],
             )
             .await?;
@@ -1368,6 +1368,33 @@ mod tests {
         let lookup = storage.cached_message(&owner, saved.id, 21).await.unwrap().unwrap();
         assert_eq!(lookup.body, "Body");
         assert!(storage.cached_message(&owner, saved.id, 999).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn postgres_returns_cached_messages_in_uid_desc_order() {
+        let Some(storage) = test_storage().await else {
+            return;
+        };
+        let owner = unique_name("cache-order");
+        let saved = storage.save_mail_account(&owner, &test_account()).await.unwrap();
+        let mut lower_uid_newer_date = overview_message(30, false);
+        lower_uid_newer_date.date = "Tue, 02 Jan 2024 00:00:00 +0000".to_string();
+        let mut higher_uid_older_date = overview_message(31, false);
+        higher_uid_older_date.date = "Mon, 01 Jan 2024 00:00:00 +0000".to_string();
+
+        storage
+            .replace_message_cache(&owner, saved.id, &[lower_uid_newer_date, higher_uid_older_date])
+            .await
+            .unwrap();
+
+        let uids = storage
+            .cached_messages(&owner, saved.id)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|message| message.uid)
+            .collect::<Vec<_>>();
+        assert_eq!(uids, vec![31, 30]);
     }
 
     #[tokio::test]
