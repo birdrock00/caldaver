@@ -44,15 +44,17 @@ impl Parser {
         &self,
         body: &str,
     ) -> Result<IndexMap<String, IndexMap<u16, Properties>>, XmlError> {
-        let document = roxmltree::Document::parse(body)
-            .map_err(|error| XmlError::Parse(error.to_string()))?;
+        let document =
+            roxmltree::Document::parse(body).map_err(|error| XmlError::Parse(error.to_string()))?;
         let root = document.root_element();
         if clark_from_node(root) != clark(DAV_NS, "multistatus") {
             return Err(XmlError::MissingMultistatusRoot);
         }
 
         let mut result = IndexMap::new();
-        for response in element_children(root).filter(|node| clark_from_node(*node) == clark(DAV_NS, "response")) {
+        for response in element_children(root)
+            .filter(|node| clark_from_node(*node) == clark(DAV_NS, "response"))
+        {
             let href = child_text(response, &clark(DAV_NS, "href")).unwrap_or_default();
             let mut statuses = IndexMap::new();
 
@@ -174,7 +176,9 @@ mod tests {
         );
         assert!(!result["/dav/"].contains_key("{DAV:}notfound"));
 
-        let first = parser.extract_first_properties_from_multistatus(body).unwrap();
+        let first = parser
+            .extract_first_properties_from_multistatus(body)
+            .unwrap();
         assert_eq!(
             first["{DAV:}current-user-principal"],
             XmlValue::Href("/dav/principals/demo/".to_string())

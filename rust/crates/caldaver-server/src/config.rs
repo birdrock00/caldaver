@@ -43,13 +43,21 @@ impl Config {
             auth_username: env::var("CALDAVER_AUTH_USERNAME").unwrap_or_default(),
             auth_password: env::var("CALDAVER_AUTH_PASSWORD").unwrap_or_default(),
             auth_password_hash: env::var("CALDAVER_AUTH_PASSWORD_HASH").unwrap_or_default(),
-            carddav_server: env::var("CALDAVER_CARDDAV_SERVER").unwrap_or_else(|_| caldav_server.clone()),
-            caldav_public_url: env::var("CALDAVER_CALDAV_PUBLIC_URL").unwrap_or_else(|_| caldav_server.clone()),
+            carddav_server: env::var("CALDAVER_CARDDAV_SERVER")
+                .unwrap_or_else(|_| caldav_server.clone()),
+            caldav_public_url: env::var("CALDAVER_CALDAV_PUBLIC_URL")
+                .unwrap_or_else(|_| caldav_server.clone()),
             caldav_username: env::var("CALDAVER_CALDAV_USERNAME").unwrap_or_default(),
             caldav_password: env::var("CALDAVER_CALDAV_PASSWORD").unwrap_or_default(),
             caldav_auth_method: env_value("CALDAVER_CALDAV_AUTHMETHOD", "basic"),
-            caldav_connect_timeout: Duration::from_secs(env_u64("CALDAVER_CALDAV_CONNECT_TIMEOUT", 10)),
-            caldav_response_timeout: Duration::from_secs(env_u64("CALDAVER_CALDAV_RESPONSE_TIMEOUT", 30)),
+            caldav_connect_timeout: Duration::from_secs(env_u64(
+                "CALDAVER_CALDAV_CONNECT_TIMEOUT",
+                10,
+            )),
+            caldav_response_timeout: Duration::from_secs(env_u64(
+                "CALDAVER_CALDAV_RESPONSE_TIMEOUT",
+                30,
+            )),
             caldav_certificate_verify: env_bool("CALDAVER_CALDAV_CERTIFICATE_VERIFY", true),
             dav_host_allowlist: parse_host_allowlist(
                 &env::var("CALDAVER_DAV_HOST_ALLOWLIST").unwrap_or_default(),
@@ -113,7 +121,9 @@ pub struct ConfigError {
 
 impl ConfigError {
     fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into() }
+        Self {
+            message: message.into(),
+        }
     }
 }
 
@@ -168,7 +178,12 @@ fn env_u64(name: &str, default: u64) -> u64 {
 fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
-        .map(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .map(|value| {
+            matches!(
+                value.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
         .unwrap_or(default)
 }
 
@@ -200,7 +215,10 @@ mod tests {
     fn test_parse_host_allowlist_trims_lowercases_and_skips_empty_entries() {
         assert_eq!(
             parse_host_allowlist(" Radicale.Example.Invalid , dav.example.org ,, "),
-            vec!["radicale.example.invalid".to_string(), "dav.example.org".to_string()]
+            vec![
+                "radicale.example.invalid".to_string(),
+                "dav.example.org".to_string()
+            ]
         );
         assert!(parse_host_allowlist("").is_empty());
         assert!(parse_host_allowlist(" , ,").is_empty());

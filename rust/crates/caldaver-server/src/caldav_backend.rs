@@ -4,9 +4,7 @@ use caldaver_core::caldav::filter::{ComponentFilter, TimeRange, Uid};
 use caldaver_core::caldav::resource::{Calendar, CalendarObject, PrincipalRef};
 use caldaver_core::xml::generator::{Generator, empty_properties};
 use caldaver_core::xml::parser::Parser;
-use caldaver_core::xml::{
-    DAV_NS, Properties, XmlElement, XmlError, XmlProperty, XmlValue, clark,
-};
+use caldaver_core::xml::{DAV_NS, Properties, XmlElement, XmlError, XmlProperty, XmlValue, clark};
 use reqwest::header::{ACCEPT, ETAG, HeaderMap, HeaderName, HeaderValue};
 use reqwest::{Method, StatusCode, Url};
 
@@ -177,9 +175,9 @@ impl CalDavClient {
             Calendar::ORDER.to_string(),
             clark(DAV_NS, "owner"),
         ];
-        let body = self.generator.propfind_body(&empty_properties(
-            property_names.iter().map(String::as_str),
-        ))?;
+        let body = self
+            .generator
+            .propfind_body(&empty_properties(property_names.iter().map(String::as_str)))?;
         let response = self
             .xml_request(
                 method("PROPFIND"),
@@ -206,7 +204,8 @@ impl CalDavClient {
         start: impl Into<String>,
         end: impl Into<String>,
     ) -> Result<Vec<CalendarObject>, CalDavError> {
-        self.report_events(calendar_url, &TimeRange::new(start, end)).await
+        self.report_events(calendar_url, &TimeRange::new(start, end))
+            .await
     }
 
     pub async fn list_events_by_uid(
@@ -252,7 +251,11 @@ impl CalDavClient {
                 calendar_url,
                 [],
                 Some(body),
-                &[StatusCode::MULTI_STATUS, StatusCode::OK, StatusCode::NO_CONTENT],
+                &[
+                    StatusCode::MULTI_STATUS,
+                    StatusCode::OK,
+                    StatusCode::NO_CONTENT,
+                ],
             )
             .await?;
         Ok(write_result(calendar_url, &response.headers))
@@ -398,7 +401,10 @@ impl CalDavClient {
     }
 
     async fn delete_with_etag(&self, url: &str, etag: Option<&str>) -> Result<(), CalDavError> {
-        let headers = vec![("If-Match", etag.filter(|value| !value.is_empty()).unwrap_or("*"))];
+        let headers = vec![(
+            "If-Match",
+            etag.filter(|value| !value.is_empty()).unwrap_or("*"),
+        )];
         self.request_with_body(
             Method::DELETE,
             url,
@@ -441,7 +447,10 @@ impl CalDavClient {
             HeaderValue::from_static("application/xml,text/xml,text/calendar,*/*"),
         );
 
-        let mut request = self.http.request(method.clone(), url.clone()).headers(defaults);
+        let mut request = self
+            .http
+            .request(method.clone(), url.clone())
+            .headers(defaults);
         request = match &self.auth {
             CalDavAuth::None => request,
             CalDavAuth::Basic { username, password } => {
@@ -941,7 +950,10 @@ mod tests {
             .await
             .unwrap();
         client
-            .delete_event("/dav/calendars/demo/personal/item-1.ics", Some("\"event-new\""))
+            .delete_event(
+                "/dav/calendars/demo/personal/item-1.ics",
+                Some("\"event-new\""),
+            )
             .await
             .unwrap();
         client
@@ -964,9 +976,15 @@ mod tests {
         assert_eq!(header(&requests[2], "if-none-match").as_deref(), Some("*"));
         assert!(requests[2].body.contains("BEGIN:VCALENDAR"));
         assert_eq!(requests[3].method, "DELETE");
-        assert_eq!(header(&requests[3], "if-match").as_deref(), Some("\"event-new\""));
+        assert_eq!(
+            header(&requests[3], "if-match").as_deref(),
+            Some("\"event-new\"")
+        );
         assert_eq!(requests[4].method, "DELETE");
-        assert_eq!(header(&requests[4], "if-match").as_deref(), Some("\"cal-new\""));
+        assert_eq!(
+            header(&requests[4], "if-match").as_deref(),
+            Some("\"cal-new\"")
+        );
     }
 
     fn event_multistatus(calendar_data: &str) -> String {

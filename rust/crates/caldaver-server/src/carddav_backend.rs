@@ -7,7 +7,8 @@ use caldaver_core::xml::generator::{empty_properties, properties_from_text};
 use caldaver_core::xml::toolkit::{ParsedMultistatus, RequestBody, Toolkit};
 use caldaver_core::xml::{XmlError, XmlValue};
 use reqwest::header::{
-    ACCEPT, AUTHORIZATION, CONTENT_TYPE, ETAG, HeaderMap, HeaderName, HeaderValue, IF_MATCH, IF_NONE_MATCH,
+    ACCEPT, AUTHORIZATION, CONTENT_TYPE, ETAG, HeaderMap, HeaderName, HeaderValue, IF_MATCH,
+    IF_NONE_MATCH,
 };
 use reqwest::{Method, StatusCode, Url};
 use uuid::Uuid;
@@ -87,13 +88,17 @@ impl CardDavClient {
         }
 
         let default_href = join_href(&home_set, &format!("{}/", Uuid::new_v4()));
-        self.create_default_addressbook(&default_href, displayname).await?;
+        self.create_default_addressbook(&default_href, displayname)
+            .await?;
         addressbooks = self.list_addressbooks_at(&home_set).await?;
 
         if addressbooks.is_empty() {
             addressbooks.push(AddressBook::with_properties(
                 default_href,
-                [(AddressBook::DISPLAYNAME, format!("{displayname} addressbook"))],
+                [(
+                    AddressBook::DISPLAYNAME,
+                    format!("{displayname} addressbook"),
+                )],
             ));
         }
         Ok(addressbooks)
@@ -111,10 +116,7 @@ impl CardDavClient {
         Ok(contacts)
     }
 
-    pub async fn create_contact(
-        &self,
-        input: &ContactInput,
-    ) -> Result<Contact, CardDavError> {
+    pub async fn create_contact(&self, input: &ContactInput) -> Result<Contact, CardDavError> {
         let addressbook = self
             .ensure_addressbooks(None, "Default")
             .await?
@@ -153,20 +155,13 @@ impl CardDavClient {
         Ok(Contact::from_vcard(href, etag, &vcard))
     }
 
-    pub async fn delete_contact(
-        &self,
-        href: &str,
-        etag: Option<&str>,
-    ) -> Result<(), CardDavError> {
+    pub async fn delete_contact(&self, href: &str, etag: Option<&str>) -> Result<(), CardDavError> {
         let url = self.href_to_url(href)?;
         let mut request = self.request(method("DELETE"), url.clone());
         if let Some(etag) = etag.filter(|value| !value.is_empty()) {
             request = request.header(IF_MATCH, etag);
         }
-        let response = request
-            .send()
-            .await
-            .map_err(CardDavError::Http)?;
+        let response = request.send().await.map_err(CardDavError::Http)?;
         let status = response.status();
 
         if !matches!(
@@ -237,8 +232,8 @@ impl CardDavClient {
             return Ok(home_set);
         }
 
-        let principal = href_property(&values, CURRENT_USER_PRINCIPAL)
-            .ok_or(CardDavError::MissingHomeSet)?;
+        let principal =
+            href_property(&values, CURRENT_USER_PRINCIPAL).ok_or(CardDavError::MissingHomeSet)?;
         let principal_url = self.href_to_url(&principal)?;
         let body = self
             .toolkit
@@ -251,10 +246,7 @@ impl CardDavClient {
         Ok(href_property(&values, ADDRESSBOOK_HOME_SET).unwrap_or(principal))
     }
 
-    async fn list_addressbooks_at(
-        &self,
-        home_set: &str,
-    ) -> Result<Vec<AddressBook>, CardDavError> {
+    async fn list_addressbooks_at(&self, home_set: &str) -> Result<Vec<AddressBook>, CardDavError> {
         let url = self.href_to_url(home_set)?;
         let properties = empty_properties([
             "{DAV:}resourcetype",
@@ -275,7 +267,10 @@ impl CardDavClient {
                     Some(XmlValue::ResourceType(values)) => values,
                     _ => return None,
                 };
-                if !resource_type.iter().any(|value| value == ADDRESSBOOK_RESOURCE) {
+                if !resource_type
+                    .iter()
+                    .any(|value| value == ADDRESSBOOK_RESOURCE)
+                {
                     return None;
                 }
 
@@ -286,9 +281,7 @@ impl CardDavClient {
                     AddressBook::CTAG,
                 ] {
                     if let Some(value) = text_property(&properties, property) {
-                        addressbook
-                            .properties
-                            .insert(property.to_string(), value);
+                        addressbook.properties.insert(property.to_string(), value);
                     }
                 }
                 Some(addressbook)
@@ -296,7 +289,11 @@ impl CardDavClient {
             .collect())
     }
 
-    async fn create_default_addressbook(&self, href: &str, displayname: &str) -> Result<(), CardDavError> {
+    async fn create_default_addressbook(
+        &self,
+        href: &str,
+        displayname: &str,
+    ) -> Result<(), CardDavError> {
         let url = self.href_to_url(href)?;
         let name = format!("{displayname} addressbook");
         let properties = properties_from_text([
@@ -318,7 +315,10 @@ impl CardDavClient {
 
         if !matches!(
             status,
-            StatusCode::CREATED | StatusCode::OK | StatusCode::NO_CONTENT | StatusCode::METHOD_NOT_ALLOWED
+            StatusCode::CREATED
+                | StatusCode::OK
+                | StatusCode::NO_CONTENT
+                | StatusCode::METHOD_NOT_ALLOWED
         ) {
             return Err(CardDavError::UnexpectedStatus {
                 method: "MKCOL",
@@ -412,13 +412,18 @@ impl CardDavClient {
 
     fn request(&self, method: Method, url: Url) -> reqwest::RequestBuilder {
         let mut headers = HeaderMap::new();
-        headers.insert(ACCEPT, HeaderValue::from_static("application/xml,text/xml,*/*"));
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_static("application/xml,text/xml,*/*"),
+        );
 
         let request = self.http.request(method, url).headers(headers);
         match &self.auth {
             CalDavAuth::None => request,
             CalDavAuth::Basic { username, password } if username.is_empty() => request,
-            CalDavAuth::Basic { username, password } => request.basic_auth(username, Some(password)),
+            CalDavAuth::Basic { username, password } => {
+                request.basic_auth(username, Some(password))
+            }
             CalDavAuth::Bearer(token) => request.header(AUTHORIZATION, format!("Bearer {token}")),
         }
     }
@@ -445,7 +450,11 @@ impl std::fmt::Display for CardDavError {
             Self::MissingHomeSet => write!(f, "CardDAV addressbook-home-set was not found"),
             Self::Http(error) => write!(f, "CardDAV HTTP error: {error}"),
             Self::Xml(error) => write!(f, "CardDAV XML error: {error}"),
-            Self::UnexpectedStatus { method, url, status } => {
+            Self::UnexpectedStatus {
+                method,
+                url,
+                status,
+            } => {
                 write!(f, "CardDAV {method} {url} returned {status}")
             }
         }
@@ -478,10 +487,7 @@ fn href_property(
         })
 }
 
-fn text_property(
-    properties: &caldaver_core::xml::Properties,
-    property: &str,
-) -> Option<String> {
+fn text_property(properties: &caldaver_core::xml::Properties, property: &str) -> Option<String> {
     match properties.get(property) {
         Some(XmlValue::Text(value) | XmlValue::Href(value)) if !value.is_empty() => {
             Some(value.clone())
@@ -703,8 +709,14 @@ END:VCARD
         let addressbooks = client.ensure_addressbooks(None, "Demo").await.unwrap();
         let contacts = client.list_contacts(&addressbooks).await.unwrap();
 
-        assert_eq!(addressbooks[0].url, "/dav/addressbooks/users/demo/contacts/");
-        assert_eq!(addressbooks[0].property(AddressBook::DISPLAYNAME), Some("Contacts"));
+        assert_eq!(
+            addressbooks[0].url,
+            "/dav/addressbooks/users/demo/contacts/"
+        );
+        assert_eq!(
+            addressbooks[0].property(AddressBook::DISPLAYNAME),
+            Some("Contacts")
+        );
         assert_eq!(contacts.len(), 1);
         assert_eq!(contacts[0].full_name, "Ada Lovelace");
         assert_eq!(contacts[0].email, "ada@example.test");
@@ -746,10 +758,17 @@ END:VCARD
         let addressbooks = client.ensure_addressbooks(None, "Demo").await.unwrap();
 
         assert_eq!(addressbooks.len(), 1);
-        assert_eq!(addressbooks[0].url, "/dav/addressbooks/users/demo/generated/");
+        assert_eq!(
+            addressbooks[0].url,
+            "/dav/addressbooks/users/demo/generated/"
+        );
         let requests = server.requests();
         assert_eq!(requests[2].method, "MKCOL");
-        assert!(requests[2].path.starts_with("/dav/addressbooks/users/demo/"));
+        assert!(
+            requests[2]
+                .path
+                .starts_with("/dav/addressbooks/users/demo/")
+        );
         assert_ne!(requests[2].path, "/dav/addressbooks/users/demo/default/");
         assert!(requests[2].body.contains("addressbook"));
         assert!(requests[2].body.contains("Demo addressbook"));
@@ -812,17 +831,32 @@ END:VCARD
 
         let requests = server.requests();
         assert_eq!(requests[2].method, "PUT");
-        assert_eq!(requests[2].path, "/dav/addressbooks/users/demo/contacts/ada.vcf");
+        assert_eq!(
+            requests[2].path,
+            "/dav/addressbooks/users/demo/contacts/ada.vcf"
+        );
         assert_eq!(header(&requests[2], "if-none-match").as_deref(), Some("*"));
         assert!(requests[2].body.contains("BEGIN:VCARD"));
         assert!(requests[2].body.contains("FN:Ada Lovelace"));
         assert_eq!(requests[3].method, "PUT");
-        assert_eq!(requests[3].path, "/dav/addressbooks/users/demo/contacts/ada.vcf");
-        assert_eq!(header(&requests[3], "if-match").as_deref(), Some(r#""new-etag""#));
+        assert_eq!(
+            requests[3].path,
+            "/dav/addressbooks/users/demo/contacts/ada.vcf"
+        );
+        assert_eq!(
+            header(&requests[3], "if-match").as_deref(),
+            Some(r#""new-etag""#)
+        );
         assert!(requests[3].body.contains("FN:Ada Byron"));
         assert_eq!(requests[4].method, "DELETE");
-        assert_eq!(requests[4].path, "/dav/addressbooks/users/demo/contacts/ada.vcf");
-        assert_eq!(header(&requests[4], "if-match").as_deref(), Some(r#""updated-etag""#));
+        assert_eq!(
+            requests[4].path,
+            "/dav/addressbooks/users/demo/contacts/ada.vcf"
+        );
+        assert_eq!(
+            header(&requests[4], "if-match").as_deref(),
+            Some(r#""updated-etag""#)
+        );
     }
 
     #[tokio::test]
