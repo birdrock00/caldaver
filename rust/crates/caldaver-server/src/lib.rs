@@ -72,6 +72,8 @@ pub(crate) struct Preferences {
     list_days: u8,
     default_view: String,
     disable_javascript: bool,
+    #[serde(default)]
+    removed_shared_calendars: Vec<String>,
 }
 
 impl Default for Preferences {
@@ -90,6 +92,7 @@ impl Default for Preferences {
             list_days: 7,
             default_view: "month".to_string(),
             disable_javascript: false,
+            removed_shared_calendars: Vec::new(),
         }
     }
 }
@@ -439,6 +442,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/calendars", get(calendars_list).post(calendar_save))
         .route("/calendars/save", post(calendar_save))
         .route("/calendars/delete", post(calendar_delete))
+        .route("/calendars/shared/remove", post(calendar_shared_remove))
         .route("/events", get(events_list))
         .route("/eventbase", get(event_base))
         .route("/events/save", post(event_save))
@@ -941,11 +945,21 @@ async fn calendars_list(State(state): State<AppState>, headers: HeaderMap) -> Re
         Ok(client) => client,
         Err(error) => return caldav_response(error),
     };
+    let removed = &session.preferences.removed_shared_calendars;
     match client.list_calendars(&calendar_home_set).await {
-        Ok(calendars) => Json(json!({
-            "data": calendars.iter().map(calendar_payload).collect::<Vec<_>>()
-        }))
-        .into_response(),
+        Ok(calendars) => {
+            let filtered: Vec<CoreCalendar> = calendars
+                .into_iter()
+                .filter(|calendar| {
+                    let url = calendar.url();
+                    !removed.iter().any(|removed_url| removed_url == url)
+                })
+                .collect();
+            Json(json!({
+                "data": filtered.iter().map(calendar_payload).collect::<Vec<_>>()
+            }))
+            .into_response()
+        }
         Err(error) => caldav_response(error),
     }
 }
@@ -1028,6 +1042,62 @@ async fn calendar_delete(
         Ok(()) => Json(json!({"result": "SUCCESS", "message": calendar})).into_response(),
         Err(error) => caldav_response(error),
     }
+}
+
+async fn calendar_shared_remove(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
+    let Ok((id, mut session)) = ajax_session_from(&headers, &state).await else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
+    };
+    if !valid_csrf(&session, &form) {
+        return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
+    }
+    let Some(calendar) = form.get("calendar").filter(|value| !value.is_empty()) else {
+        return json_error(StatusCode::BAD_REQUEST, "Calendar is required");
+    };
+    let mut preferences = state
+        .storage
+        .preferences(&session.username)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| session.preferences.clone());
+    if !preferences
+        .removed_shared_calendars
+        .iter()
+        .any(|url| url == calendar)
+    {
+        preferences
+            .removed_shared_calendars
+            .push(calendar.to_string());
+    }
+    if let Err(error) = state
+        .storage
+        .save_preferences(&session.username, &preferences)
+        .await
+    {
+        tracing::error!(%error, "failed to save preferences to Postgres");
+        return json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unable to record removed shared calendar",
+        );
+    }
+    session.preferences = preferences;
+    if let Err(error) = state
+        .storage
+        .insert_session(&id, &session, state.config.session_lifetime)
+        .await
+    {
+        tracing::error!(%error, "failed to refresh session preferences in Postgres");
+        return json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unable to record removed shared calendar",
+        );
+    }
+    Json(json!({"result": "SUCCESS", "message": calendar})).into_response()
 }
 
 async fn events_list(
@@ -4944,5 +5014,128 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
             calendar_home_set: String::new(),
             addressbook_home_set: String::new(),
         }
+    }
+
+    #[tokio::test]
+    async fn calendar_shared_remove_persists_preference() {
+        // Requires a live Postgres test database. Set
+        // CALDAVER_TEST_DATABASE_URL=postgres://... and run:
+        //   cargo test -p caldaver-server --lib calendar_shared_remove_persists_preference
+        let Some(state) = test_state().await else {
+            return;
+        };
+        let username = format!("shared-remove-{}", Uuid::new_v4());
+        let app = build_router(state.clone());
+        let cookie = session_cookie_for(&state, &username).await;
+
+        let body = "_token=token&calendar=%2Fshared%2Ffoo%2F";
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/calendars/shared/remove")
+                    .header(header::COOKIE, &cookie)
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let stored = state
+            .storage
+            .preferences(&username)
+            .await
+            .unwrap()
+            .expect("preferences row should exist after successful remove");
+        assert!(
+            stored
+                .removed_shared_calendars
+                .iter()
+                .any(|url| url == "/shared/foo/"),
+            "expected /shared/foo/ in removed_shared_calendars, got {:?}",
+            stored.removed_shared_calendars
+        );
+
+        // Posting the same calendar URL again must be idempotent (no error, no
+        // duplicate entries).
+        let duplicate = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/calendars/shared/remove")
+                    .header(header::COOKIE, &cookie)
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(Body::from(body))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(duplicate.status(), StatusCode::OK);
+        let stored_after_dup = state.storage.preferences(&username).await.unwrap().unwrap();
+        assert_eq!(
+            stored_after_dup
+                .removed_shared_calendars
+                .iter()
+                .filter(|url| *url == "/shared/foo/")
+                .count(),
+            1,
+            "duplicate POST should not add a second entry"
+        );
+
+        // Posting an unknown calendar URL should still succeed — removal is
+        // just a wish to never see that URL again.
+        let unknown = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/calendars/shared/remove")
+                    .header(header::COOKIE, &cookie)
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(Body::from("_token=token&calendar=%2Fshared%2Fnever-was%2F"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(unknown.status(), StatusCode::OK);
+        let stored_after_unknown = state.storage.preferences(&username).await.unwrap().unwrap();
+        assert!(stored_after_unknown
+            .removed_shared_calendars
+            .iter()
+            .any(|url| url == "/shared/never-was/"));
+
+        // Missing CSRF must be rejected with 401.
+        let no_csrf = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/calendars/shared/remove")
+                    .header(header::COOKIE, &cookie)
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(Body::from("calendar=%2Fshared%2Fbar%2F"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(no_csrf.status(), StatusCode::UNAUTHORIZED);
+
+        // Missing session must be rejected with 401.
+        let no_session = app
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/calendars/shared/remove")
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(Body::from("_token=token&calendar=%2Fshared%2Fbaz%2F"))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(no_session.status(), StatusCode::UNAUTHORIZED);
     }
 }
