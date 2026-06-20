@@ -137,7 +137,10 @@ fn clark_from_node(node: roxmltree::Node<'_, '_>) -> String {
     }
 }
 
-pub(crate) fn property_elements(properties: &[XmlProperty], include_values: bool) -> Vec<XmlElement> {
+pub(crate) fn property_elements(
+    properties: &[XmlProperty],
+    include_values: bool,
+) -> Vec<XmlElement> {
     properties
         .iter()
         .map(|property| XmlElement {

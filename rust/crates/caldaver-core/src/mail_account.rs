@@ -21,9 +21,7 @@ impl ValidationError {
         match self {
             Self::InvalidPort => "IMAP port must be between 1 and 65535",
             Self::LocalhostHost => "IMAP host cannot be localhost",
-            Self::PrivateOrReservedAddress => {
-                "IMAP host cannot be a private or reserved address"
-            }
+            Self::PrivateOrReservedAddress => "IMAP host cannot be a private or reserved address",
             Self::InvalidHostname => "IMAP host must be a valid hostname",
             Self::HostDoesNotResolve => "IMAP host must resolve to a public address",
         }
@@ -158,7 +156,8 @@ mod tests {
 
     #[test]
     fn rejects_zero_port_with_legacy_message() {
-        let result = validate_with_resolver(&account("imap.example.com", 0), &FakeResolver::default());
+        let result =
+            validate_with_resolver(&account("imap.example.com", 0), &FakeResolver::default());
 
         assert_eq!(result, Err(ValidationError::InvalidPort));
         assert_eq!(
@@ -198,14 +197,22 @@ mod tests {
             Ok(())
         );
         assert_eq!(
-            validate_with_resolver(&account("2606:4700:4700::1111", 993), &FakeResolver::default()),
+            validate_with_resolver(
+                &account("2606:4700:4700::1111", 993),
+                &FakeResolver::default()
+            ),
             Ok(())
         );
     }
 
     #[test]
     fn rejects_invalid_hostnames_before_dns() {
-        for host in ["imap", "imap_example.com", "imap example.com", "imap/example.com"] {
+        for host in [
+            "imap",
+            "imap_example.com",
+            "imap example.com",
+            "imap/example.com",
+        ] {
             assert_eq!(
                 validate_with_resolver(&account(host, 993), &FakeResolver::default()),
                 Err(ValidationError::InvalidHostname),

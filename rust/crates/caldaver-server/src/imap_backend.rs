@@ -1,7 +1,7 @@
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
-use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use caldaver_core::mail_account as core_mail_account;
 use imap::ConnectionMode;
 use mailparse::{DispositionType, MailHeaderMap, ParsedMail};
@@ -122,8 +122,9 @@ impl SealedPassword {
         }
 
         let nonce_bytes: [u8; 12] = rand::random();
-        let cipher = Aes256Gcm::new_from_slice(&password_key()?)
-            .map_err(|_| MailBackendError::Crypto("Unable to initialize password seal".to_string()))?;
+        let cipher = Aes256Gcm::new_from_slice(&password_key()?).map_err(|_| {
+            MailBackendError::Crypto("Unable to initialize password seal".to_string())
+        })?;
         let ciphertext = cipher
             .encrypt(Nonce::from_slice(&nonce_bytes), plaintext.as_bytes())
             .map_err(|_| MailBackendError::Crypto("Unable to seal mail password".to_string()))?;
@@ -141,20 +142,25 @@ impl SealedPassword {
         }
 
         if self.version != 1 {
-            return Err(MailBackendError::Crypto("Unsupported sealed password version".to_string()));
+            return Err(MailBackendError::Crypto(
+                "Unsupported sealed password version".to_string(),
+            ));
         }
 
         let nonce = BASE64
             .decode(&self.nonce)
             .map_err(|_| MailBackendError::Crypto("Invalid sealed password nonce".to_string()))?;
-        let ciphertext = BASE64
-            .decode(&self.ciphertext)
-            .map_err(|_| MailBackendError::Crypto("Invalid sealed password ciphertext".to_string()))?;
-        let cipher = Aes256Gcm::new_from_slice(&password_key()?)
-            .map_err(|_| MailBackendError::Crypto("Unable to initialize password seal".to_string()))?;
+        let ciphertext = BASE64.decode(&self.ciphertext).map_err(|_| {
+            MailBackendError::Crypto("Invalid sealed password ciphertext".to_string())
+        })?;
+        let cipher = Aes256Gcm::new_from_slice(&password_key()?).map_err(|_| {
+            MailBackendError::Crypto("Unable to initialize password seal".to_string())
+        })?;
         let plaintext = cipher
             .decrypt(Nonce::from_slice(&nonce), ciphertext.as_ref())
-            .map_err(|_| MailBackendError::Crypto("Unable to reveal sealed mail password".to_string()))?;
+            .map_err(|_| {
+                MailBackendError::Crypto("Unable to reveal sealed mail password".to_string())
+            })?;
 
         String::from_utf8(plaintext)
             .map_err(|_| MailBackendError::Crypto("Sealed mail password is not UTF-8".to_string()))
@@ -167,11 +173,15 @@ fn password_key() -> Result<[u8; 32], MailBackendError> {
 }
 
 fn derive_password_key(secret: Option<&str>) -> Result<[u8; 32], MailBackendError> {
-    let secret = secret.map(str::trim).filter(|value| !value.is_empty()).ok_or_else(|| {
-        MailBackendError::Crypto(
-            "CALDAVER_MAIL_PASSWORD_KEY is required to encrypt stored account credentials".to_string(),
-        )
-    })?;
+    let secret = secret
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            MailBackendError::Crypto(
+                "CALDAVER_MAIL_PASSWORD_KEY is required to encrypt stored account credentials"
+                    .to_string(),
+            )
+        })?;
     if secret.as_bytes().len() < MIN_MAIL_PASSWORD_KEY_BYTES {
         return Err(MailBackendError::Crypto(format!(
             "CALDAVER_MAIL_PASSWORD_KEY must be at least {MIN_MAIL_PASSWORD_KEY_BYTES} bytes"
@@ -235,8 +245,15 @@ impl From<mailparse::MailParseError> for MailBackendError {
 }
 
 pub(crate) trait MailBackend: Send + Sync {
-    fn fetch_inbox_overview(&self, account: &MailAccount) -> Result<Vec<MailMessage>, MailBackendError>;
-    fn fetch_message(&self, account: &MailAccount, uid: u64) -> Result<MailMessage, MailBackendError>;
+    fn fetch_inbox_overview(
+        &self,
+        account: &MailAccount,
+    ) -> Result<Vec<MailMessage>, MailBackendError>;
+    fn fetch_message(
+        &self,
+        account: &MailAccount,
+        uid: u64,
+    ) -> Result<MailMessage, MailBackendError>;
     fn fetch_message_navigation(
         &self,
         account: &MailAccount,
@@ -254,7 +271,12 @@ pub(crate) trait MailBackend: Send + Sync {
         uid: u64,
         part: &str,
     ) -> Result<AttachmentDownload, MailBackendError>;
-    fn mark_seen(&self, account: &MailAccount, uid: u64, seen: bool) -> Result<(), MailBackendError>;
+    fn mark_seen(
+        &self,
+        account: &MailAccount,
+        uid: u64,
+        seen: bool,
+    ) -> Result<(), MailBackendError>;
     // Moves or permanently deletes the message identified by (`mailbox`, `uid`).
     // When the IMAP account exposes a `\Trash` special-use mailbox the message is
     // moved there; otherwise it is flagged `\Deleted` and expunged from the source
@@ -287,7 +309,10 @@ fn reset_mail_password_message() -> String {
 }
 
 impl MailBackend for ImapMailBackend {
-    fn fetch_inbox_overview(&self, account: &MailAccount) -> Result<Vec<MailMessage>, MailBackendError> {
+    fn fetch_inbox_overview(
+        &self,
+        account: &MailAccount,
+    ) -> Result<Vec<MailMessage>, MailBackendError> {
         self.with_session(account, |session| {
             let mut uids = session.uid_search("ALL")?.into_iter().collect::<Vec<_>>();
             uids.sort_unstable_by(|a, b| b.cmp(a));
@@ -302,7 +327,11 @@ impl MailBackend for ImapMailBackend {
         })
     }
 
-    fn fetch_message(&self, account: &MailAccount, uid: u64) -> Result<MailMessage, MailBackendError> {
+    fn fetch_message(
+        &self,
+        account: &MailAccount,
+        uid: u64,
+    ) -> Result<MailMessage, MailBackendError> {
         let uid = uid32(uid)?;
         self.with_session(account, |session| fetch_message_by_uid(session, uid, true))
     }
@@ -336,10 +365,19 @@ impl MailBackend for ImapMailBackend {
         })
     }
 
-    fn mark_seen(&self, account: &MailAccount, uid: u64, seen: bool) -> Result<(), MailBackendError> {
+    fn mark_seen(
+        &self,
+        account: &MailAccount,
+        uid: u64,
+        seen: bool,
+    ) -> Result<(), MailBackendError> {
         let uid = uid32(uid)?;
         self.with_session(account, |session| {
-            let flags = if seen { "+FLAGS.SILENT (\\Seen)" } else { "-FLAGS.SILENT (\\Seen)" };
+            let flags = if seen {
+                "+FLAGS.SILENT (\\Seen)"
+            } else {
+                "-FLAGS.SILENT (\\Seen)"
+            };
             session.uid_store(uid.to_string(), flags)?;
             Ok(())
         })
@@ -352,7 +390,11 @@ impl MailBackend for ImapMailBackend {
         uid: u64,
     ) -> Result<(), MailBackendError> {
         let uid = uid32(uid)?;
-        let mailbox = if mailbox.trim().is_empty() { "INBOX" } else { mailbox };
+        let mailbox = if mailbox.trim().is_empty() {
+            "INBOX"
+        } else {
+            mailbox
+        };
         self.with_session_on_mailbox(account, mailbox, move |session| {
             if let Some(trash) = lookup_special_use_mailbox(session, SpecialUse::Trash)? {
                 move_or_fallback(session, uid, &trash)?;
@@ -373,10 +415,14 @@ impl MailBackend for ImapMailBackend {
         uid: u64,
     ) -> Result<(), MailBackendError> {
         let uid = uid32(uid)?;
-        let mailbox = if mailbox.trim().is_empty() { "INBOX" } else { mailbox };
+        let mailbox = if mailbox.trim().is_empty() {
+            "INBOX"
+        } else {
+            mailbox
+        };
         self.with_session_on_mailbox(account, mailbox, move |session| {
-            let archive = lookup_special_use_mailbox(session, SpecialUse::Archive)?
-                .ok_or_else(|| {
+            let archive =
+                lookup_special_use_mailbox(session, SpecialUse::Archive)?.ok_or_else(|| {
                     MailBackendError::NotFound(
                         "No Archive folder is configured on this IMAP account".to_string(),
                     )
@@ -396,11 +442,8 @@ where
     ordered_uids.dedup();
     let current_index = ordered_uids.iter().position(|uid| *uid == current_uid);
     MailMessageNavigation {
-        previous: current_index.and_then(|index| {
-            index
-                .checked_sub(1)
-                .map(|previous| ordered_uids[previous])
-        }),
+        previous: current_index
+            .and_then(|index| index.checked_sub(1).map(|previous| ordered_uids[previous])),
         next: current_index.and_then(|index| ordered_uids.get(index + 1).copied()),
     }
 }
@@ -439,14 +482,16 @@ impl ImapMailBackend {
                     && !fallback_username.is_empty()
                     && fallback_username != primary_username =>
             {
-                client
-                    .login(fallback_username, password.as_str())
-                    .map_err(|(fallback_error, _)| {
+                client.login(fallback_username, password.as_str()).map_err(
+                    |(fallback_error, _)| {
                         if account.password_needs_reset {
                             return MailBackendError::Credentials(reset_mail_password_message());
                         }
-                        MailBackendError::Credentials(format!("{error}; fallback login failed: {fallback_error}"))
-                    })?
+                        MailBackendError::Credentials(format!(
+                            "{error}; fallback login failed: {fallback_error}"
+                        ))
+                    },
+                )?
             }
             Err((error, _)) => {
                 if account.password_needs_reset {
@@ -508,7 +553,11 @@ fn lookup_special_use_mailbox(
     let names = session.list(None, Some("*"))?;
     let mut fallback: Option<String> = None;
     for name in names.iter() {
-        if name.attributes().iter().any(|attr| special_use.matches_attribute(attr)) {
+        if name
+            .attributes()
+            .iter()
+            .any(|attr| special_use.matches_attribute(attr))
+        {
             return Ok(Some(name.name().to_string()));
         }
         if fallback.is_none() && special_use.matches_name_lower(&name.name().to_lowercase()) {
@@ -557,13 +606,22 @@ fn fetch_message_by_uid(
         .iter()
         .next()
         .ok_or_else(|| MailBackendError::NotFound("Message not found".to_string()))?;
-    let seen = fetch.flags().iter().any(|flag| matches!(flag, imap::types::Flag::Seen));
+    let seen = fetch
+        .flags()
+        .iter()
+        .any(|flag| matches!(flag, imap::types::Flag::Seen));
     let date = fetch.internal_date().map(|date| date.to_rfc2822());
-    let raw = fetch
-        .body()
-        .ok_or_else(|| MailBackendError::Parse("IMAP server did not return message body".to_string()))?;
+    let raw = fetch.body().ok_or_else(|| {
+        MailBackendError::Parse("IMAP server did not return message body".to_string())
+    })?;
 
-    parse_mail_message(fetch.uid.unwrap_or(uid) as u64, seen, date, raw, include_body)
+    parse_mail_message(
+        fetch.uid.unwrap_or(uid) as u64,
+        seen,
+        date,
+        raw,
+        include_body,
+    )
 }
 
 fn fetch_raw_message(
@@ -575,10 +633,9 @@ fn fetch_raw_message(
         .iter()
         .next()
         .ok_or_else(|| MailBackendError::NotFound("Message not found".to_string()))?;
-    fetch
-        .body()
-        .map(Vec::from)
-        .ok_or_else(|| MailBackendError::Parse("IMAP server did not return message body".to_string()))
+    fetch.body().map(Vec::from).ok_or_else(|| {
+        MailBackendError::Parse("IMAP server did not return message body".to_string())
+    })
 }
 
 pub(crate) fn parse_mail_message(
@@ -647,9 +704,15 @@ fn collect_parts(
             return;
         }
 
-        if include_body && part.ctype.mimetype.eq_ignore_ascii_case("text/plain") && plain_body.is_empty() {
+        if include_body
+            && part.ctype.mimetype.eq_ignore_ascii_case("text/plain")
+            && plain_body.is_empty()
+        {
             *plain_body = part.get_body().unwrap_or_default();
-        } else if include_body && part.ctype.mimetype.eq_ignore_ascii_case("text/html") && html_body.is_empty() {
+        } else if include_body
+            && part.ctype.mimetype.eq_ignore_ascii_case("text/html")
+            && html_body.is_empty()
+        {
             *html_body = part.get_body().unwrap_or_default();
         }
         return;
@@ -661,7 +724,14 @@ fn collect_parts(
         } else {
             format!("{path}.{}", index + 1)
         };
-        collect_parts(subpart, &child_path, include_body, plain_body, html_body, attachments);
+        collect_parts(
+            subpart,
+            &child_path,
+            include_body,
+            plain_body,
+            html_body,
+            attachments,
+        );
     }
 }
 
@@ -707,10 +777,15 @@ fn attachment_filename(part: &ParsedMail<'_>) -> Option<String> {
     let inline_attachment = disposition.disposition == DispositionType::Inline
         && !part.ctype.mimetype.eq_ignore_ascii_case("text/plain")
         && !part.ctype.mimetype.eq_ignore_ascii_case("text/html");
-    if disposition.disposition != DispositionType::Attachment && filename.is_none() && !inline_attachment {
+    if disposition.disposition != DispositionType::Attachment
+        && filename.is_none()
+        && !inline_attachment
+    {
         return None;
     }
-    Some(sanitize_filename(filename.map(String::as_str).unwrap_or("attachment")))
+    Some(sanitize_filename(
+        filename.map(String::as_str).unwrap_or("attachment"),
+    ))
 }
 
 fn strip_html_text(html: &str) -> String {
@@ -772,7 +847,11 @@ mod tests {
     #[test]
     fn password_key_requires_dedicated_strong_secret() {
         let missing = derive_password_key(None).unwrap_err();
-        assert!(missing.to_string().contains("CALDAVER_MAIL_PASSWORD_KEY is required"));
+        assert!(
+            missing
+                .to_string()
+                .contains("CALDAVER_MAIL_PASSWORD_KEY is required")
+        );
 
         let weak = derive_password_key(Some("short-secret")).unwrap_err();
         assert!(weak.to_string().contains("at least 32 bytes"));

@@ -294,7 +294,11 @@ mod tests {
 
         assert_eq!(calendar.property(Calendar::DISPLAYNAME), Some("Test"));
         assert!(!calendar.writable_properties().contains_key(Calendar::CTAG));
-        assert!(calendar.writable_properties().contains_key(Calendar::DISPLAYNAME));
+        assert!(
+            calendar
+                .writable_properties()
+                .contains_key(Calendar::DISPLAYNAME)
+        );
     }
 
     #[test]

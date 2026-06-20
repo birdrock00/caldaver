@@ -1,4 +1,4 @@
-use std::collections::{hash_map::DefaultHasher, BTreeMap};
+use std::collections::{BTreeMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -197,7 +197,10 @@ pub fn build_vcard(data: &ContactInput) -> (String, String) {
     ];
 
     if !data.email.is_empty() {
-        lines.push(format!("EMAIL;TYPE=internet:{}", escape_text(data.email.trim())));
+        lines.push(format!(
+            "EMAIL;TYPE=internet:{}",
+            escape_text(data.email.trim())
+        ));
     }
 
     if !data.phone.is_empty() {
@@ -265,7 +268,10 @@ fn organization(properties: &BTreeMap<String, Vec<String>>) -> String {
 }
 
 fn categories(properties: &BTreeMap<String, Vec<String>>) -> Vec<String> {
-    let Some(raw) = properties.get("CATEGORIES").and_then(|values| values.first()) else {
+    let Some(raw) = properties
+        .get("CATEGORIES")
+        .and_then(|values| values.first())
+    else {
         return Vec::new();
     };
 
@@ -509,7 +515,10 @@ mod tests {
         );
 
         assert_eq!(address_book.url, "/user/addressbook/");
-        assert_eq!(address_book.property(AddressBook::DISPLAYNAME), Some("Personal"));
+        assert_eq!(
+            address_book.property(AddressBook::DISPLAYNAME),
+            Some("Personal")
+        );
         assert_eq!(address_book.property("{DAV:}missing"), None);
         assert_eq!(Contact::DATA, ADDRESS_DATA);
         assert_eq!(Contact::ETAG, ETAG);
@@ -614,7 +623,10 @@ END:VCARD\r\n"
     fn contact_url_matches_create_contact_path() {
         let address_book = AddressBook::new("/user/imported/");
 
-        assert_eq!(contact_url(&address_book, "alpha"), "/user/imported/alpha.vcf");
+        assert_eq!(
+            contact_url(&address_book, "alpha"),
+            "/user/imported/alpha.vcf"
+        );
     }
 
     #[test]
@@ -640,8 +652,28 @@ END:VCARD\r\n"
     #[test]
     fn sort_contacts_by_full_name_is_case_insensitive() {
         let mut contacts = vec![
-            Contact::new("/b.vcf", None::<String>, "b", "beta", "", "", "", "", vec![]),
-            Contact::new("/a.vcf", None::<String>, "a", "Alpha", "", "", "", "", vec![]),
+            Contact::new(
+                "/b.vcf",
+                None::<String>,
+                "b",
+                "beta",
+                "",
+                "",
+                "",
+                "",
+                vec![],
+            ),
+            Contact::new(
+                "/a.vcf",
+                None::<String>,
+                "a",
+                "Alpha",
+                "",
+                "",
+                "",
+                "",
+                vec![],
+            ),
         ];
 
         sort_contacts_by_full_name(&mut contacts);
