@@ -5473,4 +5473,15 @@ body:has(.modal.in) .caldaver-bottom-tabs {
   display: none !important;
 }
 
+// Trash button on each shared-calendar row. Same shape as the .cfg
+// cog button (it inherits .pseudobutton) but tinted red so it reads as a
+// destructive action.
+.delete_shared_calendar {
+  color: @brand-danger;
+  margin-left: 4px;
+}
+.delete_shared_calendar:hover {
+  color: darken(@brand-danger, 10%);
+}
+
 // vim: ft=css sw=2 tabstop=2 expandtab
