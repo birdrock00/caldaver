@@ -1828,6 +1828,7 @@ async fn mail_messages_payload(state: AppState, headers: HeaderMap, query: HashM
         .await
     {
         tracing::error!(%error, "failed to cache synced mail in Postgres");
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to cache synced messages");
     }
     Json(json!({"result": "SUCCESS", "data": messages, "cached": false})).into_response()
 }
@@ -3663,6 +3664,64 @@ mod tests {
             .to_string()
     }
 
+    async fn session_cookie_for(state: &AppState, username: &str) -> String {
+        let id = Uuid::new_v4().to_string();
+        let mut session = test_session_without_storage();
+        session.username = username.to_string();
+        session.displayname = username.to_string();
+        state
+            .storage
+            .insert_session(&id, &session, std::time::Duration::from_secs(3600))
+            .await
+            .unwrap();
+        format!("caldaver_sess={id}")
+    }
+
+    async fn install_mail_cache_failure_trigger(
+        database_url: &str,
+    ) -> Option<tokio_postgres::Client> {
+        let (client, connection) = tokio_postgres::connect(database_url, tokio_postgres::NoTls)
+            .await
+            .ok()?;
+        tokio::spawn(async move {
+            let _ = connection.await;
+        });
+        client
+            .batch_execute(
+                r#"
+CREATE OR REPLACE FUNCTION caldaver_test_fail_mail_cache_for_prefix()
+RETURNS trigger AS $$
+BEGIN
+  IF NEW.owner LIKE 'sync-cache-fail-%' THEN
+    RAISE EXCEPTION 'forced mail cache failure for %', NEW.owner;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS caldaver_test_fail_mail_cache_for_prefix ON mail_message_cache;
+CREATE TRIGGER caldaver_test_fail_mail_cache_for_prefix
+BEFORE INSERT OR UPDATE ON mail_message_cache
+FOR EACH ROW EXECUTE FUNCTION caldaver_test_fail_mail_cache_for_prefix();
+"#,
+            )
+            .await
+            .ok()?;
+        Some(client)
+    }
+
+    async fn remove_mail_cache_failure_trigger(client: &tokio_postgres::Client) {
+        client
+            .batch_execute(
+                r#"
+DROP TRIGGER IF EXISTS caldaver_test_fail_mail_cache_for_prefix ON mail_message_cache;
+DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
+"#,
+            )
+            .await
+            .unwrap();
+    }
+
     #[tokio::test]
     async fn serves_health_from_rust_backend() {
         let Some(state) = test_state().await else { return; };
@@ -3831,6 +3890,43 @@ mod tests {
         let body = axum::body::to_bytes(second.into_body(), usize::MAX).await.unwrap();
         let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(payload["cached"], serde_json::json!(true));
+    }
+
+    #[tokio::test]
+    async fn mail_messages_sync_reports_error_when_cache_replace_fails() {
+        let fake = Arc::new(FakeMailBackend::new(vec![fake_message(41, false)]));
+        let Some(state) = test_state_with_backend(fake).await else {
+            return;
+        };
+        let database_url = state.config.database_url.clone();
+        let Some(trigger_client) = install_mail_cache_failure_trigger(&database_url).await else {
+            return;
+        };
+        let owner = format!("sync-cache-fail-{}", Uuid::new_v4());
+        let mut account = fake_account();
+        account.id = 0;
+        let saved = state.storage.save_mail_account(&owner, &account).await.unwrap();
+        let cookie = session_cookie_for(&state, &owner).await;
+        let app = build_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/mail/messages/sync?account_id={}", saved.id))
+                    .header(header::COOKIE, cookie)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        remove_mail_cache_failure_trigger(&trigger_client).await;
+
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(payload["result"], serde_json::json!("ERROR"));
+        assert_ne!(payload["result"], serde_json::json!("SUCCESS"));
     }
 
     #[test]
