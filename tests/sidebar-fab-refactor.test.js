@@ -238,3 +238,42 @@ test('rebuilt dist assets include the FAB and add-button markers', () => {
   assert.match(distJs, /shared_calendar_add/);
   assert.match(distJs, /shortcut_add_event/);
 });
+
+test('shared-calendar remove UI is wired in source and dist', () => {
+  const entry = read('assets/templates/calendar_list_entry.dust');
+  const dialog = read('assets/templates/shared_calendar_remove_dialog.dust');
+  const appJs = read('assets/js/app/app.js');
+  const distJs = read('web/public/dist/js/caldaver.js');
+  const distMin = read('web/public/dist/js/caldaver.min.js');
+  const distCss = read('web/public/dist/css/caldaver.css');
+
+  // Trash button only on shared rows in the per-row template.
+  assert.match(entry, /\{?is_shared\}[\s\S]*?delete_shared_calendar[\s\S]*?\{?\/is_shared\}/);
+  assert.match(entry, /class="delete_shared_calendar pseudobutton"/);
+  assert.match(entry, /fa fa-trash/);
+  // The existing .cfg cog button must be untouched.
+  assert.match(entry, /class="cfg pseudobutton"/);
+
+  // Dialog template references the new i18n key and a hidden calendar input.
+  assert.match(dialog, /id="shared_calendar_remove_dialog"/);
+  assert.match(dialog, /confirm_remove_shared_calendar/);
+  assert.match(dialog, /name="calendar"/);
+
+  // app.js binds the click, defines the dialog function, and POSTs to the new endpoint.
+  assert.match(
+    appJs,
+    /div\.calendar_list[\s\S]*?'\.delete_shared_calendar'[\s\S]*?shared_calendar_remove_dialog/
+  );
+  assert.match(appJs, /var shared_calendar_remove_dialog = function/);
+  // The function body references the new endpoint. The URL is concatenated with
+  // CaldaverConf.base_app_url, so we only assert the path component appears in
+  // the source.
+  assert.match(appJs, /['"]calendars\/shared\/remove['"]/);
+
+  // Rebuilt dist artifacts contain the new pieces.
+  assert.match(distJs, /delete_shared_calendar/);
+  assert.match(distJs, /shared_calendar_remove_dialog/);
+  assert.match(distJs, /calendars\/shared\/remove/);
+  assert.match(distMin, /delete_shared_calendar/);
+  assert.match(distCss, /\.delete_shared_calendar/);
+});

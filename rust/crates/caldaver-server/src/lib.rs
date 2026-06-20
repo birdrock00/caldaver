@@ -3884,6 +3884,15 @@ fn translations_json() -> String {
         ("labels.currentlysharing", "Currently sharing this calendar"),
         ("labels.modify", "Modify"),
         ("labels.delete", "Delete"),
+        ("labels.delete_shared_calendar", "Remove from my calendars"),
+        (
+            "labels.delete_shared_calendar_title",
+            "Remove shared calendar",
+        ),
+        (
+            "messages.confirm_remove_shared_calendar",
+            "Remove \"%displayname%\" from your shared calendars list? You can be re-invited by the owner.",
+        ),
         (
             "messages.error_loading_calendar_list",
             "Unable to load calendars",

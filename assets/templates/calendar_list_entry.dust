@@ -18,6 +18,13 @@
  {^is_owned}
  title="{@i18n type="messages" name="info_sharedby" user="{owner}"/}"
  {/is_owned}>{displayname}</span>
+ {?is_shared}
+  <button type="button" class="delete_shared_calendar pseudobutton"
+   title="{@i18n type="labels" name="delete_shared_calendar"/}"
+   aria-label="{@i18n type="labels" name="delete_shared_calendar"/}">
+   <i class="fa fa-trash" aria-hidden="true"></i>
+  </button>
+ {/is_shared}
  <button type="button" title="{@i18n type="labels" name="modifycalendar"/}" aria-label="{@i18n type="labels" name="modifycalendar"/}" class="cfg pseudobutton">
   <i class="fa fa-cogs" aria-hidden="true"></i>
  </button>
