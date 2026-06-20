@@ -78,10 +78,7 @@ impl ComponentFilter for PrincipalPropertySearch {
             children.push(XmlElement::children(
                 clark(DAV_NS, "property-search"),
                 vec![
-                    XmlElement::children(
-                        clark(DAV_NS, "prop"),
-                        vec![XmlElement::empty(property)],
-                    ),
+                    XmlElement::children(clark(DAV_NS, "prop"), vec![XmlElement::empty(property)]),
                     XmlElement::text(clark(DAV_NS, "match"), &self.input),
                 ],
             ));
@@ -142,7 +139,10 @@ mod tests {
         let XmlValue::Elements(children) = element.value else {
             panic!("uid filter should contain a text-match child");
         };
-        assert_eq!(children[0].name, "{urn:ietf:params:xml:ns:caldav}text-match");
+        assert_eq!(
+            children[0].name,
+            "{urn:ietf:params:xml:ns:caldav}text-match"
+        );
         assert_eq!(children[0].attributes["collation"], "i;octet");
         assert_eq!(children[0].value, XmlValue::Text("1234567890".to_string()));
     }

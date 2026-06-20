@@ -1,5 +1,5 @@
-mod carddav_backend;
 pub mod caldav_backend;
+mod carddav_backend;
 mod config;
 mod imap_backend;
 mod storage;
@@ -7,23 +7,23 @@ mod storage;
 use crate::caldav_backend::{CalDavAuth, CalDavClient, CalDavConfig, CalDavError};
 use crate::config::Config;
 use crate::storage::{DavAccount, SessionDavCredentials, Storage};
+use axum::Router;
 use axum::extract::{Form, Query, State};
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{Html, IntoResponse, Json, Redirect, Response};
 use axum::routing::{get, post};
-use axum::Router;
+use base64::Engine;
 use caldaver_core::caldav::resource::{Calendar as CoreCalendar, CalendarObject};
-use caldaver_core::carddav::{ContactInput, Contact as CardDavContact};
+use caldaver_core::carddav::{Contact as CardDavContact, ContactInput};
 use caldaver_core::xml::XmlProperty;
 use carddav_backend::{CardDavClient, CardDavConfig};
 use imap_backend::{
     ImapMailBackend, MailAccount, MailAccountPublic, MailBackend, MailBackendError, MailMessage,
     SealedPassword,
 };
-use base64::Engine;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::env;
@@ -83,7 +83,8 @@ impl Default for Preferences {
             time_format: "24".to_string(),
             date_format: "ymd".to_string(),
             weekstart: 0,
-            timezone: env::var("CALDAVER_TIMEZONE").unwrap_or_else(|_| DEFAULT_TIMEZONE.to_string()),
+            timezone: env::var("CALDAVER_TIMEZONE")
+                .unwrap_or_else(|_| DEFAULT_TIMEZONE.to_string()),
             show_week_nb: false,
             show_now_indicator: true,
             list_days: 7,
@@ -207,7 +208,10 @@ async fn bootstrap_postgres_accounts(config: &Config, storage: &Storage) -> Resu
     }
 
     if migrated > 0 {
-        tracing::info!(migrated, "bootstrapped DAV account credentials into Postgres");
+        tracing::info!(
+            migrated,
+            "bootstrapped DAV account credentials into Postgres"
+        );
     }
     if errors.is_empty() {
         Ok(())
@@ -254,11 +258,13 @@ async fn bootstrap_env_dav_accounts(config: &Config, storage: &Storage) -> Resul
     .await
 }
 
-async fn bootstrap_session_dav_accounts(config: &Config, storage: &Storage) -> Result<usize, String> {
-    let credentials = storage
-        .session_dav_credentials()
-        .await
-        .map_err(|error| format!("failed to load session DAV credentials from Postgres: {error}"))?;
+async fn bootstrap_session_dav_accounts(
+    config: &Config,
+    storage: &Storage,
+) -> Result<usize, String> {
+    let credentials = storage.session_dav_credentials().await.map_err(|error| {
+        format!("failed to load session DAV credentials from Postgres: {error}")
+    })?;
     let mut migrated = 0usize;
     let mut errors = Vec::new();
     for credential in credentials {
@@ -362,13 +368,16 @@ async fn save_missing_bootstrap_dav_account(
     if storage
         .dav_account(owner, account_type)
         .await
-        .map_err(|error| format!("failed to check stored {account_type} account for {owner}: {error}"))?
+        .map_err(|error| {
+            format!("failed to check stored {account_type} account for {owner}: {error}")
+        })?
         .is_some()
     {
         return Ok(false);
     }
-    let credential_sealed = SealedPassword::seal(password)
-        .map_err(|error| format!("failed to seal {account_type} credential for {owner}: {error}"))?;
+    let credential_sealed = SealedPassword::seal(password).map_err(|error| {
+        format!("failed to seal {account_type} credential for {owner}: {error}")
+    })?;
     let account = DavAccount {
         id: 0,
         account_type: account_type.to_string(),
@@ -386,7 +395,9 @@ async fn save_missing_bootstrap_dav_account(
     storage
         .save_dav_account(owner, &account)
         .await
-        .map_err(|error| format!("failed to bootstrap stored {account_type} account for {owner}: {error}"))?;
+        .map_err(|error| {
+            format!("failed to bootstrap stored {account_type} account for {owner}: {error}")
+        })?;
     Ok(true)
 }
 
@@ -437,9 +448,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/principals", get(principals))
         .route("/jssettings", get(jssettings))
         .route("/keepalive", get(|| async { "" }))
-        .route("/__rust/health", get(|| async { Json(json!({"ok": true, "backend": "rust"})) }))
+        .route(
+            "/__rust/health",
+            get(|| async { Json(json!({"ok": true, "backend": "rust"})) }),
+        )
         .fallback_service(
-            ServeDir::new(static_root).fallback(get(not_found_page).with_state(state.clone()))
+            ServeDir::new(static_root).fallback(get(not_found_page).with_state(state.clone())),
         )
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -457,32 +471,35 @@ fn secure_cookie_attr(config: &Config) -> &'static str {
     if config.cookie_secure { "; Secure" } else { "" }
 }
 
-async fn session_from(headers: &HeaderMap, state: &AppState) -> Result<(String, Session), Response> {
+async fn session_from(
+    headers: &HeaderMap,
+    state: &AppState,
+) -> Result<(String, Session), Response> {
     let Some(id) = cookie_value(headers, "caldaver_sess") else {
         return Err(Redirect::to("/login").into_response());
     };
-    let Some(session) = state
-        .storage
-        .session(&id)
-        .await
-        .map_err(|error| {
-            tracing::error!(%error, "failed to load session from Postgres");
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        })?
+    let Some(session) = state.storage.session(&id).await.map_err(|error| {
+        tracing::error!(%error, "failed to load session from Postgres");
+        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+    })?
     else {
         return Err(Redirect::to("/login").into_response());
     };
     Ok((id, session.clone()))
 }
 
-async fn ajax_session_from(headers: &HeaderMap, state: &AppState) -> Result<(String, Session), Response> {
+async fn ajax_session_from(
+    headers: &HeaderMap,
+    state: &AppState,
+) -> Result<(String, Session), Response> {
     session_from(headers, state)
         .await
         .map_err(|_| (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response())
 }
 
 fn valid_csrf(session: &Session, form: &HashMap<String, String>) -> bool {
-    form.get("_token").is_some_and(|token| token == &session.csrf)
+    form.get("_token")
+        .is_some_and(|token| token == &session.csrf)
 }
 
 fn html_response(body: String) -> Html<String> {
@@ -503,14 +520,20 @@ async fn login_page(State(state): State<AppState>) -> Html<String> {
     html_response(render_login(&state, None))
 }
 
-async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn login_post(
+    State(state): State<AppState>,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let user = form.get("user").map(String::as_str).unwrap_or("").trim();
     let password = form.get("password").map(String::as_str).unwrap_or("");
     if user.is_empty() || password.is_empty() {
         return Html(render_login(&state, Some("Required fields are missing"))).into_response();
     }
     let local_auth_enforced = !state.config.auth_username.is_empty();
-    if local_auth_enforced && (state.config.auth_username != user || !verify_local_auth_password(&state.config, password)) {
+    if local_auth_enforced
+        && (state.config.auth_username != user
+            || !verify_local_auth_password(&state.config, password))
+    {
         return Html(render_login(&state, Some("Invalid username or password"))).into_response();
     }
 
@@ -554,11 +577,13 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
         .flatten()
         .is_some();
     let should_validate_dav_login = !local_auth_enforced;
-    let should_bootstrap_dav_login =
-        !has_stored_calendar && !state.config.caldav_server.trim().is_empty() && !session.dav_password.trim().is_empty();
+    let should_bootstrap_dav_login = !has_stored_calendar
+        && !state.config.caldav_server.trim().is_empty()
+        && !session.dav_password.trim().is_empty();
     if should_validate_dav_login || should_bootstrap_dav_login {
         if state.config.caldav_server.trim().is_empty() {
-            return Html(render_login(&state, Some("Invalid username or password"))).into_response();
+            return Html(render_login(&state, Some("Invalid username or password")))
+                .into_response();
         }
         match discover_login_dav_homes(&state.config, &session).await {
             Ok(homes) => {
@@ -571,8 +596,12 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
                         calendar_home_set: homes.calendar_home_set.clone(),
                         addressbook_home_set: homes.addressbook_home_set.clone(),
                     };
-                    if let Err(error) =
-                        bootstrap_dav_accounts_from_session(&state.config, &state.storage, &session_credentials).await
+                    if let Err(error) = bootstrap_dav_accounts_from_session(
+                        &state.config,
+                        &state.storage,
+                        &session_credentials,
+                    )
+                    .await
                     {
                         tracing::warn!(%error, user = %session.username, "failed to bootstrap DAV login credentials into Postgres");
                     }
@@ -581,17 +610,26 @@ async fn login_post(State(state): State<AppState>, Form(form): Form<HashMap<Stri
             Err(error) => {
                 tracing::warn!(%error, user = %session.username, "legacy DAV login bootstrap failed");
                 if should_validate_dav_login {
-                    return Html(render_login(&state, Some("Invalid username or password"))).into_response();
+                    return Html(render_login(&state, Some("Invalid username or password")))
+                        .into_response();
                 }
             }
         }
     }
-    if let Ok(Some(account)) = state.storage.dav_account(&session.username, "calendar").await {
+    if let Ok(Some(account)) = state
+        .storage
+        .dav_account(&session.username, "calendar")
+        .await
+    {
         session.dav_username = account.username;
         session.principal_url = account.principal_url;
         session.calendar_home_set = account.home_set;
     }
-    if let Ok(Some(account)) = state.storage.dav_account(&session.username, "carddav").await {
+    if let Ok(Some(account)) = state
+        .storage
+        .dav_account(&session.username, "carddav")
+        .await
+    {
         session.addressbook_home_set = account.home_set;
     }
     session.dav_password.clear();
@@ -623,7 +661,11 @@ async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
             tracing::error!(%error, "failed to delete session from Postgres");
         }
     }
-    let location = state.config.logout_redirection.as_deref().unwrap_or("/login");
+    let location = state
+        .config
+        .logout_redirection
+        .as_deref()
+        .unwrap_or("/login");
     let mut response = Redirect::to(location).into_response();
     response.headers_mut().insert(
         header::SET_COOKIE,
@@ -650,19 +692,38 @@ async fn cards_page(State(state): State<AppState>, headers: HeaderMap) -> Respon
     html_response(render_cards(&state, &session)).into_response()
 }
 
-async fn mail_page(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn mail_page(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = session_from(&headers, &state).await else {
         return Redirect::to("/login").into_response();
     };
-    html_response(render_mail(&state, &session, mail_javascript_disabled(&session, &query))).into_response()
+    html_response(render_mail(
+        &state,
+        &session,
+        mail_javascript_disabled(&session, &query),
+    ))
+    .into_response()
 }
 
-async fn mail_read_page(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn mail_read_page(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = session_from(&headers, &state).await else {
         return Redirect::to("/login").into_response();
     };
-    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = query.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = query
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    let uid = query
+        .get("uid")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     html_response(render_mail_read(&state, &session, account_id, uid)).into_response()
 }
 
@@ -681,21 +742,39 @@ async fn preferences_page(State(state): State<AppState>, headers: HeaderMap) -> 
         Ok((client, calendar_home_set)) => client
             .list_calendars(&calendar_home_set)
             .await
-            .map(|cals| cals.iter().map(|c| (c.url().to_string(), c.property(CoreCalendar::DISPLAYNAME).unwrap_or("Calendar").to_string())).collect::<Vec<_>>())
+            .map(|cals| {
+                cals.iter()
+                    .map(|c| {
+                        (
+                            c.url().to_string(),
+                            c.property(CoreCalendar::DISPLAYNAME)
+                                .unwrap_or("Calendar")
+                                .to_string(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
             .unwrap_or_default(),
         Err(_) => Vec::new(),
     };
     html_response(render_preferences(&state, &session, &accounts, &calendars)).into_response()
 }
 
-async fn preferences_save(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn preferences_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((id, mut session)) = session_from(&headers, &state).await else {
         return Redirect::to("/login").into_response();
     };
     if !valid_csrf(&session, &form) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
-    session.preferences.language = form.get("language").cloned().unwrap_or_else(|| "en".to_string());
+    session.preferences.language = form
+        .get("language")
+        .cloned()
+        .unwrap_or_else(|| "en".to_string());
     session.preferences.timezone = form
         .get("timezone")
         .cloned()
@@ -704,15 +783,36 @@ async fn preferences_save(State(state): State<AppState>, headers: HeaderMap, For
         .get("default_calendar")
         .cloned()
         .unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
-    session.preferences.date_format = form.get("date_format").cloned().unwrap_or_else(|| "ymd".to_string());
-    session.preferences.time_format = form.get("time_format").cloned().unwrap_or_else(|| "24".to_string());
-    session.preferences.weekstart = form.get("weekstart").and_then(|v| v.parse().ok()).unwrap_or(0);
+    session.preferences.date_format = form
+        .get("date_format")
+        .cloned()
+        .unwrap_or_else(|| "ymd".to_string());
+    session.preferences.time_format = form
+        .get("time_format")
+        .cloned()
+        .unwrap_or_else(|| "24".to_string());
+    session.preferences.weekstart = form
+        .get("weekstart")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
     session.preferences.show_week_nb = form.get("show_week_nb").is_some_and(|v| v == "true");
-    session.preferences.show_now_indicator = form.get("show_now_indicator").is_none_or(|v| v == "true");
-    session.preferences.list_days = form.get("list_days").and_then(|v| v.parse().ok()).unwrap_or(7);
-    session.preferences.default_view = form.get("default_view").cloned().unwrap_or_else(|| "month".to_string());
-    session.preferences.disable_javascript = form.get("disable_javascript").is_some_and(|v| v == "true");
-    if let Err(error) = state.storage.save_preferences(&session.username, &session.preferences).await {
+    session.preferences.show_now_indicator =
+        form.get("show_now_indicator").is_none_or(|v| v == "true");
+    session.preferences.list_days = form
+        .get("list_days")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(7);
+    session.preferences.default_view = form
+        .get("default_view")
+        .cloned()
+        .unwrap_or_else(|| "month".to_string());
+    session.preferences.disable_javascript =
+        form.get("disable_javascript").is_some_and(|v| v == "true");
+    if let Err(error) = state
+        .storage
+        .save_preferences(&session.username, &session.preferences)
+        .await
+    {
         tracing::error!(%error, "failed to save preferences to Postgres");
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
@@ -850,7 +950,11 @@ async fn calendars_list(State(state): State<AppState>, headers: HeaderMap) -> Re
     }
 }
 
-async fn calendar_save(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn calendar_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
@@ -877,7 +981,10 @@ async fn calendar_save(State(state): State<AppState>, headers: HeaderMap, Form(f
         .cloned()
         .unwrap_or_else(|| new_calendar_url(&calendar_home_set, displayname));
     if !dav_href_in_scope(&calendar_url, &calendar_home_set) {
-        return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "Calendar href is outside the CalDAV home set",
+        );
     }
     let result = if form.get("calendar").is_some() {
         client.update_calendar(&calendar_url, &properties).await
@@ -890,7 +997,11 @@ async fn calendar_save(State(state): State<AppState>, headers: HeaderMap, Form(f
     }
 }
 
-async fn calendar_delete(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn calendar_delete(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
@@ -905,22 +1016,38 @@ async fn calendar_delete(State(state): State<AppState>, headers: HeaderMap, Form
         Err(error) => return caldav_response(error),
     };
     if !dav_href_in_scope(calendar, &calendar_home_set) {
-        return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "Calendar href is outside the CalDAV home set",
+        );
     }
-    match client.delete_calendar(calendar, form.get("etag").map(String::as_str)).await {
+    match client
+        .delete_calendar(calendar, form.get("etag").map(String::as_str))
+        .await
+    {
         Ok(()) => Json(json!({"result": "SUCCESS", "message": calendar})).into_response(),
         Err(error) => caldav_response(error),
     }
 }
 
-async fn events_list(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn events_list(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    let calendar = query.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
+    let calendar = query
+        .get("calendar")
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
     if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
         if !dav_href_in_scope(&calendar, &calendar_home_set) {
-            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Calendar href is outside the CalDAV home set",
+            );
         }
         let start = query
             .get("start")
@@ -930,7 +1057,10 @@ async fn events_list(State(state): State<AppState>, headers: HeaderMap, Query(qu
             .get("end")
             .map(|value| caldav_datetime(value))
             .unwrap_or_else(|| "29991231T235959Z".to_string());
-        return match client.list_events_by_time_range(&calendar, start, end).await {
+        return match client
+            .list_events_by_time_range(&calendar, start, end)
+            .await
+        {
             Ok(objects) => {
                 let events = objects
                     .iter()
@@ -991,21 +1121,40 @@ fn soft_calendar_failure_status(error: &CalDavError) -> Option<StatusCode> {
     }
 }
 
-async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn event_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let calendar = form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
-    let uid = form.get("uid").cloned().unwrap_or_else(|| Uuid::new_v4().to_string());
+    let calendar = form
+        .get("calendar")
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
+    let uid = form
+        .get("uid")
+        .cloned()
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
     let event = CalendarEvent {
         id: uid.clone(),
         uid: uid.clone(),
-        title: form.get("summary").cloned().unwrap_or_else(|| "Untitled".to_string()),
-        start: form.get("start").cloned().unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-        end: form.get("end").cloned().unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+        title: form
+            .get("summary")
+            .cloned()
+            .unwrap_or_else(|| "Untitled".to_string()),
+        start: form
+            .get("start")
+            .cloned()
+            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+        end: form
+            .get("end")
+            .cloned()
+            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
         all_day: form.get("allday").is_some_and(|v| v == "true"),
         calendar: calendar.clone(),
         href: format!("{calendar}{uid}.ics"),
@@ -1022,12 +1171,20 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
     };
     if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
         if !dav_href_in_scope(&calendar, &calendar_home_set) {
-            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Calendar href is outside the CalDAV home set",
+            );
         }
-        let original_calendar = form.get("original_calendar").filter(|value| !value.is_empty());
+        let original_calendar = form
+            .get("original_calendar")
+            .filter(|value| !value.is_empty());
         if let Some(original_calendar) = original_calendar {
             if !dav_href_in_scope(original_calendar, &calendar_home_set) {
-                return json_error(StatusCode::BAD_REQUEST, "Original calendar href is outside the CalDAV home set");
+                return json_error(
+                    StatusCode::BAD_REQUEST,
+                    "Original calendar href is outside the CalDAV home set",
+                );
             }
         }
         let href = form
@@ -1037,19 +1194,29 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
             .unwrap_or_else(|| format!("{}{}.ics", ensure_slash(&calendar), uid));
         let href_scope = original_calendar.unwrap_or(&calendar);
         if !dav_href_in_scope(&href, href_scope) {
-            return json_error(StatusCode::BAD_REQUEST, "Event href is outside the selected calendar");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Event href is outside the selected calendar",
+            );
         }
-        let etag = form.get("etag").map(String::as_str).filter(|value| !value.is_empty());
-        let existing = if etag.is_some() || original_calendar.is_some_and(|source| source != &calendar) {
-            match client.list_events_by_uid(original_calendar.unwrap_or(&calendar), &uid).await {
-                Ok(objects) => objects
-                    .into_iter()
-                    .find(|object| object.url() == href || object.rendered_event().is_some()),
-                Err(error) => return caldav_response(error),
-            }
-        } else {
-            None
-        };
+        let etag = form
+            .get("etag")
+            .map(String::as_str)
+            .filter(|value| !value.is_empty());
+        let existing =
+            if etag.is_some() || original_calendar.is_some_and(|source| source != &calendar) {
+                match client
+                    .list_events_by_uid(original_calendar.unwrap_or(&calendar), &uid)
+                    .await
+                {
+                    Ok(objects) => objects
+                        .into_iter()
+                        .find(|object| object.url() == href || object.rendered_event().is_some()),
+                    Err(error) => return caldav_response(error),
+                }
+            } else {
+                None
+            };
         let icalendar = existing
             .as_ref()
             .and_then(|object| object.rendered_event())
@@ -1061,7 +1228,10 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
             href.clone()
         };
         if !dav_href_in_scope(&destination_href, &calendar) {
-            return json_error(StatusCode::BAD_REQUEST, "Destination href is outside the selected calendar");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Destination href is outside the selected calendar",
+            );
         }
         let result = match client.put_event(&destination_href, icalendar, etag).await {
             Ok(result) => result,
@@ -1085,31 +1255,51 @@ async fn event_save(State(state): State<AppState>, headers: HeaderMap, Form(form
     Json(json!({"result": "SUCCESS", "message": [calendar]})).into_response()
 }
 
-async fn event_delete(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn event_delete(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let calendar = form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
+    let calendar = form
+        .get("calendar")
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
     if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
         if !dav_href_in_scope(&calendar, &calendar_home_set) {
-            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Calendar href is outside the CalDAV home set",
+            );
         }
-        let Some(etag) = form.get("etag").map(String::as_str).filter(|value| !value.is_empty()) else {
+        let Some(etag) = form
+            .get("etag")
+            .map(String::as_str)
+            .filter(|value| !value.is_empty())
+        else {
             return json_error(StatusCode::BAD_REQUEST, "Event ETag is required");
         };
         let href = form
             .get("href")
             .cloned()
             .filter(|value| !value.is_empty())
-            .or_else(|| form.get("uid").map(|uid| format!("{}{}.ics", ensure_slash(&calendar), uid)));
+            .or_else(|| {
+                form.get("uid")
+                    .map(|uid| format!("{}{}.ics", ensure_slash(&calendar), uid))
+            });
         let Some(href) = href else {
             return json_error(StatusCode::BAD_REQUEST, "Event href or uid is required");
         };
         if !dav_href_in_scope(&href, &calendar) {
-            return json_error(StatusCode::BAD_REQUEST, "Event href is outside the selected calendar");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Event href is outside the selected calendar",
+            );
         }
         if let Some(recurrence_id) = form.get("recurrence_id").filter(|value| !value.is_empty()) {
             let uid = form.get("uid").cloned().unwrap_or_default();
@@ -1117,7 +1307,10 @@ async fn event_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
                 Ok(objects) => objects,
                 Err(error) => return caldav_response(error),
             };
-            let Some(object) = objects.into_iter().find(|object| object.url() == href || object.rendered_event().is_some()) else {
+            let Some(object) = objects
+                .into_iter()
+                .find(|object| object.url() == href || object.rendered_event().is_some())
+            else {
                 return json_error(StatusCode::NOT_FOUND, "Event not found");
             };
             let Some(data) = object.rendered_event() else {
@@ -1143,15 +1336,28 @@ async fn event_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
     Json(json!({"result": "SUCCESS", "message": [calendar]})).into_response()
 }
 
-async fn event_drop(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn event_drop(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     event_alter(state, headers, form, false).await
 }
 
-async fn event_resize(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn event_resize(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     event_alter(state, headers, form, true).await
 }
 
-async fn event_alter(state: AppState, headers: HeaderMap, form: HashMap<String, String>, resize: bool) -> Response {
+async fn event_alter(
+    state: AppState,
+    headers: HeaderMap,
+    form: HashMap<String, String>,
+    resize: bool,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
@@ -1159,9 +1365,15 @@ async fn event_alter(state: AppState, headers: HeaderMap, form: HashMap<String, 
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
     if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
-        let calendar = form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
+        let calendar = form
+            .get("calendar")
+            .cloned()
+            .unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
         if !dav_href_in_scope(&calendar, &calendar_home_set) {
-            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Calendar href is outside the CalDAV home set",
+            );
         }
         let uid = form.get("uid").cloned().unwrap_or_default();
         if !uid.is_empty() {
@@ -1173,14 +1385,18 @@ async fn event_alter(state: AppState, headers: HeaderMap, form: HashMap<String, 
                             let href = event.href.clone();
                             let etag = event.etag.clone();
                             if etag.is_empty() {
-                                return json_error(StatusCode::BAD_REQUEST, "Event ETag is required");
+                                return json_error(
+                                    StatusCode::BAD_REQUEST,
+                                    "Event ETag is required",
+                                );
                             }
                             let icalendar = object
                                 .rendered_event()
                                 .map(|raw| merge_icalendar_from_event(raw, &event))
                                 .unwrap_or_else(|| icalendar_from_event(&event));
                             return match client.put_event(&href, icalendar, Some(&etag)).await {
-                                Ok(_) => Json(json!({"result": "SUCCESS", "message": [calendar]})).into_response(),
+                                Ok(_) => Json(json!({"result": "SUCCESS", "message": [calendar]}))
+                                    .into_response(),
                                 Err(error) => caldav_response(error),
                             };
                         }
@@ -1193,19 +1409,32 @@ async fn event_alter(state: AppState, headers: HeaderMap, form: HashMap<String, 
     Json(json!({"result": "SUCCESS", "message": [form.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string())]})).into_response()
 }
 
-async fn event_base(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn event_base(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    let calendar = query.get("calendar").cloned().unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
+    let calendar = query
+        .get("calendar")
+        .cloned()
+        .unwrap_or_else(|| DEFAULT_CALENDAR.to_string());
     let uid = query.get("uid").cloned().unwrap_or_default();
     if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
         if !dav_href_in_scope(&calendar, &calendar_home_set) {
-            return json_error(StatusCode::BAD_REQUEST, "Calendar href is outside the CalDAV home set");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Calendar href is outside the CalDAV home set",
+            );
         }
         match client.list_events_by_uid(&calendar, &uid).await {
             Ok(objects) => {
-                if let Some(event) = objects.iter().find_map(|object| event_payload_from_object(object, &calendar)) {
+                if let Some(event) = objects
+                    .iter()
+                    .find_map(|object| event_payload_from_object(object, &calendar))
+                {
                     return Json(event).into_response();
                 }
                 return json_error(StatusCode::NOT_FOUND, "Event not found");
@@ -1227,7 +1456,8 @@ async fn cards_list(State(state): State<AppState>, headers: HeaderMap) -> Respon
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await {
+    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await
+    {
         let addressbooks = match carddav
             .ensure_addressbooks(Some(&addressbook_home_set), &session.displayname)
             .await
@@ -1275,7 +1505,11 @@ async fn cards_list(State(state): State<AppState>, headers: HeaderMap) -> Respon
     }
 }
 
-async fn cards_save(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn cards_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
@@ -1288,67 +1522,103 @@ async fn cards_save(State(state): State<AppState>, headers: HeaderMap, Form(form
     }
     if let Ok((carddav, _)) = carddav_client_for_request(&state, &session).await {
         return match carddav.create_contact(&input).await {
-            Ok(contact) => Json(json!({"result": "SUCCESS", "data": contact_payload(&contact)})).into_response(),
+            Ok(contact) => Json(json!({"result": "SUCCESS", "data": contact_payload(&contact)}))
+                .into_response(),
             Err(error) => json_error(StatusCode::BAD_GATEWAY, &error.to_string()),
         };
     }
 
-    let contact = local_contact_from_input(input, format!("/addressbooks/default/{}.vcf", Uuid::new_v4()));
-    if let Err(error) = state.storage.upsert_contact(&session.username, &contact).await {
+    let contact = local_contact_from_input(
+        input,
+        format!("/addressbooks/default/{}.vcf", Uuid::new_v4()),
+    );
+    if let Err(error) = state
+        .storage
+        .upsert_contact(&session.username, &contact)
+        .await
+    {
         tracing::error!(%error, "failed to save contact to Postgres");
         return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save contact");
     }
     Json(json!({"result": "SUCCESS", "data": contact})).into_response()
 }
 
-async fn cards_update(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn cards_update(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let Some(url) = form.get("url").map(|value| value.trim()).filter(|value| !value.is_empty()) else {
+    let Some(url) = form
+        .get("url")
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+    else {
         return json_error(StatusCode::BAD_REQUEST, "Contact URL is required");
     };
     let input = contact_input_from_form(&form, Some(url));
     if input.full_name.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "Full name is required");
     }
-    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await {
+    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await
+    {
         if !dav_href_in_scope(url, &addressbook_home_set) {
-            return json_error(StatusCode::BAD_REQUEST, "Contact href is outside the CardDAV home set");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Contact href is outside the CardDAV home set",
+            );
         }
         return match carddav
             .update_contact(url, form.get("etag").map(String::as_str), &input)
             .await
         {
-            Ok(contact) => Json(json!({"result": "SUCCESS", "data": contact_payload(&contact)})).into_response(),
+            Ok(contact) => Json(json!({"result": "SUCCESS", "data": contact_payload(&contact)}))
+                .into_response(),
             Err(error) => json_error(StatusCode::BAD_GATEWAY, &error.to_string()),
         };
     }
 
     let contact = local_contact_from_input(input, url.to_string());
-    if let Err(error) = state.storage.upsert_contact(&session.username, &contact).await {
+    if let Err(error) = state
+        .storage
+        .upsert_contact(&session.username, &contact)
+        .await
+    {
         tracing::error!(%error, "failed to update contact in Postgres");
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to update contact");
+        return json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unable to update contact",
+        );
     }
     Json(json!({"result": "SUCCESS", "data": contact})).into_response()
 }
 
-async fn cards_delete(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn cards_delete(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await {
+    if let Ok((carddav, addressbook_home_set)) = carddav_client_for_request(&state, &session).await
+    {
         let Some(url) = form.get("url").filter(|value| !value.is_empty()) else {
             return json_error(StatusCode::BAD_REQUEST, "Contact URL is required");
         };
         if !dav_href_in_scope(url, &addressbook_home_set) {
-            return json_error(StatusCode::BAD_REQUEST, "Contact href is outside the CardDAV home set");
+            return json_error(
+                StatusCode::BAD_REQUEST,
+                "Contact href is outside the CardDAV home set",
+            );
         }
         return match carddav
             .delete_contact(url, form.get("etag").map(String::as_str))
@@ -1362,7 +1632,10 @@ async fn cards_delete(State(state): State<AppState>, headers: HeaderMap, Form(fo
     if let Some(url) = form.get("url") {
         if let Err(error) = state.storage.delete_contact(&session.username, url).await {
             tracing::error!(%error, "failed to delete contact from Postgres");
-            return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to delete contact");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to delete contact",
+            );
         }
     }
     Json(json!({"result": "SUCCESS", "message": ""})).into_response()
@@ -1470,15 +1743,28 @@ async fn account_save(
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
     match form.get("account_type").map(|value| value.trim()) {
-        Some("email") => match persist_mail_account_from_form(&state, &session.username, &form).await {
-            Ok(account) => Json(json!({"result": "SUCCESS", "data": connected_account_from_mail(&account)})).into_response(),
-            Err(response) => response,
-        },
-        Some("calendar" | "carddav") => match persist_dav_account_from_form(&state, &session.username, &form).await {
-            Ok(account) => Json(json!({"result": "SUCCESS", "data": connected_account_from_dav(&account)})).into_response(),
-            Err(response) => response,
-        },
-        _ => json_error(StatusCode::BAD_REQUEST, "Choose Calendar, Contacts, or Email"),
+        Some("email") => {
+            match persist_mail_account_from_form(&state, &session.username, &form).await {
+                Ok(account) => Json(
+                    json!({"result": "SUCCESS", "data": connected_account_from_mail(&account)}),
+                )
+                .into_response(),
+                Err(response) => response,
+            }
+        }
+        Some("calendar" | "carddav") => {
+            match persist_dav_account_from_form(&state, &session.username, &form).await {
+                Ok(account) => {
+                    Json(json!({"result": "SUCCESS", "data": connected_account_from_dav(&account)}))
+                        .into_response()
+                }
+                Err(response) => response,
+            }
+        }
+        _ => json_error(
+            StatusCode::BAD_REQUEST,
+            "Choose Calendar, Contacts, or Email",
+        ),
     }
 }
 
@@ -1546,23 +1832,37 @@ async fn persist_mail_account_from_form(
 ) -> Result<MailAccount, Response> {
     for field in ["label", "email_address", "imap_host", "username"] {
         if form.get(field).is_none_or(|value| value.trim().is_empty()) {
-            return Err(json_error(StatusCode::BAD_REQUEST, "Required mail account fields are missing"));
+            return Err(json_error(
+                StatusCode::BAD_REQUEST,
+                "Required mail account fields are missing",
+            ));
         }
     }
     let id = form.get("id").and_then(|v| v.parse().ok()).unwrap_or(0);
-    if id == 0 && form.get("password").is_none_or(|value| value.trim().is_empty()) {
+    if id == 0
+        && form
+            .get("password")
+            .is_none_or(|value| value.trim().is_empty())
+    {
         return Err(json_error(
             StatusCode::BAD_REQUEST,
             "A password is required for new mail accounts",
         ));
     }
-    let password_sealed = if id != 0 && form.get("password").is_none_or(|value| value.trim().is_empty()) {
+    let password_sealed = if id != 0
+        && form
+            .get("password")
+            .is_none_or(|value| value.trim().is_empty())
+    {
         match state.storage.mail_account(owner, id).await {
             Ok(Some(existing)) => existing.password_sealed,
             Ok(None) => return Err(json_error(StatusCode::NOT_FOUND, "Mail account not found")),
             Err(error) => {
                 tracing::error!(%error, "failed to load existing mail account from Postgres");
-                return Err(json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save mail account"));
+                return Err(json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Unable to save mail account",
+                ));
             }
         }
     } else {
@@ -1576,7 +1876,10 @@ async fn persist_mail_account_from_form(
         label: limited_field(form, "label", 120),
         email_address: limited_field(form, "email_address", 254),
         imap_host: limited_field(form, "imap_host", 253),
-        imap_port: form.get("imap_port").and_then(|v| v.parse().ok()).unwrap_or(993),
+        imap_port: form
+            .get("imap_port")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(993),
         encryption: limited_field_default(form, "encryption", 16, "ssl"),
         username: limited_field(form, "username", 254),
         password_sealed,
@@ -1591,13 +1894,22 @@ async fn persist_mail_account_from_form(
     if let Err(error) = imap_backend::validate_account(&account) {
         return Err(mail_backend_response(error));
     }
-    state.storage.save_mail_account(owner, &account).await.map_err(|error| match error {
-        crate::storage::StorageError::NotFound => json_error(StatusCode::NOT_FOUND, "Mail account not found"),
-        error => {
-            tracing::error!(%error, "failed to save mail account to Postgres");
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save mail account")
-        }
-    })
+    state
+        .storage
+        .save_mail_account(owner, &account)
+        .await
+        .map_err(|error| match error {
+            crate::storage::StorageError::NotFound => {
+                json_error(StatusCode::NOT_FOUND, "Mail account not found")
+            }
+            error => {
+                tracing::error!(%error, "failed to save mail account to Postgres");
+                json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Unable to save mail account",
+                )
+            }
+        })
 }
 
 async fn persist_dav_account_from_form(
@@ -1607,20 +1919,37 @@ async fn persist_dav_account_from_form(
 ) -> Result<DavAccount, Response> {
     let account_type = limited_field(form, "account_type", 16);
     if account_type != "calendar" && account_type != "carddav" {
-        return Err(json_error(StatusCode::BAD_REQUEST, "Choose Calendar or Contacts"));
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "Choose Calendar or Contacts",
+        ));
     }
     for field in ["label", "server_url", "username"] {
         if form.get(field).is_none_or(|value| value.trim().is_empty()) {
-            return Err(json_error(StatusCode::BAD_REQUEST, "Required account fields are missing"));
+            return Err(json_error(
+                StatusCode::BAD_REQUEST,
+                "Required account fields are missing",
+            ));
         }
     }
     let id = form.get("id").and_then(|v| v.parse().ok()).unwrap_or(0);
     let auth_method = limited_field_default(form, "auth_method", 16, "basic");
     if !matches!(auth_method.as_str(), "basic" | "bearer" | "none") {
-        return Err(json_error(StatusCode::BAD_REQUEST, "Unsupported authentication method"));
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "Unsupported authentication method",
+        ));
     }
-    if id == 0 && auth_method != "none" && form.get("password").is_none_or(|value| value.trim().is_empty()) {
-        return Err(json_error(StatusCode::BAD_REQUEST, "A password or token is required"));
+    if id == 0
+        && auth_method != "none"
+        && form
+            .get("password")
+            .is_none_or(|value| value.trim().is_empty())
+    {
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "A password or token is required",
+        ));
     }
     let server_url = validated_dav_server_url(
         &limited_field(form, "server_url", 2048),
@@ -1628,16 +1957,33 @@ async fn persist_dav_account_from_form(
     )?;
     let home_set = limited_field(form, "home_set", 512);
     if !home_set.is_empty() && !home_set.starts_with('/') {
-        return Err(json_error(StatusCode::BAD_REQUEST, "Home set must start with /"));
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "Home set must start with /",
+        ));
     }
-    let credential_sealed = if id != 0 && form.get("password").is_none_or(|value| value.trim().is_empty()) {
+    let credential_sealed = if id != 0
+        && form
+            .get("password")
+            .is_none_or(|value| value.trim().is_empty())
+    {
         match state.storage.dav_account_by_id(owner, id).await {
-            Ok(Some(existing)) if existing.account_type == account_type => existing.credential_sealed,
-            Ok(Some(_)) => return Err(json_error(StatusCode::BAD_REQUEST, "Account type cannot be changed")),
+            Ok(Some(existing)) if existing.account_type == account_type => {
+                existing.credential_sealed
+            }
+            Ok(Some(_)) => {
+                return Err(json_error(
+                    StatusCode::BAD_REQUEST,
+                    "Account type cannot be changed",
+                ));
+            }
             Ok(None) => return Err(json_error(StatusCode::NOT_FOUND, "Account not found")),
             Err(error) => {
                 tracing::error!(%error, "failed to load existing DAV account from Postgres");
-                return Err(json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save account"));
+                return Err(json_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Unable to save account",
+                ));
             }
         }
     } else {
@@ -1660,13 +2006,19 @@ async fn persist_dav_account_from_form(
         enabled: true,
         last_error: String::new(),
     };
-    state.storage.save_dav_account(owner, &account).await.map_err(|error| match error {
-        crate::storage::StorageError::NotFound => json_error(StatusCode::NOT_FOUND, "Account not found"),
-        error => {
-            tracing::error!(%error, "failed to save DAV account to Postgres");
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save account")
-        }
-    })
+    state
+        .storage
+        .save_dav_account(owner, &account)
+        .await
+        .map_err(|error| match error {
+            crate::storage::StorageError::NotFound => {
+                json_error(StatusCode::NOT_FOUND, "Account not found")
+            }
+            error => {
+                tracing::error!(%error, "failed to save DAV account to Postgres");
+                json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to save account")
+            }
+        })
 }
 
 /// Hosts that bypass the IP-block check in [`validated_dav_server_url`]: the hosts of the
@@ -1693,21 +2045,37 @@ fn allowed_dav_hosts(config: &Config) -> Vec<String> {
 }
 
 fn validated_dav_server_url(value: &str, allowed_hosts: &[String]) -> Result<String, Response> {
-    let url = Url::parse(value).map_err(|_| json_error(StatusCode::BAD_REQUEST, "Server URL is invalid"))?;
+    let url = Url::parse(value)
+        .map_err(|_| json_error(StatusCode::BAD_REQUEST, "Server URL is invalid"))?;
     if url.scheme() != "https" && url.scheme() != "http" {
-        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must use http or https"));
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "Server URL must use http or https",
+        ));
     }
     if !url.username().is_empty() || url.password().is_some() {
-        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must not include credentials"));
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "Server URL must not include credentials",
+        ));
     }
     let Some(host) = url.host_str() else {
-        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL must include a host"));
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "Server URL must include a host",
+        ));
     };
-    if allowed_hosts.iter().any(|allowed| host.eq_ignore_ascii_case(allowed)) {
+    if allowed_hosts
+        .iter()
+        .any(|allowed| host.eq_ignore_ascii_case(allowed))
+    {
         return Ok(url.to_string());
     }
     if host.eq_ignore_ascii_case("localhost") || host.ends_with(".localhost") {
-        return Err(json_error(StatusCode::BAD_REQUEST, "Server URL host is not allowed"));
+        return Err(json_error(
+            StatusCode::BAD_REQUEST,
+            "Server URL host is not allowed",
+        ));
     }
     if let Ok(ip) = host.parse::<IpAddr>() {
         let blocked = match ip {
@@ -1715,7 +2083,10 @@ fn validated_dav_server_url(value: &str, allowed_hosts: &[String]) -> Result<Str
             IpAddr::V6(ip) => blocked_ipv6(ip),
         };
         if blocked {
-            return Err(json_error(StatusCode::BAD_REQUEST, "Server URL host is not allowed"));
+            return Err(json_error(
+                StatusCode::BAD_REQUEST,
+                "Server URL host is not allowed",
+            ));
         }
     } else {
         let port = url.port_or_known_default().unwrap_or(443);
@@ -1728,7 +2099,10 @@ fn validated_dav_server_url(value: &str, allowed_hosts: &[String]) -> Result<Str
                 IpAddr::V6(ip) => blocked_ipv6(ip),
             };
             if blocked {
-                return Err(json_error(StatusCode::BAD_REQUEST, "Server URL host is not allowed"));
+                return Err(json_error(
+                    StatusCode::BAD_REQUEST,
+                    "Server URL host is not allowed",
+                ));
             }
         }
     }
@@ -1769,12 +2143,19 @@ async fn mail_accounts(State(state): State<AppState>, headers: HeaderMap) -> Res
         }
         Err(error) => {
             tracing::error!(%error, "failed to load mail accounts from Postgres");
-            json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to load mail accounts")
+            json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unable to load mail accounts",
+            )
         }
     }
 }
 
-async fn mail_account_save(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn mail_account_save(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
@@ -1782,31 +2163,56 @@ async fn mail_account_save(State(state): State<AppState>, headers: HeaderMap, Fo
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
     match persist_mail_account_from_form(&state, &session.username, &form).await {
-        Ok(account) => Json(json!({"result": "SUCCESS", "data": MailAccountPublic::from(&account)})).into_response(),
+        Ok(account) => {
+            Json(json!({"result": "SUCCESS", "data": MailAccountPublic::from(&account)}))
+                .into_response()
+        }
         Err(response) => response,
     }
 }
 
-async fn mail_messages(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn mail_messages(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     mail_messages_payload(state, headers, query, true).await
 }
 
-async fn mail_messages_sync(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn mail_messages_sync(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     mail_messages_payload(state, headers, query, false).await
 }
 
-async fn mail_messages_payload(state: AppState, headers: HeaderMap, query: HashMap<String, String>, cached: bool) -> Response {
+async fn mail_messages_payload(
+    state: AppState,
+    headers: HeaderMap,
+    query: HashMap<String, String>,
+    cached: bool,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = query
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let account = match mail_account_for(&state, &session.username, account_id).await {
         Ok(account) => account,
         Err(response) => return response,
     };
     if cached {
-        return match state.storage.cached_messages(&session.username, account_id).await {
-            Ok(messages) => Json(json!({"result": "SUCCESS", "data": messages, "cached": true})).into_response(),
+        return match state
+            .storage
+            .cached_messages(&session.username, account_id)
+            .await
+        {
+            Ok(messages) => {
+                Json(json!({"result": "SUCCESS", "data": messages, "cached": true})).into_response()
+            }
             Err(error) => {
                 tracing::error!(%error, "failed to load mail cache from Postgres");
                 json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to load messages")
@@ -1814,14 +2220,15 @@ async fn mail_messages_payload(state: AppState, headers: HeaderMap, query: HashM
         };
     }
 
-    let messages = match run_mail_backend(state.mail_backend.clone(), account, |backend, account| {
-        backend.fetch_inbox_overview(account)
-    })
-    .await
-    {
-        Ok(messages) => messages,
-        Err(error) => return mail_backend_response(error),
-    };
+    let messages =
+        match run_mail_backend(state.mail_backend.clone(), account, |backend, account| {
+            backend.fetch_inbox_overview(account)
+        })
+        .await
+        {
+            Ok(messages) => messages,
+            Err(error) => return mail_backend_response(error),
+        };
     if let Err(error) = state
         .storage
         .replace_message_cache(&session.username, account_id, &messages)
@@ -1833,12 +2240,22 @@ async fn mail_messages_payload(state: AppState, headers: HeaderMap, query: HashM
     Json(json!({"result": "SUCCESS", "data": messages, "cached": false})).into_response()
 }
 
-async fn mail_message(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn mail_message(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = query.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = query
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    let uid = query
+        .get("uid")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let account = match mail_account_for(&state, &session.username, account_id).await {
         Ok(account) => account,
         Err(response) => return response,
@@ -1874,7 +2291,11 @@ async fn mail_message(State(state): State<AppState>, headers: HeaderMap, Query(q
         Err(error) => return mail_backend_response(error),
     };
     message.seen = true;
-    if let Err(error) = state.storage.cache_message(&session.username, account_id, &message).await {
+    if let Err(error) = state
+        .storage
+        .cache_message(&session.username, account_id, &message)
+        .await
+    {
         tracing::error!(%error, "failed to cache fetched mail message in Postgres");
     }
     Json(json!({"result": "SUCCESS", "data": message, "cached": false})).into_response()
@@ -1888,15 +2309,23 @@ async fn mail_message_navigation(
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = query.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = query
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    let uid = query
+        .get("uid")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let account = match mail_account_for(&state, &session.username, account_id).await {
         Ok(account) => account,
         Err(response) => return response,
     };
-    match run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
-        backend.fetch_message_navigation(account, uid)
-    })
+    match run_mail_backend(
+        state.mail_backend.clone(),
+        account,
+        move |backend, account| backend.fetch_message_navigation(account, uid),
+    )
     .await
     {
         Ok(navigation) => Json(json!({"result": "SUCCESS", "data": navigation})).into_response(),
@@ -1904,22 +2333,34 @@ async fn mail_message_navigation(
     }
 }
 
-async fn mail_mark_unread(State(state): State<AppState>, headers: HeaderMap, Form(form): Form<HashMap<String, String>>) -> Response {
+async fn mail_mark_unread(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Form(form): Form<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let account_id = form.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = form.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = form
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    let uid = form
+        .get("uid")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let account = match mail_account_for(&state, &session.username, account_id).await {
         Ok(account) => account,
         Err(response) => return response,
     };
-    if let Err(error) = run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
-        backend.mark_seen(account, uid, false)
-    })
+    if let Err(error) = run_mail_backend(
+        state.mail_backend.clone(),
+        account,
+        move |backend, account| backend.mark_seen(account, uid, false),
+    )
     .await
     {
         return mail_backend_response(error);
@@ -1930,7 +2371,10 @@ async fn mail_mark_unread(State(state): State<AppState>, headers: HeaderMap, For
         .await
     {
         tracing::error!(%error, "failed to mark cached message unread in Postgres");
-        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to update message");
+        return json_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Unable to update message",
+        );
     }
     Json(json!({"result": "SUCCESS", "data": {"uid": uid, "seen": false}})).into_response()
 }
@@ -1949,8 +2393,14 @@ async fn mail_message_delete(
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let account_id = form.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = form.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = form
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    let uid = form
+        .get("uid")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let mailbox = form
         .get("mailbox")
         .map(|value| value.trim().to_string())
@@ -1963,11 +2413,12 @@ async fn mail_message_delete(
         Ok(account) => account,
         Err(response) => return response,
     };
-    if let Err(error) =
-        run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
-            backend.delete_message(account, &mailbox, uid)
-        })
-        .await
+    if let Err(error) = run_mail_backend(
+        state.mail_backend.clone(),
+        account,
+        move |backend, account| backend.delete_message(account, &mailbox, uid),
+    )
+    .await
     {
         return mail_backend_response(error);
     }
@@ -1996,8 +2447,14 @@ async fn mail_message_archive(
     if !valid_csrf(&session, &form) {
         return json_error(StatusCode::UNAUTHORIZED, "CSRF token not present");
     }
-    let account_id = form.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = form.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = form
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    let uid = form
+        .get("uid")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let mailbox = form
         .get("mailbox")
         .map(|value| value.trim().to_string())
@@ -2010,11 +2467,12 @@ async fn mail_message_archive(
         Ok(account) => account,
         Err(response) => return response,
     };
-    if let Err(error) =
-        run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
-            backend.archive_message(account, &mailbox, uid)
-        })
-        .await
+    if let Err(error) = run_mail_backend(
+        state.mail_backend.clone(),
+        account,
+        move |backend, account| backend.archive_message(account, &mailbox, uid),
+    )
+    .await
     {
         return mail_backend_response(error);
     }
@@ -2028,20 +2486,32 @@ async fn mail_message_archive(
     Json(json!({"result": "SUCCESS", "data": {"uid": uid}})).into_response()
 }
 
-async fn mail_attachment(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn mail_attachment(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return (StatusCode::UNAUTHORIZED, Json(json!({}))).into_response();
     };
-    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
-    let uid = query.get("uid").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = query
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+    let uid = query
+        .get("uid")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let part = query.get("part").cloned().unwrap_or_default();
     let account = match mail_account_for(&state, &session.username, account_id).await {
         Ok(account) => account,
         Err(response) => return response,
     };
-    let download = match run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
-        backend.download_attachment(account, uid, &part)
-    })
+    let download = match run_mail_backend(
+        state.mail_backend.clone(),
+        account,
+        move |backend, account| backend.download_attachment(account, uid, &part),
+    )
     .await
     {
         Ok(download) => download,
@@ -2064,17 +2534,30 @@ async fn mail_attachment(State(state): State<AppState>, headers: HeaderMap, Quer
         header::CONTENT_LENGTH,
         HeaderValue::from_str(&content_length).unwrap_or_else(|_| HeaderValue::from_static("0")),
     );
-    headers.insert("x-content-type-options", HeaderValue::from_static("nosniff"));
+    headers.insert(
+        "x-content-type-options",
+        HeaderValue::from_static("nosniff"),
+    );
     response
 }
 
-async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>) -> Response {
+async fn mail_image(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
     let Ok((_, session)) = ajax_session_from(&headers, &state).await else {
         return StatusCode::UNAUTHORIZED.into_response();
     };
-    let account_id = query.get("account_id").and_then(|v| v.parse::<u64>().ok()).unwrap_or(0);
+    let account_id = query
+        .get("account_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
     let image_url = query.get("url").cloned().unwrap_or_default();
-    if query.get("_token").is_none_or(|token| token != &session.csrf) {
+    if query
+        .get("_token")
+        .is_none_or(|token| token != &session.csrf)
+    {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let Ok(url) = reqwest::Url::parse(&image_url) else {
@@ -2083,7 +2566,10 @@ async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(que
     if !mail_image_url_allowed(&url) {
         return StatusCode::BAD_REQUEST.into_response();
     }
-    if mail_account_for(&state, &session.username, account_id).await.is_err() {
+    if mail_account_for(&state, &session.username, account_id)
+        .await
+        .is_err()
+    {
         return StatusCode::NOT_FOUND.into_response();
     }
 
@@ -2100,7 +2586,10 @@ async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(que
     };
     let remote = match client
         .get(url)
-        .header("accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+        .header(
+            "accept",
+            "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        )
         .header("user-agent", "Caldaver mail image proxy")
         .send()
         .await
@@ -2123,7 +2612,10 @@ async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(que
     if !content_type.to_ascii_lowercase().starts_with("image/") {
         return StatusCode::BAD_GATEWAY.into_response();
     }
-    if remote.content_length().is_some_and(|length| length > 15 * 1024 * 1024) {
+    if remote
+        .content_length()
+        .is_some_and(|length| length > 15 * 1024 * 1024)
+    {
         return StatusCode::PAYLOAD_TOO_LARGE.into_response();
     }
     let bytes = match remote.bytes().await {
@@ -2139,10 +2631,17 @@ async fn mail_image(State(state): State<AppState>, headers: HeaderMap, Query(que
     let headers = response.headers_mut();
     headers.insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_str(&content_type).unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+        HeaderValue::from_str(&content_type)
+            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
     );
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=86400"));
-    headers.insert("x-content-type-options", HeaderValue::from_static("nosniff"));
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, max-age=86400"),
+    );
+    headers.insert(
+        "x-content-type-options",
+        HeaderValue::from_static("nosniff"),
+    );
     response
 }
 
@@ -2200,7 +2699,10 @@ async fn jssettings(State(state): State<AppState>, headers: HeaderMap) -> Respon
         serde_json::to_string(&session.preferences).unwrap()
     );
     (
-        [(header::CONTENT_TYPE, "application/javascript; charset=utf-8")],
+        [(
+            header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
         body,
     )
         .into_response()
@@ -2267,11 +2769,16 @@ async fn caldav_client_for_request(
     state: &AppState,
     session: &Session,
 ) -> Result<(CalDavClient, String), CalDavError> {
-    match state.storage.dav_account(&session.username, "calendar").await {
+    match state
+        .storage
+        .dav_account(&session.username, "calendar")
+        .await
+    {
         Ok(Some(account)) => {
             let mut dav_config = CalDavConfig::from_app_config(&state.config);
             dav_config.base_url = account.server_url.clone();
-            dav_config.auth = dav_auth_for_account(&account).map_err(CalDavError::InvalidBaseUrl)?;
+            dav_config.auth =
+                dav_auth_for_account(&account).map_err(CalDavError::InvalidBaseUrl)?;
             let client = CalDavClient::new(dav_config)?;
             let home_set = if account.home_set.is_empty() {
                 client.login().await?.calendar_home_set
@@ -2298,11 +2805,16 @@ async fn carddav_client_for_request(
     state: &AppState,
     session: &Session,
 ) -> Result<(CardDavClient, String), carddav_backend::CardDavError> {
-    match state.storage.dav_account(&session.username, "carddav").await {
+    match state
+        .storage
+        .dav_account(&session.username, "carddav")
+        .await
+    {
         Ok(Some(account)) => {
             let client = CardDavClient::new(CardDavConfig {
                 base_url: account.server_url.clone(),
-                auth: dav_auth_for_account(&account).map_err(carddav_backend::CardDavError::InvalidBaseUrl)?,
+                auth: dav_auth_for_account(&account)
+                    .map_err(carddav_backend::CardDavError::InvalidBaseUrl)?,
             })?;
             let home_set = if account.home_set.is_empty() {
                 client.discover_addressbook_home_set().await?
@@ -2340,11 +2852,17 @@ fn dav_auth_for_account(account: &DavAccount) -> Result<CalDavAuth, String> {
     })
 }
 
-async fn discover_login_dav_homes(config: &Config, session: &Session) -> Result<BootstrapDavHomes, CalDavError> {
+async fn discover_login_dav_homes(
+    config: &Config,
+    session: &Session,
+) -> Result<BootstrapDavHomes, CalDavError> {
     let client = caldav_client_for_session(config, session)?;
     let dav_session = client.login().await?;
     let addressbook_home_set = match carddav_client_for_session(config, session) {
-        Ok(carddav) => carddav.discover_addressbook_home_set().await.unwrap_or_default(),
+        Ok(carddav) => carddav
+            .discover_addressbook_home_set()
+            .await
+            .unwrap_or_default(),
         Err(_) => String::new(),
     };
     Ok(BootstrapDavHomes {
@@ -2354,7 +2872,10 @@ async fn discover_login_dav_homes(config: &Config, session: &Session) -> Result<
     })
 }
 
-fn caldav_client_for_session(config: &Config, session: &Session) -> Result<CalDavClient, CalDavError> {
+fn caldav_client_for_session(
+    config: &Config,
+    session: &Session,
+) -> Result<CalDavClient, CalDavError> {
     let mut dav_config = CalDavConfig::from_app_config(config);
     dav_config.base_url = substitute_dav_username(&config.caldav_server, &session.dav_username);
     dav_config.auth = match config.caldav_auth_method.to_ascii_lowercase().as_str() {
@@ -2392,9 +2913,12 @@ fn substitute_dav_username(url: &str, username: &str) -> String {
 
 fn mail_javascript_disabled(session: &Session, query: &HashMap<String, String>) -> bool {
     session.preferences.disable_javascript
-        || query
-            .get("nojs")
-            .is_some_and(|value| matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        || query.get("nojs").is_some_and(|value| {
+            matches!(
+                value.to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
 }
 
 fn calendar_payload(calendar: &CoreCalendar) -> Value {
@@ -2573,8 +3097,16 @@ fn merge_icalendar_from_event(existing: &str, event: &CalendarEvent) -> String {
         ("SUMMARY", "SUMMARY".to_string(), escape_ical(&event.title)),
         ("DTSTART", dtstart_name, dtstart),
         ("DTEND", dtend_name, dtend),
-        ("LOCATION", "LOCATION".to_string(), escape_ical(&event.location)),
-        ("DESCRIPTION", "DESCRIPTION".to_string(), escape_ical(&event.description)),
+        (
+            "LOCATION",
+            "LOCATION".to_string(),
+            escape_ical(&event.location),
+        ),
+        (
+            "DESCRIPTION",
+            "DESCRIPTION".to_string(),
+            escape_ical(&event.description),
+        ),
     ];
     replace_vevent_properties(existing, &replacements)
 }
@@ -2688,7 +3220,10 @@ fn event_datetime_properties(event: &CalendarEvent) -> (String, String, String, 
 
 fn timezone_event_datetimes(event: &CalendarEvent) -> Option<(String, String, String)> {
     let timezone = event.timezone.trim();
-    if timezone.is_empty() || timezone.eq_ignore_ascii_case("UTC") || timezone.eq_ignore_ascii_case("Etc/UTC") {
+    if timezone.is_empty()
+        || timezone.eq_ignore_ascii_case("UTC")
+        || timezone.eq_ignore_ascii_case("Etc/UTC")
+    {
         return None;
     }
 
@@ -2712,7 +3247,11 @@ fn caldav_datetime_in_timezone(value: &str, timezone: chrono_tz::Tz) -> Option<S
 fn exclusive_all_day_end(value: &str) -> String {
     let date = value.get(0..10).unwrap_or(value);
     chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
-        .map(|date| (date + chrono::Duration::days(1)).format("%Y%m%d").to_string())
+        .map(|date| {
+            (date + chrono::Duration::days(1))
+                .format("%Y%m%d")
+                .to_string()
+        })
         .unwrap_or_else(|_| caldav_date(value))
 }
 
@@ -2754,8 +3293,7 @@ fn apply_event_time_delta(event: &mut CalendarEvent, form: &HashMap<String, Stri
 fn shift_iso_minutes(value: &str, minutes: i64) -> String {
     chrono::DateTime::parse_from_rfc3339(value)
         .map(|datetime| {
-            (datetime.with_timezone(&chrono::Utc) + chrono::Duration::minutes(minutes))
-                .to_rfc3339()
+            (datetime.with_timezone(&chrono::Utc) + chrono::Duration::minutes(minutes)).to_rfc3339()
         })
         .unwrap_or_else(|_| value.to_string())
 }
@@ -2834,7 +3372,9 @@ async fn mail_account_for(
 async fn run_mail_backend<T>(
     backend: Arc<dyn MailBackend>,
     account: MailAccount,
-    operation: impl FnOnce(&dyn MailBackend, &MailAccount) -> Result<T, MailBackendError> + Send + 'static,
+    operation: impl FnOnce(&dyn MailBackend, &MailAccount) -> Result<T, MailBackendError>
+    + Send
+    + 'static,
 ) -> Result<T, MailBackendError>
 where
     T: Send + 'static,
@@ -2872,7 +3412,12 @@ fn render_calendar(state: &AppState, session: &Session) -> String {
         navbar = navbar(state, session, "calendar"),
         sidebar = calendar_sidebar()
     );
-    layout(state, "caldaver-calendar-page", &content, &calendar_bottom(session))
+    layout(
+        state,
+        "caldaver-calendar-page",
+        &content,
+        &calendar_bottom(session),
+    )
 }
 
 fn render_cards(state: &AppState, session: &Session) -> String {
@@ -2895,7 +3440,11 @@ fn render_mail(state: &AppState, session: &Session, no_js: bool) -> String {
         appnav = appnav("mail"),
         csrf = escape(&session.csrf)
     );
-    let bottom = if no_js { String::new() } else { part_js("mailjs") };
+    let bottom = if no_js {
+        String::new()
+    } else {
+        part_js("mailjs")
+    };
     layout(state, "caldaver-mail-page", &content, &bottom)
 }
 
@@ -2907,18 +3456,35 @@ fn render_mail_read(state: &AppState, session: &Session, account_id: u64, uid: u
         appnav = appnav("mail"),
         csrf = session.csrf
     );
-    layout(state, "caldaver-mail-page", &content, &part_js("mailmessagejs"))
+    layout(
+        state,
+        "caldaver-mail-page",
+        &content,
+        &part_js("mailmessagejs"),
+    )
 }
 
-fn render_preferences(state: &AppState, session: &Session, accounts: &[ConnectedAccountPublic], calendars: &[(String, String)]) -> String {
+fn render_preferences(
+    state: &AppState,
+    session: &Session,
+    accounts: &[ConnectedAccountPublic],
+    calendars: &[(String, String)],
+) -> String {
     let prefs = &session.preferences;
     let calendar_options = if calendars.is_empty() {
-        format!(r#"<option value="{calendar}" selected>Default</option>"#, calendar = DEFAULT_CALENDAR)
+        format!(
+            r#"<option value="{calendar}" selected>Default</option>"#,
+            calendar = DEFAULT_CALENDAR
+        )
     } else {
         calendars
             .iter()
             .map(|(url, name)| {
-                let selected = if url == &prefs.default_calendar { r#" selected"# } else { "" };
+                let selected = if url == &prefs.default_calendar {
+                    r#" selected"#
+                } else {
+                    ""
+                };
                 format!(r#"<option value="{url}"{selected}>{name}</option>"#)
             })
             .collect::<Vec<_>>()
@@ -2929,12 +3495,22 @@ fn render_preferences(state: &AppState, session: &Session, accounts: &[Connected
         let mut opts: Vec<String> = tzs
             .iter()
             .map(|tz| {
-                let selected = if *tz == prefs.timezone { r#" selected"# } else { "" };
+                let selected = if *tz == prefs.timezone {
+                    r#" selected"#
+                } else {
+                    ""
+                };
                 format!(r#"<option value="{tz}"{selected}>{tz}</option>"#)
             })
             .collect();
         if !tzs.contains(&prefs.timezone.as_str()) {
-            opts.insert(0, format!(r#"<option value="{tz}" selected>{tz}</option>"#, tz = escape(&prefs.timezone)));
+            opts.insert(
+                0,
+                format!(
+                    r#"<option value="{tz}" selected>{tz}</option>"#,
+                    tz = escape(&prefs.timezone)
+                ),
+            );
         }
         opts.join("")
     };
@@ -2947,11 +3523,44 @@ fn render_preferences(state: &AppState, session: &Session, accounts: &[Connected
         csrf = session.csrf,
         timezone_options = timezone_options,
         calendar_options = calendar_options,
-        radio_date = pref_radios("date_format", "Date format", &[("ymd", "2026-05-30"), ("dmy", "30/05/2026"), ("mdy", "05/30/2026")], &prefs.date_format),
-        radio_time = pref_radios("time_format", "Time format", &[("24", "13:00"), ("12", "01:00 pm")], &prefs.time_format),
-        radio_week = pref_radios("weekstart", "Week starts on", &[("0", "Sunday"), ("1", "Monday")], &prefs.weekstart.to_string()),
-        radio_week_nb = pref_radios("show_week_nb", "Show week numbers", &[("true", "Yes"), ("false", "No")], if prefs.show_week_nb {"true"} else {"false"}),
-        radio_now = pref_radios("show_now_indicator", "Show a marker indicating the current time", &[("true", "Yes"), ("false", "No")], if prefs.show_now_indicator {"true"} else {"false"}),
+        radio_date = pref_radios(
+            "date_format",
+            "Date format",
+            &[
+                ("ymd", "2026-05-30"),
+                ("dmy", "30/05/2026"),
+                ("mdy", "05/30/2026")
+            ],
+            &prefs.date_format
+        ),
+        radio_time = pref_radios(
+            "time_format",
+            "Time format",
+            &[("24", "13:00"), ("12", "01:00 pm")],
+            &prefs.time_format
+        ),
+        radio_week = pref_radios(
+            "weekstart",
+            "Week starts on",
+            &[("0", "Sunday"), ("1", "Monday")],
+            &prefs.weekstart.to_string()
+        ),
+        radio_week_nb = pref_radios(
+            "show_week_nb",
+            "Show week numbers",
+            &[("true", "Yes"), ("false", "No")],
+            if prefs.show_week_nb { "true" } else { "false" }
+        ),
+        radio_now = pref_radios(
+            "show_now_indicator",
+            "Show a marker indicating the current time",
+            &[("true", "Yes"), ("false", "No")],
+            if prefs.show_now_indicator {
+                "true"
+            } else {
+                "false"
+            }
+        ),
         accounts_section = preferences_accounts_section(accounts),
         account_dialog = account_dialog(&session.csrf)
     );
@@ -2976,7 +3585,11 @@ fn account_row_html(account: &ConnectedAccountPublic) -> String {
         "email" => "Email",
         _ => "Account",
     };
-    let source = if account.source == "session" { "Session" } else { "Postgres" };
+    let source = if account.source == "session" {
+        "Session"
+    } else {
+        "Postgres"
+    };
     let warning = if account.password_needs_reset {
         r#"<span class="prefs-account-warning">Password needs reset</span>"#
     } else {
@@ -3215,36 +3828,84 @@ fn calendar_bottom(session: &Session) -> String {
 fn translations_json() -> String {
     let mut map = serde_json::Map::new();
     for (key, value) in [
-        ("labels.create", "Create"), ("labels.save", "Save"), ("labels.cancel", "Cancel"),
-        ("labels.refresh", "Refresh"), ("labels.createevent", "Create event"),
-        ("labels.editevent", "Edit event"), ("labels.newcalendar", "New calendar"),
-        ("labels.modifycalendar", "Modify calendar"), ("labels.deletecalendar", "Delete calendar"),
-        ("labels.calendar", "Calendar"), ("labels.contacts", "Contacts"), ("labels.mail", "Mail"),
-        ("labels.generaloptions", "General options"), ("labels.repeatoptions", "Repeat"),
-        ("labels.remindersoptions", "Reminders"), ("labels.workgroupoptions", "Workgroup"),
-        ("labels.summary", "Summary"), ("labels.location", "Location"), ("labels.description", "Description"),
+        ("labels.create", "Create"),
+        ("labels.save", "Save"),
+        ("labels.cancel", "Cancel"),
+        ("labels.refresh", "Refresh"),
+        ("labels.createevent", "Create event"),
+        ("labels.editevent", "Edit event"),
+        ("labels.newcalendar", "New calendar"),
+        ("labels.modifycalendar", "Modify calendar"),
+        ("labels.deletecalendar", "Delete calendar"),
+        ("labels.calendar", "Calendar"),
+        ("labels.contacts", "Contacts"),
+        ("labels.mail", "Mail"),
+        ("labels.generaloptions", "General options"),
+        ("labels.repeatoptions", "Repeat"),
+        ("labels.remindersoptions", "Reminders"),
+        ("labels.workgroupoptions", "Workgroup"),
+        ("labels.summary", "Summary"),
+        ("labels.location", "Location"),
+        ("labels.description", "Description"),
         ("labels.timezone", "Timezone"),
-        ("labels.startdate", "Start date"), ("labels.enddate", "End date"), ("labels.alldayform", "All day"),
-        ("labels.displayname", "Display name"), ("labels.color", "Color"), ("labels.privacy", "Privacy"),
-        ("labels.public", "Public"), ("labels.private", "Private"), ("labels.confidential", "Confidential"),
-        ("labels.transp", "Show this time as"), ("labels.opaque", "Busy"), ("labels.transparent", "Free"),
-        ("labels.repeatno", "No repetitions"), ("labels.repeatdaily", "Daily"), ("labels.repeatweekly", "Weekly"),
-        ("labels.repeatmonthly", "Monthly"), ("labels.repeatyearly", "Yearly"), ("labels.every", "Every"),
-        ("labels.ends", "Ends:"), ("labels.never", "Never"), ("labels.after", "After"),
-        ("labels.choose_date", "Choose a date"), ("labels.occurrences", "occurrences"),
-        ("labels.minutes", "minutes"), ("labels.hours", "hours"), ("labels.days", "days"),
-        ("labels.weeks", "weeks"), ("labels.months", "months"), ("labels.before_start", "before start"),
-        ("labels.add_reminder", "Add reminder"), ("labels.add_share", "Add share"),
-        ("labels.readonly", "Read only"), ("labels.readandwrite", "Read and write"),
-        ("labels.currentlysharing", "Currently sharing this calendar"), ("labels.modify", "Modify"),
-        ("labels.delete", "Delete"), ("messages.error_loading_calendar_list", "Unable to load calendars"),
-        ("messages.error_interfacefailure", "Interface failure"), ("messages.error_loadevents", "Error loading events for %cal"),
-        ("messages.notice_no_calendars", "No calendars found"), ("messages.error_empty_fields", "Required fields are missing"),
-        ("messages.error_oops", "Something went wrong"), ("messages.internal_server_error", "Internal server error"),
-        ("messages.error_invalidinput", "Invalid input"), ("messages.info_noreminders", "No reminders"),
-        ("messages.info_reminders_caldaver_support", "Reminders are stored with the event"),
-        ("messages.info_rrule_not_reproducible", "This repeat rule cannot be represented"),
-        ("messages.info_rrule_protected", "Repeat rule is protected"), ("messages.info_sharedby", "Shared by %user"),
+        ("labels.startdate", "Start date"),
+        ("labels.enddate", "End date"),
+        ("labels.alldayform", "All day"),
+        ("labels.displayname", "Display name"),
+        ("labels.color", "Color"),
+        ("labels.privacy", "Privacy"),
+        ("labels.public", "Public"),
+        ("labels.private", "Private"),
+        ("labels.confidential", "Confidential"),
+        ("labels.transp", "Show this time as"),
+        ("labels.opaque", "Busy"),
+        ("labels.transparent", "Free"),
+        ("labels.repeatno", "No repetitions"),
+        ("labels.repeatdaily", "Daily"),
+        ("labels.repeatweekly", "Weekly"),
+        ("labels.repeatmonthly", "Monthly"),
+        ("labels.repeatyearly", "Yearly"),
+        ("labels.every", "Every"),
+        ("labels.ends", "Ends:"),
+        ("labels.never", "Never"),
+        ("labels.after", "After"),
+        ("labels.choose_date", "Choose a date"),
+        ("labels.occurrences", "occurrences"),
+        ("labels.minutes", "minutes"),
+        ("labels.hours", "hours"),
+        ("labels.days", "days"),
+        ("labels.weeks", "weeks"),
+        ("labels.months", "months"),
+        ("labels.before_start", "before start"),
+        ("labels.add_reminder", "Add reminder"),
+        ("labels.add_share", "Add share"),
+        ("labels.readonly", "Read only"),
+        ("labels.readandwrite", "Read and write"),
+        ("labels.currentlysharing", "Currently sharing this calendar"),
+        ("labels.modify", "Modify"),
+        ("labels.delete", "Delete"),
+        (
+            "messages.error_loading_calendar_list",
+            "Unable to load calendars",
+        ),
+        ("messages.error_interfacefailure", "Interface failure"),
+        ("messages.error_loadevents", "Error loading events for %cal"),
+        ("messages.notice_no_calendars", "No calendars found"),
+        ("messages.error_empty_fields", "Required fields are missing"),
+        ("messages.error_oops", "Something went wrong"),
+        ("messages.internal_server_error", "Internal server error"),
+        ("messages.error_invalidinput", "Invalid input"),
+        ("messages.info_noreminders", "No reminders"),
+        (
+            "messages.info_reminders_caldaver_support",
+            "Reminders are stored with the event",
+        ),
+        (
+            "messages.info_rrule_not_reproducible",
+            "This repeat rule cannot be represented",
+        ),
+        ("messages.info_rrule_protected", "Repeat rule is protected"),
+        ("messages.info_sharedby", "Shared by %user"),
     ] {
         map.insert(key.to_string(), Value::String(value.to_string()));
     }
@@ -3274,7 +3935,9 @@ fn pref_radios(name: &str, label: &str, options: &[(&str, &str)], selected: &str
         })
         .collect::<Vec<_>>()
         .join("");
-    format!(r#"<div class="form-group prefs-radio-group" role="radiogroup"><div class="prefs-control-label">{label}</div>{controls}</div>"#)
+    format!(
+        r#"<div class="form-group prefs-radio-group" role="radiogroup"><div class="prefs-control-label">{label}</div>{controls}</div>"#
+    )
 }
 
 fn part_js(name: &str) -> String {
@@ -3285,22 +3948,58 @@ fn part_js(name: &str) -> String {
         "mailaccountjs" => include_str!("../../../../web/templates/parts/mailaccountjs.html"),
         _ => "",
     };
-    raw.replace("{{ app.url_generator.generate('cards.list') }}", "/cards/list")
-        .replace("{{ app.url_generator.generate('cards.delete') }}", "/cards/delete")
-        .replace("{{ app.url_generator.generate('cards.save') }}", "/cards/save")
-        .replace("{{ app.url_generator.generate('cards.update') }}", "/cards/update")
-        .replace("{{ app.url_generator.generate('mail.read') }}", "/mail/read")
-        .replace("{{ app.url_generator.generate('mail.attachment') }}", "/mail/attachment")
-        .replace("{{ app.url_generator.generate('mail.accounts') }}", "/mail/accounts")
-        .replace("{{ app.url_generator.generate('mail.messages') }}", "/mail/messages")
-        .replace("{{ app.url_generator.generate('mail.messages.sync') }}", "/mail/messages/sync")
-        .replace("{{ app.url_generator.generate('mail.message.navigation') }}", "/mail/message/navigation")
-        .replace("{{ app.url_generator.generate('preferences') }}", "/preferences")
-        .replace("{{ 'labels.delete'|trans }}", "Delete")
-        .replace("{{ 'labels.mail'|trans }}", "Mail")
-        .replace("{% trans %}labels.cancel{% endtrans %}", "Cancel")
-        .replace("{% trans %}labels.save{% endtrans %}", "Save")
-        .replace("{{ app.url_generator.generate('mail.accounts.save') }}", "/mail/accounts/save")
+    raw.replace(
+        "{{ app.url_generator.generate('cards.list') }}",
+        "/cards/list",
+    )
+    .replace(
+        "{{ app.url_generator.generate('cards.delete') }}",
+        "/cards/delete",
+    )
+    .replace(
+        "{{ app.url_generator.generate('cards.save') }}",
+        "/cards/save",
+    )
+    .replace(
+        "{{ app.url_generator.generate('cards.update') }}",
+        "/cards/update",
+    )
+    .replace(
+        "{{ app.url_generator.generate('mail.read') }}",
+        "/mail/read",
+    )
+    .replace(
+        "{{ app.url_generator.generate('mail.attachment') }}",
+        "/mail/attachment",
+    )
+    .replace(
+        "{{ app.url_generator.generate('mail.accounts') }}",
+        "/mail/accounts",
+    )
+    .replace(
+        "{{ app.url_generator.generate('mail.messages') }}",
+        "/mail/messages",
+    )
+    .replace(
+        "{{ app.url_generator.generate('mail.messages.sync') }}",
+        "/mail/messages/sync",
+    )
+    .replace(
+        "{{ app.url_generator.generate('mail.message.navigation') }}",
+        "/mail/message/navigation",
+    )
+    .replace(
+        "{{ app.url_generator.generate('preferences') }}",
+        "/preferences",
+    )
+    .replace("{{ 'labels.delete'|trans }}", "Delete")
+    .replace("{{ 'labels.mail'|trans }}", "Mail")
+    .replace("{% trans %}labels.cancel{% endtrans %}", "Cancel")
+    .replace("{% trans %}labels.save{% endtrans %}", "Save")
+    .replace(
+        "{{ app.url_generator.generate('mail.accounts.save') }}",
+        "/mail/accounts/save",
+    )
 }
 
 fn escape(input: &str) -> String {
@@ -3315,8 +4014,8 @@ fn escape(input: &str) -> String {
 mod tests {
     use super::*;
     use axum::body::Body;
-    use axum::http::Request;
     use axum::http::Method;
+    use axum::http::Request;
     use base64::Engine;
     use std::sync::Mutex;
     use tower::ServiceExt;
@@ -3365,7 +4064,10 @@ mod tests {
     }
 
     impl MailBackend for FakeMailBackend {
-        fn fetch_inbox_overview(&self, _account: &MailAccount) -> Result<Vec<MailMessage>, MailBackendError> {
+        fn fetch_inbox_overview(
+            &self,
+            _account: &MailAccount,
+        ) -> Result<Vec<MailMessage>, MailBackendError> {
             let mut messages = self.messages.lock().unwrap().clone();
             messages.sort_by(|a, b| b.uid.cmp(&a.uid));
             Ok(messages)
@@ -3395,10 +4097,17 @@ mod tests {
                     bytes: b"report".to_vec(),
                 });
             }
-            Err(MailBackendError::NotFound("Attachment not found".to_string()))
+            Err(MailBackendError::NotFound(
+                "Attachment not found".to_string(),
+            ))
         }
 
-        fn mark_seen(&self, _account: &MailAccount, uid: u64, seen: bool) -> Result<(), MailBackendError> {
+        fn mark_seen(
+            &self,
+            _account: &MailAccount,
+            uid: u64,
+            seen: bool,
+        ) -> Result<(), MailBackendError> {
             self.seen_updates.lock().unwrap().push((uid, seen));
             Ok(())
         }
@@ -3458,7 +4167,10 @@ mod tests {
     fn local_auth_accepts_pbkdf2_sha256_password_hash() {
         let config = test_auth_config("", &encoded_test_hash("correct horse battery staple"));
 
-        assert!(verify_local_auth_password(&config, "correct horse battery staple"));
+        assert!(verify_local_auth_password(
+            &config,
+            "correct horse battery staple"
+        ));
         assert!(!verify_local_auth_password(&config, "wrong password"));
     }
 
@@ -3506,7 +4218,10 @@ mod tests {
             "https://foo.localhost/",
             "https://[::1]/",
         ] {
-            assert!(validated_dav_server_url(url, &no_allowed_hosts()).is_err(), "{url} should be rejected");
+            assert!(
+                validated_dav_server_url(url, &no_allowed_hosts()).is_err(),
+                "{url} should be rejected"
+            );
         }
     }
 
@@ -3526,10 +4241,14 @@ mod tests {
         // `.invalid` never resolves, so success proves DNS resolution was skipped.
         let allowed = vec!["radicale.homelab.invalid".to_string()];
         assert_eq!(
-            validated_dav_server_url("https://Radicale.HomeLab.invalid/radicale/", &allowed).unwrap(),
+            validated_dav_server_url("https://Radicale.HomeLab.invalid/radicale/", &allowed)
+                .unwrap(),
             "https://radicale.homelab.invalid/radicale/"
         );
-        assert!(validated_dav_server_url("https://radicale.homelab.invalid/", &no_allowed_hosts()).is_err());
+        assert!(
+            validated_dav_server_url("https://radicale.homelab.invalid/", &no_allowed_hosts())
+                .is_err()
+        );
     }
 
     #[test]
@@ -3542,8 +4261,13 @@ mod tests {
     fn dav_server_url_allowlisted_host_still_requires_scheme_and_no_credentials() {
         let allowed = vec!["radicale.homelab.invalid".to_string()];
         assert!(validated_dav_server_url("ftp://radicale.homelab.invalid/", &allowed).is_err());
-        assert!(validated_dav_server_url("https://user:pass@radicale.homelab.invalid/", &allowed).is_err());
-        assert!(validated_dav_server_url("https://user@radicale.homelab.invalid/", &allowed).is_err());
+        assert!(
+            validated_dav_server_url("https://user:pass@radicale.homelab.invalid/", &allowed)
+                .is_err()
+        );
+        assert!(
+            validated_dav_server_url("https://user@radicale.homelab.invalid/", &allowed).is_err()
+        );
     }
 
     #[test]
@@ -3558,7 +4282,9 @@ mod tests {
         assert!(hosts.contains(&"cards.example.org".to_string()));
         assert!(hosts.contains(&"extra.example.net".to_string()));
 
-        assert!(validated_dav_server_url("https://radicale.example.invalid/radicale/", &hosts).is_ok());
+        assert!(
+            validated_dav_server_url("https://radicale.example.invalid/radicale/", &hosts).is_ok()
+        );
     }
 
     #[test]
@@ -3568,7 +4294,10 @@ mod tests {
         config.carddav_server = String::new();
         config.dav_host_allowlist = vec!["dav.example.org".to_string()];
 
-        assert_eq!(allowed_dav_hosts(&config), vec!["dav.example.org".to_string()]);
+        assert_eq!(
+            allowed_dav_hosts(&config),
+            vec!["dav.example.org".to_string()]
+        );
     }
 
     fn fake_account() -> MailAccount {
@@ -3724,10 +4453,17 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
 
     #[tokio::test]
     async fn serves_health_from_rust_backend() {
-        let Some(state) = test_state().await else { return; };
+        let Some(state) = test_state().await else {
+            return;
+        };
         let app = build_router(state);
         let response = app
-            .oneshot(Request::builder().uri("/__rust/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/__rust/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -3735,7 +4471,9 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
 
     #[tokio::test]
     async fn login_sets_stable_session_cookie() {
-        let Some(state) = test_state().await else { return; };
+        let Some(state) = test_state().await else {
+            return;
+        };
         let app = build_router(state);
         let cookie = logged_in_cookie(&app).await;
         assert!(cookie.starts_with("caldaver_sess="));
@@ -3743,7 +4481,9 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
 
     #[tokio::test]
     async fn authenticated_calendar_list_matches_legacy_shape() {
-        let Some(state) = test_state().await else { return; };
+        let Some(state) = test_state().await else {
+            return;
+        };
         let app = build_router(state);
         let cookie = logged_in_cookie(&app).await;
         let response = app
@@ -3761,10 +4501,17 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
 
     #[tokio::test]
     async fn protected_json_routes_return_unauthorized_without_session() {
-        let Some(state) = test_state().await else { return; };
+        let Some(state) = test_state().await else {
+            return;
+        };
         let app = build_router(state);
         let response = app
-            .oneshot(Request::builder().uri("/calendars").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/calendars")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
@@ -3784,7 +4531,13 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
         })
         .await
         .unwrap();
-        assert_eq!(overview.iter().map(|message| message.uid).collect::<Vec<_>>(), vec![9, 2]);
+        assert_eq!(
+            overview
+                .iter()
+                .map(|message| message.uid)
+                .collect::<Vec<_>>(),
+            vec![9, 2]
+        );
 
         let message = run_mail_backend(backend.clone(), account.clone(), |backend, account| {
             backend.fetch_message(account, 9)
@@ -3832,7 +4585,8 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
 
     #[tokio::test]
     async fn fake_mail_backend_reports_honest_error_when_archive_is_unavailable() {
-        let fake = Arc::new(FakeMailBackend::new(vec![fake_message(7, false)]).with_archive_failure());
+        let fake =
+            Arc::new(FakeMailBackend::new(vec![fake_message(7, false)]).with_archive_failure());
         let backend: Arc<dyn MailBackend> = fake.clone();
         let account = fake_account();
 
@@ -3842,8 +4596,10 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
         .await;
 
         let error = result.unwrap_err();
-        assert!(matches!(error, MailBackendError::NotFound(_)),
-            "expected NotFound when archive is unavailable, got {error:?}");
+        assert!(
+            matches!(error, MailBackendError::NotFound(_)),
+            "expected NotFound when archive is unavailable, got {error:?}"
+        );
         assert!(fake.archived_messages().is_empty());
     }
 
@@ -4058,7 +4814,11 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
             all_day: false,
             ..fake_event(false)
         };
-        apply_event_time_delta(&mut event, &HashMap::from([("delta".to_string(), "30".to_string())]), true);
+        apply_event_time_delta(
+            &mut event,
+            &HashMap::from([("delta".to_string(), "30".to_string())]),
+            true,
+        );
         assert_eq!(event.start, "2026-06-01T10:00:00Z");
         assert_eq!(event.end, "2026-06-01T11:30:00+00:00");
 
@@ -4077,8 +4837,14 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
         assert!(first.starts_with("/calendars/user/"));
 
         let mut session = test_session_without_storage();
-        assert!(!mail_javascript_disabled(&session, &HashMap::from([("nojs".to_string(), "0".to_string())])));
-        assert!(mail_javascript_disabled(&session, &HashMap::from([("nojs".to_string(), "true".to_string())])));
+        assert!(!mail_javascript_disabled(
+            &session,
+            &HashMap::from([("nojs".to_string(), "0".to_string())])
+        ));
+        assert!(mail_javascript_disabled(
+            &session,
+            &HashMap::from([("nojs".to_string(), "true".to_string())])
+        ));
         session.preferences.disable_javascript = true;
         assert!(mail_javascript_disabled(&session, &HashMap::new()));
     }
@@ -4093,15 +4859,25 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
 
     #[test]
     fn mail_image_proxy_allows_only_public_http_images() {
-        assert!(mail_image_url_allowed(&reqwest::Url::parse("https://example.test/image.png").unwrap()));
-        assert!(!mail_image_url_allowed(&reqwest::Url::parse("javascript:alert(1)").unwrap()));
-        assert!(!mail_image_url_allowed(&reqwest::Url::parse("http://127.0.0.1/image.png").unwrap()));
-        assert!(!mail_image_url_allowed(&reqwest::Url::parse("http://localhost/image.png").unwrap()));
+        assert!(mail_image_url_allowed(
+            &reqwest::Url::parse("https://example.test/image.png").unwrap()
+        ));
+        assert!(!mail_image_url_allowed(
+            &reqwest::Url::parse("javascript:alert(1)").unwrap()
+        ));
+        assert!(!mail_image_url_allowed(
+            &reqwest::Url::parse("http://127.0.0.1/image.png").unwrap()
+        ));
+        assert!(!mail_image_url_allowed(
+            &reqwest::Url::parse("http://localhost/image.png").unwrap()
+        ));
     }
 
     #[tokio::test]
     async fn rendered_mail_reader_keeps_back_and_unread_controls() {
-        let Some(state) = test_state().await else { return; };
+        let Some(state) = test_state().await else {
+            return;
+        };
         let session = test_session_without_storage();
         let html = render_mail_read(&state, &session, 1, 2);
         assert!(html.contains(r#"id="mail_reader_back""#));
@@ -4136,9 +4912,18 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
         );
 
         // Auth-related and configuration statuses stay hard so the client can react.
-        assert_eq!(soft_calendar_failure_status(&unexpected(StatusCode::UNAUTHORIZED)), None);
-        assert_eq!(soft_calendar_failure_status(&unexpected(StatusCode::FORBIDDEN)), None);
-        assert_eq!(soft_calendar_failure_status(&unexpected(StatusCode::CONFLICT)), None);
+        assert_eq!(
+            soft_calendar_failure_status(&unexpected(StatusCode::UNAUTHORIZED)),
+            None
+        );
+        assert_eq!(
+            soft_calendar_failure_status(&unexpected(StatusCode::FORBIDDEN)),
+            None
+        );
+        assert_eq!(
+            soft_calendar_failure_status(&unexpected(StatusCode::CONFLICT)),
+            None
+        );
 
         // Bad-config errors surface as hard errors, not partial responses.
         assert_eq!(

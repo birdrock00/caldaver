@@ -200,8 +200,7 @@ mod tests {
 
     #[test]
     fn replaces_all_options() {
-        let mut preferences =
-            Preferences::from_options([("old".to_string(), string("old value"))]);
+        let mut preferences = Preferences::from_options([("old".to_string(), string("old value"))]);
 
         preferences.set_all([
             ("i1".to_string(), string("v1")),

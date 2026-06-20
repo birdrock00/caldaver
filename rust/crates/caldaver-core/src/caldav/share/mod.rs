@@ -114,7 +114,10 @@ impl Acl {
     pub fn grants_privileges(&self) -> Result<IndexMap<String, Vec<String>>, ShareError> {
         let mut result = IndexMap::new();
         for (principal, role) in &self.grants {
-            result.insert(principal.clone(), self.permissions.privileges_for(role)?.to_vec());
+            result.insert(
+                principal.clone(),
+                self.permissions.privileges_for(role)?.to_vec(),
+            );
         }
         Ok(result)
     }
@@ -132,7 +135,10 @@ mod tests {
 
     fn permissions() -> Permissions {
         Permissions::new([
-            ("default".to_string(), vec!["{urn:ietf:params:xml:ns:caldav}read-free-busy".to_string()]),
+            (
+                "default".to_string(),
+                vec!["{urn:ietf:params:xml:ns:caldav}read-free-busy".to_string()],
+            ),
             ("owner".to_string(), vec!["{DAV:}all".to_string()]),
             (
                 "read-write".to_string(),
@@ -144,7 +150,8 @@ mod tests {
 
     #[test]
     fn permissions_reject_duplicate_and_missing_roles() {
-        let mut permissions = Permissions::new([("owner".to_string(), vec!["{DAV:}all".to_string()])]);
+        let mut permissions =
+            Permissions::new([("owner".to_string(), vec!["{DAV:}all".to_string()])]);
 
         assert_eq!(
             permissions.privileges_for("missing"),

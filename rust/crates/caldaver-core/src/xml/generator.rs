@@ -104,15 +104,19 @@ impl Generator {
                 ),
                 XmlElement::children(
                     clark(CALDAV_NS, "filter"),
-                    vec![XmlElement::children(
-                        clark(CALDAV_NS, "comp-filter"),
-                        vec![XmlElement::children(
+                    vec![
+                        XmlElement::children(
                             clark(CALDAV_NS, "comp-filter"),
-                            vec![component_filter.to_xml_element()],
+                            vec![
+                                XmlElement::children(
+                                    clark(CALDAV_NS, "comp-filter"),
+                                    vec![component_filter.to_xml_element()],
+                                )
+                                .with_attribute("name", "VEVENT"),
+                            ],
                         )
-                        .with_attribute("name", "VEVENT")],
-                    )
-                    .with_attribute("name", "VCALENDAR")],
+                        .with_attribute("name", "VCALENDAR"),
+                    ],
                 ),
             ],
         ))
@@ -269,7 +273,10 @@ impl NamespaceRegistry {
     }
 }
 
-fn collect_namespaces(element: &XmlElement, namespaces: &mut BTreeSet<String>) -> Result<(), XmlError> {
+fn collect_namespaces(
+    element: &XmlElement,
+    namespaces: &mut BTreeSet<String>,
+) -> Result<(), XmlError> {
     if let Some((namespace, _)) = parse_clark(&element.name) {
         namespaces.insert(namespace.to_string());
     }
@@ -427,7 +434,10 @@ mod tests {
             .filter(|node| node.is_element())
             .map(|node| node.tag_name().name())
             .collect();
-        assert_eq!(names, ["resourcetype", "calendar-home-set", "calendar-color"]);
+        assert_eq!(
+            names,
+            ["resourcetype", "calendar-home-set", "calendar-color"]
+        );
     }
 
     #[test]
@@ -468,7 +478,10 @@ mod tests {
         let permissions = Permissions::new([
             (
                 "owner".to_string(),
-                vec!["{DAV:}all".to_string(), "{urn:he:man}master-of-universe".to_string()],
+                vec![
+                    "{DAV:}all".to_string(),
+                    "{urn:he:man}master-of-universe".to_string(),
+                ],
             ),
             (
                 "default".to_string(),

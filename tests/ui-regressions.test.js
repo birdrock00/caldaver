@@ -27,6 +27,14 @@ function sourceBetween(source, startPattern, endPattern) {
   return tail.slice(0, end);
 }
 
+function compactRust(source) {
+  return source.replace(/\s+/g, ' ').replace(/\s*\.\s*/g, '.');
+}
+
+function assertRustContains(source, snippet) {
+  assert.match(compactRust(source), new RegExp(snippet.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\ /g, '\\s+')));
+}
+
 test('Rust workspace owns backend crates and scripts', () => {
   const toolchain = read('rust-toolchain.toml');
   const workspace = read('rust/Cargo.toml');
@@ -112,11 +120,14 @@ test('Rust server exposes the web route surface', () => {
     'route("/events/resize", post(event_resize))',
     'route("/principals", get(principals))',
     'route("/jssettings", get(jssettings))',
-    'route("/keepalive", get(|| async { "" }))',
-    'route("/__rust/health", get(|| async { Json(json!({"ok": true, "backend": "rust"})) }))'
+    'route("/keepalive", get(|| async { "" }))'
   ]) {
-    assert.match(server, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assertRustContains(server, route);
   }
+  assert.match(
+    compactRust(server),
+    /route\(\s*"\/__rust\/health",\s*get\(\|\| async \{ Json\(json!\(\{"ok": true, "backend": "rust"\}\)\) \}\),?\s*\)/
+  );
 });
 
 test('Docker image runs the standalone Rust backend', () => {
@@ -388,9 +399,9 @@ test('blank credentials preserve stored secrets during account edits', () => {
   const storage = read('rust/crates/caldaver-server/src/storage.rs');
   const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
 
-  assert.match(server, /id != 0 && form\.get\("password"\)\.is_none_or\(\|value\| value\.trim\(\)\.is_empty\(\)\)/);
-  assert.match(server, /state\.storage\.mail_account\(owner, id\)\.await/);
-  assert.match(server, /state\.storage\.dav_account_by_id\(owner, id\)\.await/);
+  assert.match(compactRust(server), /id != 0 && form\.get\("password"\)\.is_none_or\(\|value\| value\.trim\(\)\.is_empty\(\)\)/);
+  assert.match(compactRust(server), /state\.storage\.mail_account\(owner, id\)\.await/);
+  assert.match(compactRust(server), /state\.storage\.dav_account_by_id\(owner, id\)\.await/);
   assert.match(server, /Ok\(Some\(_\)\) => return Err\(json_error\(StatusCode::BAD_REQUEST, "Account type cannot be changed"\)\)/);
   assert.match(storage, /pub async fn dav_account_by_id/);
   assert.match(mailAccountJs, /password\.required = !editingStoredAccount/);
@@ -420,8 +431,8 @@ test('account API aggregates only stored accounts without secrets', () => {
   assert.doesNotMatch(server, /source: "session"\.to_string\(\)/);
   assert.match(server, /connected_account_from_dav/);
   assert.match(server, /connected_account_from_mail/);
-  assert.match(server, /state\.storage\.dav_account\(&session\.username, "calendar"\)\.await/);
-  assert.match(server, /state\.storage\.dav_account\(&session\.username, "carddav"\)\.await/);
+  assert.match(compactRust(server), /state\.storage\.dav_account\(&session\.username, "calendar"\)\.await/);
+  assert.match(compactRust(server), /state\.storage\.dav_account\(&session\.username, "carddav"\)\.await/);
   assert.match(server, /caldav_client_for_request\(&state, &session\)\.await/);
   assert.match(server, /carddav_client_for_request\(&state, &session\)\.await/);
 });
@@ -435,7 +446,7 @@ test('Postgres-only credential migration bootstraps DAV accounts from session cr
   assert.match(server, /bootstrap_session_dav_accounts\(config, storage\)\.await/);
   assert.match(server, /storage[\s\S]*\.dav_account\(owner, account_type\)[\s\S]*\.is_some\(\)[\s\S]*return Ok\(false\)/);
   assert.match(server, /storage[\s\S]*\.save_dav_account\(owner, &account\)/);
-  assert.match(storage, /pub async fn session_dav_credentials\(&self\)/);
+  assert.match(compactRust(storage), /pub async fn session_dav_credentials\( &self,? \)/);
   assert.match(storage, /SELECT DISTINCT ON \(username\)[\s\S]*FROM caldaver_sessions[\s\S]*WHERE expires_at > \$1/);
   assert.match(storage, /credential_secret = CASE WHEN \$8 = '' THEN credential_secret ELSE \$8 END/);
 });
@@ -445,11 +456,11 @@ test('runtime DAV clients use Postgres account credentials after migration with 
   const caldavRequest = sourceBetween(server, /async fn caldav_client_for_request\(/, /async fn carddav_client_for_request\(/);
   const carddavRequest = sourceBetween(server, /async fn carddav_client_for_request\(/, /fn dav_auth_for_account\(/);
 
-  assert.match(caldavRequest, /state\.storage\.dav_account\(&session\.username, "calendar"\)\.await/);
+  assert.match(compactRust(caldavRequest), /state\.storage\.dav_account\(&session\.username, "calendar"\)\.await/);
   assert.match(caldavRequest, /dav_auth_for_account\(&account\)/);
   assert.doesNotMatch(caldavRequest, /caldav_client_for_session/);
   assert.doesNotMatch(caldavRequest, /falling back to session credentials/);
-  assert.match(carddavRequest, /state\.storage\.dav_account\(&session\.username, "carddav"\)\.await/);
+  assert.match(compactRust(carddavRequest), /state\.storage\.dav_account\(&session\.username, "carddav"\)\.await/);
   assert.match(carddavRequest, /dav_auth_for_account\(&account\)/);
   assert.doesNotMatch(carddavRequest, /carddav_client_for_session/);
   assert.doesNotMatch(carddavRequest, /falling back to session credentials/);
@@ -544,7 +555,7 @@ test('email account creation remains backwards compatible through old and new ro
   const mailAccountJs = read('web/templates/parts/mailaccountjs.html');
 
   assert.match(server, /route\("\/mail\/accounts\/save", post\(mail_account_save\)\)/);
-  assert.match(server, /Some\("email"\) => match persist_mail_account_from_form/);
+  assert.match(compactRust(server), /Some\("email"\) => \{? match persist_mail_account_from_form/);
   assert.match(server, /mail_account_save[\s\S]*persist_mail_account_from_form\(&state, &session\.username, &form\)/);
   assert.match(mailAccountJs, /name="account_type"/);
   assert.doesNotMatch(mailAccountJs, /\/mail\/accounts\/save/);
@@ -750,9 +761,9 @@ test('Rust server handles sessions, CSRF, no-JS mail, and unread updates', () =>
   assert.match(storage, /mail_message_cache/);
   assert.match(server, /fn valid_csrf\(session: &Session, form: &HashMap<String, String>\) -> bool/);
   assert.match(server, /json_error\(StatusCode::UNAUTHORIZED, "CSRF token not present"\)/);
-  assert.match(server, /render_mail\(&state, &session, mail_javascript_disabled\(&session, &query\)\)/);
+  assert.match(compactRust(server), /render_mail\( &state, &session, mail_javascript_disabled\(&session, &query\),? \)/);
   assert.match(server, /fn mail_javascript_disabled\(session: &Session, query: &HashMap<String, String>\) -> bool/);
-  assert.match(server, /let bottom = if no_js \{ String::new\(\) \} else \{ part_js\("mailjs"\) \};/);
+  assert.match(compactRust(server), /let bottom = if no_js \{ String::new\(\) \} else \{ part_js\("mailjs"\) \};/);
   assert.match(server, /backend\.mark_seen\(account, uid, false\)/);
   assert.match(server, /mark_cached_seen\(&session\.username, account_id, uid, false\)/);
   assert.match(storage, /jsonb_set\(message, '\{seen\}', to_jsonb\(\$4::boolean\), true\)/);

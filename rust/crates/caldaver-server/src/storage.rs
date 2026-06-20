@@ -1,4 +1,6 @@
-use crate::{CalendarEvent, Contact, MailAccount, MailMessage, Preferences, SealedPassword, Session};
+use crate::{
+    CalendarEvent, Contact, MailAccount, MailMessage, Preferences, SealedPassword, Session,
+};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
@@ -39,7 +41,10 @@ pub(crate) struct SessionDavCredentials {
 }
 
 impl Storage {
-    pub async fn connect(database_url: &str, secret: impl Into<String>) -> Result<Self, StorageError> {
+    pub async fn connect(
+        database_url: &str,
+        secret: impl Into<String>,
+    ) -> Result<Self, StorageError> {
         if !database_url.starts_with("postgres://") && !database_url.starts_with("postgresql://") {
             return Err(StorageError::Config(
                 "Caldaver Rust backend requires a Postgres database URL".to_string(),
@@ -365,7 +370,9 @@ WHERE id = $1
         Ok(())
     }
 
-    pub async fn session_dav_credentials(&self) -> Result<Vec<SessionDavCredentials>, StorageError> {
+    pub async fn session_dav_credentials(
+        &self,
+    ) -> Result<Vec<SessionDavCredentials>, StorageError> {
         let rows = self
             .pool
             .get()
@@ -400,7 +407,11 @@ ORDER BY username, updated_at DESC
             .collect())
     }
 
-    pub async fn save_preferences(&self, username: &str, preferences: &Preferences) -> Result<(), StorageError> {
+    pub async fn save_preferences(
+        &self,
+        username: &str,
+        preferences: &Preferences,
+    ) -> Result<(), StorageError> {
         let client = self.pool.get().await?;
         let value = serde_json::to_value(preferences)?;
         client
@@ -419,7 +430,10 @@ ON CONFLICT (username) DO UPDATE SET preferences = EXCLUDED.preferences, updated
     pub async fn preferences(&self, username: &str) -> Result<Option<Preferences>, StorageError> {
         let client = self.pool.get().await?;
         let row = client
-            .query_opt("SELECT preferences FROM caldaver_preferences WHERE username = $1", &[&username])
+            .query_opt(
+                "SELECT preferences FROM caldaver_preferences WHERE username = $1",
+                &[&username],
+            )
             .await?;
         row.map(|row| serde_json::from_value(row.get("preferences")))
             .transpose()
@@ -470,7 +484,11 @@ ON CONFLICT (calendar, uid) DO UPDATE SET event = EXCLUDED.event, updated_at = n
         Ok(())
     }
 
-    pub async fn event(&self, calendar: &str, uid: &str) -> Result<Option<CalendarEvent>, StorageError> {
+    pub async fn event(
+        &self,
+        calendar: &str,
+        uid: &str,
+    ) -> Result<Option<CalendarEvent>, StorageError> {
         self.pool
             .get()
             .await?
@@ -558,7 +576,11 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             .collect())
     }
 
-    pub async fn mail_account(&self, owner: &str, id: u64) -> Result<Option<MailAccount>, StorageError> {
+    pub async fn mail_account(
+        &self,
+        owner: &str,
+        id: u64,
+    ) -> Result<Option<MailAccount>, StorageError> {
         let id_i64 = id as i64;
         Ok(self
             .pool
@@ -587,7 +609,11 @@ ON CONFLICT (owner, url) DO UPDATE SET contact = EXCLUDED.contact, updated_at = 
             }))
     }
 
-    pub async fn save_mail_account(&self, owner: &str, account: &MailAccount) -> Result<MailAccount, StorageError> {
+    pub async fn save_mail_account(
+        &self,
+        owner: &str,
+        account: &MailAccount,
+    ) -> Result<MailAccount, StorageError> {
         let client = self.pool.get().await?;
         let password_secret = self.seal_mail_password(&account.password_sealed);
         let refresh = account.refresh_interval_seconds as i64;
@@ -684,10 +710,17 @@ ORDER BY account_type, id
                 &[&owner],
             )
             .await?;
-        Ok(rows.into_iter().map(|row| self.dav_account_from_row(row)).collect())
+        Ok(rows
+            .into_iter()
+            .map(|row| self.dav_account_from_row(row))
+            .collect())
     }
 
-    pub async fn dav_account(&self, owner: &str, account_type: &str) -> Result<Option<DavAccount>, StorageError> {
+    pub async fn dav_account(
+        &self,
+        owner: &str,
+        account_type: &str,
+    ) -> Result<Option<DavAccount>, StorageError> {
         Ok(self
             .pool
             .get()
@@ -707,7 +740,11 @@ LIMIT 1
             .map(|row| self.dav_account_from_row(row)))
     }
 
-    pub async fn dav_account_by_id(&self, owner: &str, id: u64) -> Result<Option<DavAccount>, StorageError> {
+    pub async fn dav_account_by_id(
+        &self,
+        owner: &str,
+        id: u64,
+    ) -> Result<Option<DavAccount>, StorageError> {
         let id = id as i64;
         Ok(self
             .pool
@@ -726,7 +763,11 @@ WHERE owner = $1 AND id = $2 AND enabled = TRUE
             .map(|row| self.dav_account_from_row(row)))
     }
 
-    pub async fn save_dav_account(&self, owner: &str, account: &DavAccount) -> Result<DavAccount, StorageError> {
+    pub async fn save_dav_account(
+        &self,
+        owner: &str,
+        account: &DavAccount,
+    ) -> Result<DavAccount, StorageError> {
         let client = self.pool.get().await?;
         let credential_secret = self.seal_mail_password(&account.credential_sealed);
         let id = if account.id == 0 {
@@ -739,7 +780,12 @@ WHERE owner = $1 AND account_type = $2 AND lower(server_url) = lower($3) AND use
 ORDER BY id
 LIMIT 1
 "#,
-                    &[&owner, &account.account_type, &account.server_url, &account.username],
+                    &[
+                        &owner,
+                        &account.account_type,
+                        &account.server_url,
+                        &account.username,
+                    ],
                 )
                 .await?
                 .map(|row| row.get::<_, i64>("id") as u64)
@@ -826,7 +872,11 @@ RETURNING id::BIGINT AS id
         }
     }
 
-    pub async fn cached_messages(&self, owner: &str, account_id: u64) -> Result<Vec<MailMessage>, StorageError> {
+    pub async fn cached_messages(
+        &self,
+        owner: &str,
+        account_id: u64,
+    ) -> Result<Vec<MailMessage>, StorageError> {
         let account_id = account_id as i64;
         let rows = self
             .pool
@@ -1118,7 +1168,9 @@ mod tests {
     async fn test_storage() -> Option<Storage> {
         crate::imap_backend::install_test_password_key();
         let database_url = std::env::var("CALDAVER_TEST_DATABASE_URL").ok()?;
-        Storage::connect(&database_url, "storage-test-secret").await.ok()
+        Storage::connect(&database_url, "storage-test-secret")
+            .await
+            .ok()
     }
 
     fn unique_name(prefix: &str) -> String {
@@ -1257,7 +1309,9 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_round_trips_backend_state() {
-        let Some(storage) = test_storage().await else { return; };
+        let Some(storage) = test_storage().await else {
+            return;
+        };
         let owner = unique_name("postgres-state");
         let session_id = unique_name("session");
         let session = test_session(&owner);
@@ -1275,7 +1329,10 @@ mod tests {
         let mut preferences = Preferences::default();
         preferences.default_view = "agendaWeek".to_string();
         preferences.weekstart = 1;
-        storage.save_preferences(&owner, &preferences).await.unwrap();
+        storage
+            .save_preferences(&owner, &preferences)
+            .await
+            .unwrap();
         let loaded_preferences = storage.preferences(&owner).await.unwrap().unwrap();
         assert_eq!(loaded_preferences.default_view, "agendaWeek");
         assert_eq!(loaded_preferences.weekstart, 1);
@@ -1284,33 +1341,64 @@ mod tests {
         let event = test_event(&calendar, "event-1");
         storage.upsert_event(&event).await.unwrap();
         assert_eq!(storage.events(&calendar).await.unwrap().len(), 1);
-        assert_eq!(storage.event(&calendar, "event-1").await.unwrap().unwrap().title, "Storage event");
+        assert_eq!(
+            storage
+                .event(&calendar, "event-1")
+                .await
+                .unwrap()
+                .unwrap()
+                .title,
+            "Storage event"
+        );
         storage.delete_event(&calendar, "event-1").await.unwrap();
         assert!(storage.event(&calendar, "event-1").await.unwrap().is_none());
 
         let contact = test_contact(&owner);
         storage.upsert_contact(&owner, &contact).await.unwrap();
-        assert_eq!(storage.contacts(&owner).await.unwrap()[0].full_name, "Ada Lovelace");
+        assert_eq!(
+            storage.contacts(&owner).await.unwrap()[0].full_name,
+            "Ada Lovelace"
+        );
         storage.delete_contact(&owner, &contact.url).await.unwrap();
         assert!(storage.contacts(&owner).await.unwrap().is_empty());
 
-        let saved_account = storage.save_mail_account(&owner, &test_account()).await.unwrap();
+        let saved_account = storage
+            .save_mail_account(&owner, &test_account())
+            .await
+            .unwrap();
         assert!(saved_account.id > 0);
         let loaded_account = storage
             .mail_account(&owner, saved_account.id)
             .await
             .unwrap()
             .unwrap();
-        assert_eq!(loaded_account.password_sealed.reveal().unwrap(), "mail-password");
+        assert_eq!(
+            loaded_account.password_sealed.reveal().unwrap(),
+            "mail-password"
+        );
         assert_eq!(storage.mail_accounts(&owner).await.unwrap().len(), 1);
 
         storage
-            .replace_message_cache(&owner, saved_account.id, &[test_message(10, true), test_message(11, false)])
+            .replace_message_cache(
+                &owner,
+                saved_account.id,
+                &[test_message(10, true), test_message(11, false)],
+            )
             .await
             .unwrap();
-        assert_eq!(storage.cached_messages(&owner, saved_account.id).await.unwrap().len(), 2);
+        assert_eq!(
+            storage
+                .cached_messages(&owner, saved_account.id)
+                .await
+                .unwrap()
+                .len(),
+            2
+        );
         let full_message = test_message(11, true);
-        storage.cache_message(&owner, saved_account.id, &full_message).await.unwrap();
+        storage
+            .cache_message(&owner, saved_account.id, &full_message)
+            .await
+            .unwrap();
         storage
             .mark_cached_seen(&owner, saved_account.id, 11, false)
             .await
@@ -1335,7 +1423,10 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(loaded_account.label, "Renamed Inbox");
-        assert_eq!(loaded_account.password_sealed.reveal().unwrap(), "mail-password");
+        assert_eq!(
+            loaded_account.password_sealed.reveal().unwrap(),
+            "mail-password"
+        );
 
         let mut missing = test_account();
         missing.id = 9_999_999_999;
@@ -1399,7 +1490,9 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_round_trips_dav_accounts_with_sealed_credentials() {
-        let Some(storage) = test_storage().await else { return; };
+        let Some(storage) = test_storage().await else {
+            return;
+        };
         let owner = unique_name("dav-account");
         let saved = storage
             .save_dav_account(&owner, &test_dav_account("calendar", &owner, "dav-token"))
@@ -1443,18 +1536,38 @@ mod tests {
         let mut disabled = test_dav_account("carddav", &owner, "card-token");
         disabled.enabled = false;
         storage.save_dav_account(&owner, &disabled).await.unwrap();
-        assert!(storage.dav_account(&owner, "carddav").await.unwrap().is_none());
+        assert!(
+            storage
+                .dav_account(&owner, "carddav")
+                .await
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(storage.dav_accounts(&owner).await.unwrap().len(), 1);
-        assert!(storage.dav_accounts(&unique_name("other-owner")).await.unwrap().is_empty());
+        assert!(
+            storage
+                .dav_accounts(&unique_name("other-owner"))
+                .await
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[tokio::test]
     async fn postgres_reseals_legacy_account_credentials_with_mail_password_key() {
-        let Some(storage) = test_storage().await else { return; };
+        let Some(storage) = test_storage().await else {
+            return;
+        };
         let owner = unique_name("legacy-reseal");
-        let mail = storage.save_mail_account(&owner, &test_account()).await.unwrap();
+        let mail = storage
+            .save_mail_account(&owner, &test_account())
+            .await
+            .unwrap();
         let dav = storage
-            .save_dav_account(&owner, &test_dav_account("calendar", &owner, "new-dav-secret"))
+            .save_dav_account(
+                &owner,
+                &test_dav_account("calendar", &owner, "new-dav-secret"),
+            )
             .await
             .unwrap();
 
