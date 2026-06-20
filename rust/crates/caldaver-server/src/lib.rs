@@ -2235,10 +2235,7 @@ async fn mail_messages_payload(
         .await
     {
         tracing::error!(%error, "failed to cache synced mail in Postgres");
-        return json_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Unable to cache synced messages",
-        );
+        return json_error(StatusCode::INTERNAL_SERVER_ERROR, "Unable to cache synced messages");
     }
     Json(json!({"result": "SUCCESS", "data": messages, "cached": false})).into_response()
 }
@@ -2264,45 +2261,30 @@ async fn mail_message(
         Err(response) => return response,
     };
 
-    if let Ok(Some(mut cached)) = state
-        .storage
-        .cached_message(&session.username, account_id, uid)
-        .await
-    {
+    if let Ok(Some(mut cached)) = state.storage.cached_message(&session.username, account_id, uid).await {
         if !cached.body.is_empty() || !cached.html_body.is_empty() {
             if !cached.seen {
-                if let Err(error) = run_mail_backend(
-                    state.mail_backend.clone(),
-                    account,
-                    move |backend, account| backend.mark_seen(account, uid, true),
-                )
+                if let Err(error) = run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
+                    backend.mark_seen(account, uid, true)
+                })
                 .await
                 {
                     return mail_backend_response(error);
                 }
                 cached.seen = true;
-                if let Err(error) = state
-                    .storage
-                    .mark_cached_seen(&session.username, account_id, uid, true)
-                    .await
-                {
+                if let Err(error) = state.storage.mark_cached_seen(&session.username, account_id, uid, true).await {
                     tracing::error!(%error, "failed to mark cached mail message as seen in Postgres");
                 }
             }
-            return Json(json!({"result": "SUCCESS", "data": cached, "cached": true}))
-                .into_response();
+            return Json(json!({"result": "SUCCESS", "data": cached, "cached": true})).into_response();
         }
     }
 
-    let mut message = match run_mail_backend(
-        state.mail_backend.clone(),
-        account,
-        move |backend, account| {
-            let message = backend.fetch_message(account, uid)?;
-            backend.mark_seen(account, uid, true)?;
-            Ok(message)
-        },
-    )
+    let mut message = match run_mail_backend(state.mail_backend.clone(), account, move |backend, account| {
+        let message = backend.fetch_message(account, uid)?;
+        backend.mark_seen(account, uid, true)?;
+        Ok(message)
+    })
     .await
     {
         Ok(message) => message,
@@ -4091,11 +4073,7 @@ mod tests {
             Ok(messages)
         }
 
-        fn fetch_message(
-            &self,
-            _account: &MailAccount,
-            uid: u64,
-        ) -> Result<MailMessage, MailBackendError> {
+        fn fetch_message(&self, _account: &MailAccount, uid: u64) -> Result<MailMessage, MailBackendError> {
             self.fetch_message_calls.lock().unwrap().push(uid);
             self.messages
                 .lock()
@@ -4388,14 +4366,8 @@ mod tests {
         imap_backend::install_test_password_key();
         let database_url = std::env::var("CALDAVER_TEST_DATABASE_URL").ok()?;
         let config = Config::for_tests(database_url);
-        let storage = Storage::connect(&config.database_url, config.csrf_secret.clone())
-            .await
-            .ok()?;
-        Some(AppState {
-            config,
-            storage,
-            mail_backend: backend,
-        })
+        let storage = Storage::connect(&config.database_url, config.csrf_secret.clone()).await.ok()?;
+        Some(AppState { config, storage, mail_backend: backend })
     }
 
     async fn logged_in_cookie(app: &Router) -> String {
@@ -4428,7 +4400,7 @@ mod tests {
         session.displayname = username.to_string();
         state
             .storage
-            .insert_session(&id, &session, Duration::from_secs(3600))
+            .insert_session(&id, &session, std::time::Duration::from_secs(3600))
             .await
             .unwrap();
         format!("caldaver_sess={id}")
@@ -4634,16 +4606,10 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
     #[tokio::test]
     async fn mail_message_serves_cache_on_second_open_without_refetching_body() {
         let fake = Arc::new(FakeMailBackend::new(vec![fake_message(31, false)]));
-        let Some(state) = test_state_with_backend(fake.clone()).await else {
-            return;
-        };
+        let Some(state) = test_state_with_backend(fake.clone()).await else { return; };
         let mut account = fake_account();
         account.id = 0;
-        let saved = state
-            .storage
-            .save_mail_account("demo", &account)
-            .await
-            .unwrap();
+        let saved = state.storage.save_mail_account("demo", &account).await.unwrap();
         let app = build_router(state);
         let cookie = logged_in_cookie(&app).await;
         let url = format!("/mail/message?account_id={}&uid=31", saved.id);
@@ -4677,9 +4643,7 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
         assert_eq!(fake.fetch_message_calls(), vec![31]);
         assert_eq!(fake.seen_updates(), vec![(31, true)]);
 
-        let body = axum::body::to_bytes(second.into_body(), usize::MAX)
-            .await
-            .unwrap();
+        let body = axum::body::to_bytes(second.into_body(), usize::MAX).await.unwrap();
         let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(payload["cached"], serde_json::json!(true));
     }
@@ -4697,11 +4661,7 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
         let owner = format!("sync-cache-fail-{}", Uuid::new_v4());
         let mut account = fake_account();
         account.id = 0;
-        let saved = state
-            .storage
-            .save_mail_account(&owner, &account)
-            .await
-            .unwrap();
+        let saved = state.storage.save_mail_account(&owner, &account).await.unwrap();
         let cookie = session_cookie_for(&state, &owner).await;
         let app = build_router(state);
         let response = app
@@ -4715,9 +4675,7 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
             .await
             .unwrap();
         let status = response.status();
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
         let payload: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
         remove_mail_cache_failure_trigger(&trigger_client).await;

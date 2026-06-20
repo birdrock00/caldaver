@@ -1438,58 +1438,27 @@ mod tests {
 
     #[tokio::test]
     async fn postgres_preserves_cached_bodies_and_drops_stale_uids_during_overview_sync() {
-        let Some(storage) = test_storage().await else {
-            return;
-        };
+        let Some(storage) = test_storage().await else { return; };
         let owner = unique_name("cache-merge");
-        let saved = storage
-            .save_mail_account(&owner, &test_account())
-            .await
-            .unwrap();
+        let saved = storage.save_mail_account(&owner, &test_account()).await.unwrap();
+
+        storage.cache_message(&owner, saved.id, &overview_message(20, true)).await.unwrap();
+        storage.cache_message(&owner, saved.id, &test_message(21, false)).await.unwrap();
 
         storage
-            .cache_message(&owner, saved.id, &overview_message(20, true))
-            .await
-            .unwrap();
-        storage
-            .cache_message(&owner, saved.id, &test_message(21, false))
-            .await
-            .unwrap();
-
-        storage
-            .replace_message_cache(
-                &owner,
-                saved.id,
-                &[overview_message(21, false), overview_message(22, false)],
-            )
+            .replace_message_cache(&owner, saved.id, &[overview_message(21, false), overview_message(22, false)])
             .await
             .unwrap();
 
         let cached = storage.cached_messages(&owner, saved.id).await.unwrap();
-        assert!(
-            cached.iter().all(|m| m.uid != 20),
-            "stale uid absent from overview must be removed"
-        );
+        assert!(cached.iter().all(|m| m.uid != 20), "stale uid absent from overview must be removed");
         let m21 = cached.iter().find(|m| m.uid == 21).unwrap();
-        assert_eq!(
-            m21.body, "Body",
-            "previously-cached full body must survive overview sync"
-        );
+        assert_eq!(m21.body, "Body", "previously-cached full body must survive overview sync");
         assert!(cached.iter().any(|m| m.uid == 22));
 
-        let lookup = storage
-            .cached_message(&owner, saved.id, 21)
-            .await
-            .unwrap()
-            .unwrap();
+        let lookup = storage.cached_message(&owner, saved.id, 21).await.unwrap().unwrap();
         assert_eq!(lookup.body, "Body");
-        assert!(
-            storage
-                .cached_message(&owner, saved.id, 999)
-                .await
-                .unwrap()
-                .is_none()
-        );
+        assert!(storage.cached_message(&owner, saved.id, 999).await.unwrap().is_none());
     }
 
     #[tokio::test]
@@ -1498,21 +1467,14 @@ mod tests {
             return;
         };
         let owner = unique_name("cache-order");
-        let saved = storage
-            .save_mail_account(&owner, &test_account())
-            .await
-            .unwrap();
+        let saved = storage.save_mail_account(&owner, &test_account()).await.unwrap();
         let mut lower_uid_newer_date = overview_message(30, false);
         lower_uid_newer_date.date = "Tue, 02 Jan 2024 00:00:00 +0000".to_string();
         let mut higher_uid_older_date = overview_message(31, false);
         higher_uid_older_date.date = "Mon, 01 Jan 2024 00:00:00 +0000".to_string();
 
         storage
-            .replace_message_cache(
-                &owner,
-                saved.id,
-                &[lower_uid_newer_date, higher_uid_older_date],
-            )
+            .replace_message_cache(&owner, saved.id, &[lower_uid_newer_date, higher_uid_older_date])
             .await
             .unwrap();
 
