@@ -57,8 +57,8 @@ class Client
 
     /**
     * Checks if the HTTP client can access the configured base URL by
-    * sending an OPTIONS request. It will fail if a) provided credentials are
-    * not valid or b) can't find 'calendar-access' in the DAV header
+    * sending an OPTIONS request. It will fail if provided credentials are
+    * not valid or if the server does not return a DAV header.
     *
     * @return boolean
     */
@@ -71,8 +71,9 @@ class Client
             return false;
         }
 
-        return ($response->hasHeader('DAV') &&
-            false !== strpos($response->getHeaderLine('DAV'), "calendar-access"));
+        return $response->getStatusCode() >= 200
+            && $response->getStatusCode() < 300
+            && $response->hasHeader('DAV');
     }
 
     /**

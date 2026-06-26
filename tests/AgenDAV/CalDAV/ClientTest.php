@@ -73,11 +73,20 @@ class ClientTest extends TestCase
 
     public function testCanAuthenticate()
     {
-        // #1 Test an authentication failure
         $response = new Response(200, ['DAV' => '1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, calendar-access, calendar-proxy']);
         $caldav_client = $this->createCalDAVClient($response);
 
-        $this->assertTrue($caldav_client->canAuthenticate(), 'canAuthenticate() does not work');
+        $this->assertTrue($caldav_client->canAuthenticate(), 'canAuthenticate() should return true');
+        $this->validateCheckAuthenticatedRequests();
+    }
+
+    public function testCanAuthenticateWithoutCalendarAccess()
+    {
+        // Nextcloud 33+ no longer advertises calendar-access in the DAV header
+        $response = new Response(200, ['DAV' => '1, 3, extended-mkcol, access-control, calendarserver-principal-property-search, nc-paginate, nextcloud-checksum-update']);
+        $caldav_client = $this->createCalDAVClient($response);
+
+        $this->assertTrue($caldav_client->canAuthenticate(), 'canAuthenticate() should not require calendar-access');
         $this->validateCheckAuthenticatedRequests();
     }
 
