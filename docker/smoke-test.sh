@@ -49,7 +49,22 @@ PASSES=0
 FAILS=0
 FAIL_LINES=()
 pass() { echo "  PASS  $1"; PASSES=$((PASSES+1)); }
-fail() { echo "  FAIL  $1"; FAILS=$((FAILS+1)); FAIL_LINES+=("$1"); }
+fail() { echo "  FAIL  $1"; echo -e "\033[0;31m  FAIL  $1\033[0m" >&2; FAILS=$((FAILS+1)); FAIL_LINES+=("$1"); }
+
+_smoke_summary() {
+  [[ $((PASSES + FAILS)) -eq 0 ]] && return
+  echo
+  echo "================================================="
+  echo "  PASS: $PASSES   FAIL: $FAILS"
+  echo "================================================="
+  if [[ $FAILS -gt 0 ]]; then
+    echo "Failed assertions:"
+    for line in "${FAIL_LINES[@]}"; do echo "  - $line"; done
+    echo
+    echo "Last 20 log lines (var/log/$(date +%F).log):"
+    tail -20 "var/log/$(date +%F).log" 2>/dev/null || echo "  (no log file)"
+  fi
+}
 
 assert_status() {  # name url expected [extra_curl_args...]
   local name=$1 url=$2 expected=$3; shift 3
@@ -190,7 +205,7 @@ docker compose exec -T db mysql -uagendav -pagendav agendav \
 
 JAR=$(mktemp)
 JAR_FRESH=$(mktemp)
-trap 'rm -f "$JAR" "$JAR_FRESH"' EXIT
+trap '_smoke_summary; rm -f "$JAR" "$JAR_FRESH"' EXIT
 
 # 0. front-end bundle is actually on disk (and not falling through .htaccess
 #    to Slim's 404 HTML page). Without these, the calendar UI shows a
@@ -467,17 +482,9 @@ fi
 docker compose exec -T db mysql -uagendav -pagendav agendav -e "DELETE FROM shares WHERE owner='smoke-owner';" 2>/dev/null
 
 # ----- summary -----
-echo
-echo "================================================="
-echo "  PASS: $PASSES   FAIL: $FAILS"
-echo "================================================="
+_smoke_summary
+trap - EXIT
 if [[ $FAILS -gt 0 ]]; then
-  echo "Failed assertions:"
-  for line in "${FAIL_LINES[@]}"; do echo "  - $line"; done
-  echo
-  echo "Last 20 log lines (var/log/$(date +%F).log):"
-  tail -20 "var/log/$(date +%F).log" 2>/dev/null || echo "  (no log file)"
   exit 1
 fi
 echo "All assertions passed."
-exit 0
