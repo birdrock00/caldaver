@@ -36,6 +36,29 @@ generated.
 
 Note that your application will be more slow and logs will grow really fast.
 
+Calendars not loading behind Apache with mod_proxy_fcgi
+-------------------------------------------------------
+
+If AgenDAV login succeeds but calendars fail to load, and your Baikal or
+SabreDAV server logs show::
+
+   Sabre\Xml\ParseException: The input element to parse is empty.
+
+the CalDAV ``REPORT`` request body is being silently dropped by Apache before
+it reaches PHP. This is a known behaviour of ``mod_proxy_fcgi``: it can strip
+the body of non-standard HTTP methods such as ``REPORT`` and ``PROPFIND`` when
+the request uses chunked transfer encoding.
+
+Add the following to your Apache virtual host for the CalDAV server location::
+
+   SetEnvIf Request_Method "REPORT" proxy-sendchunked=0
+   SetEnvIf Request_Method "PROPFIND" proxy-sendchunked=0
+
+If the problem persists, also disable chunked forwarding globally for the
+proxy::
+
+   ProxyFCGISetEnvIf "true" HTTP_PROXY ""
+
 Debug your browser status
 -------------------------
 
