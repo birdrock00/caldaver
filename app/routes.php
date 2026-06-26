@@ -24,17 +24,8 @@ return function (App $app) {
     // Authenticated routes
     $app->group('', function (RouteCollectorProxy $g) use ($container) {
         $g->get('/', function (ServerRequestInterface $request, ResponseInterface $response) use ($container) {
-            // Inline AgenDAVConf/UserPrefs into the page so the JS bootstrap does
-            // not depend on a separate /jssettings.js request. Some SSO/reverse-proxy
-            // setups (notably YunoHost) gate that subresource as a protected page
-            // even when the parent navigation is allowed, breaking <script src>.
-            $jsCode = new JavaScriptCode($container);
-            $jsconfig = $container->get('twig')->render('jsconfig.html', [
-                'site_config' => $jsCode->getSiteConfig($request),
-                'preferences' => $jsCode->getPreferences(),
-            ]);
             $body = $container->get('twig')->render('calendar.html', [
-                'jsconfig' => $jsconfig,
+                'json_config' => (new JavaScriptCode($container))->renderConfig($request),
             ]);
             $response->getBody()->write($body);
             return $response;
@@ -56,9 +47,6 @@ return function (App $app) {
         $g->post('/events/save', Event\Save::class)->setName('event.save');
 
         $g->get('/principals', Principals::class . ':search')->setName('principals.search');
-
-        // Dynamic JavaScript (configuration + per-user prefs)
-        $g->get('/jssettings.js', JavaScriptCode::class . ':settingsAction')->setName('settings.js');
 
         // Session keepalive
         $g->get('/keepalive', function (ServerRequestInterface $request, ResponseInterface $response) {

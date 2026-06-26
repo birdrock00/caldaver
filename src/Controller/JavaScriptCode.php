@@ -23,7 +23,6 @@ namespace AgenDAV\Controller;
 
 use AgenDAV\UserContext;
 use Psr\Container\ContainerInterface;
-use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Slim\Interfaces\RouteParserInterface;
 
@@ -33,27 +32,22 @@ class JavaScriptCode
     {
     }
 
-    public function settingsAction(
-        ServerRequestInterface $request,
-        ResponseInterface $response
-    ): ResponseInterface {
-        $site_config = $this->getSiteConfig($request);
-        $preferences = $this->getPreferences();
-
-        $body = $this->container->get('twig')->render('jsconfig.html', [
-            'site_config' => $site_config,
-            'preferences' => $preferences,
+    /**
+    * Single public entry point for routes.php to fetch config settings and
+    * render them as inline JSON afterwards.
+    */
+    public function renderConfig(ServerRequestInterface $request): string
+    {
+        return $this->container->get('twig')->render('config-data.html', [
+            'site_config' => $this->getSiteConfig($request),
+            'preferences' => $this->getPreferences(),
         ]);
-
-        $response->getBody()->write($body);
-        // Cache-Control / Pragma are stamped globally by NoStoreMiddleware.
-        return $response->withHeader('Content-Type', 'text/javascript');
     }
 
     /**
     * @return array<string, mixed>
     */
-    public function getSiteConfig(ServerRequestInterface $request): array
+    protected function getSiteConfig(ServerRequestInterface $request): array
     {
         // Derive base URLs from Slim's RouteParser rather than $_SERVER['SCRIPT_NAME'].
         // Behind a misconfigured reverse proxy SCRIPT_NAME can be attacker-
@@ -89,7 +83,7 @@ class JavaScriptCode
     /**
     * @return array<string, mixed>
     */
-    public function getPreferences(): array
+    protected function getPreferences(): array
     {
         return $this->container->get(UserContext::class)->getPreferences()->getAll();
     }
