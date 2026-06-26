@@ -65,14 +65,22 @@ class Authentication
             if (empty($user) || empty($password)) {
                 $template_vars['error'] = $translator->trans('messages.error_empty_fields');
             } else {
-                $success = $this->processLogin($user, $password);
+                $logContext = ['user' => substr((string) $user, 0, 64), 'ip' => $clientIp];
+
+                try {
+                    $success = $this->processLogin($user, $password);
+                } catch (\AgenDAV\Exception\NotCalDAV $e) {
+                    $logger->info('Failed login (not a CalDAV server)', $logContext);
+                    $template_vars['error'] = $translator->trans('messages.error_no_caldav');
+                    $body = $this->container->get('twig')->render('login.html', $template_vars);
+                    $response->getBody()->write($body);
+                    return $response;
+                }
 
                 // Username is user-submitted; route it through Monolog's
                 // context (which serialises values via JSON) instead of the
                 // message body, so CR/LF in $user can't forge log lines.
                 // Truncate as defence-in-depth against unbounded inputs.
-                $logContext = ['user' => substr((string) $user, 0, 64), 'ip' => $clientIp];
-
                 if ($success === true) {
                     $logger->info('User logged in', $logContext);
                     /** @var RouteParserInterface $routeParser */
@@ -134,12 +142,16 @@ class Authentication
         // untouched — otherwise AuthMiddleware would let a partially
         // authenticated user through with a null principal, widening
         // ACL / share visibility.
-        $principal_url = $caldav_client->getCurrentUserPrincipal();
-        if (empty($principal_url)) {
-            return false;
+        try {
+            $principal_url = $caldav_client->getCurrentUserPrincipal();
+            if (empty($principal_url)) {
+                return false;
+            }
+            $principal = $this->container->get('principals.repository')->get($principal_url);
+            $calendar_home_set = $caldav_client->getCalendarHomeSet($principal);
+        } catch (\AgenDAV\Exception\NotFound $e) {
+            throw new \AgenDAV\Exception\NotCalDAV($e->getMessage(), 0, $e);
         }
-        $principal = $this->container->get('principals.repository')->get($principal_url);
-        $calendar_home_set = $caldav_client->getCalendarHomeSet($principal);
 
         $session = $this->container->get('session');
         // Defeat session fixation: regenerate the session id and destroy the

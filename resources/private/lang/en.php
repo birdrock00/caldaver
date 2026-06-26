@@ -190,6 +190,7 @@ $translations = [
 
 // Messages
     'messages.error_auth' => 'Invalid username or password',
+    'messages.error_no_caldav' => 'Login succeeded but the server does not appear to be a CalDAV server',
     'messages.error_denied' => 'Server refused your request (permission forbidden)',
 
     'messages.info_confirmcaldelete' => 'Are you sure you want to delete the following calendar?',
