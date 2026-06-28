@@ -54,6 +54,17 @@ $cli->addCommands([
 
 	// Clear sessions command
 	new \AgenDAV\Console\Command\SessionsClearCommand($connection),
+
+	// Clear all template & database caches
+	new \AgenDAV\Console\Command\CacheClearCommand(
+		__DIR__ . '/../var/cache'
+	),
+
+	// Remove all temporary data
+	new \AgenDAV\Console\Command\CachePurgeCommand(
+		__DIR__ . '/../var',
+		$connection
+	),
 ]);
 
 $cli->run();

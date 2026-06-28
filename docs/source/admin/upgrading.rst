@@ -104,14 +104,14 @@ way::
 Clear sessions and caches
 -------------------------
 
-It is recommended to remove all active sessions. Do it by running the
-following command::
+Run the following command to remove all active sessions and clear all caches::
 
-  $ php bin/agendavcli sessions:clear
+  $ php bin/agendavcli cache:purge
 
-Also clear the cache directory within the variable data directory::
+If you only want to clear the template and database cache without affecting
+active sessions, use::
 
-  $ rm -rf var/*
+  $ php bin/agendavcli cache:clear
 
 Finishing the upgrade from AgenDAV 1.2.x (shares)
 -------------------------------------------------
