@@ -3,11 +3,10 @@
 namespace AgenDAV\Session;
 
 use RuntimeException;
-use SodiumException;
 
 /**
  * Authenticated symmetric encryption for short secrets (the CalDAV password)
- * stored in the session blob. Uses libsodium's secretbox (XSalsa20+Poly1305).
+ * stored in the session blob. Uses AES-256-GCM via ext-openssl.
  *
  * The session backend (PdoSessionHandler) keeps an authenticated user's
  * password serialised in the database. Encrypting it at rest with a key that
@@ -16,12 +15,17 @@ use SodiumException;
  */
 class PasswordCipher
 {
+    private const KEY_BYTES = 32;
+    private const IV_BYTES = 12;
+    private const TAG_BYTES = 16;
+    private const CIPHER = 'aes-256-gcm';
+
     public function __construct(private string $key)
     {
-        if (strlen($key) !== SODIUM_CRYPTO_SECRETBOX_KEYBYTES) {
+        if (strlen($key) !== self::KEY_BYTES) {
             throw new RuntimeException(sprintf(
                 'PasswordCipher key must be %d bytes, got %d',
-                SODIUM_CRYPTO_SECRETBOX_KEYBYTES,
+                self::KEY_BYTES,
                 strlen($key)
             ));
         }
@@ -29,9 +33,13 @@ class PasswordCipher
 
     public function encrypt(string $plaintext): string
     {
-        $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-        $cipher = sodium_crypto_secretbox($plaintext, $nonce, $this->key);
-        return base64_encode($nonce . $cipher);
+        $iv = random_bytes(self::IV_BYTES);
+        $tag = '';
+        $cipher = openssl_encrypt($plaintext, self::CIPHER, $this->key, OPENSSL_RAW_DATA, $iv, $tag, '', self::TAG_BYTES);
+        if ($cipher === false) {
+            throw new RuntimeException('Encryption failed');
+        }
+        return base64_encode($iv . $tag . $cipher);
     }
 
     /**
@@ -40,16 +48,14 @@ class PasswordCipher
     public function decrypt(string $payload): ?string
     {
         $raw = base64_decode($payload, true);
-        if ($raw === false || strlen($raw) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
+        $minLen = self::IV_BYTES + self::TAG_BYTES;
+        if ($raw === false || strlen($raw) <= $minLen) {
             return null;
         }
-        $nonce = substr($raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-        $cipher = substr($raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
-        try {
-            $plain = sodium_crypto_secretbox_open($cipher, $nonce, $this->key);
-        } catch (SodiumException) {
-            return null;
-        }
+        $iv = substr($raw, 0, self::IV_BYTES);
+        $tag = substr($raw, self::IV_BYTES, self::TAG_BYTES);
+        $cipher = substr($raw, $minLen);
+        $plain = openssl_decrypt($cipher, self::CIPHER, $this->key, OPENSSL_RAW_DATA, $iv, $tag);
         return $plain === false ? null : $plain;
     }
 }

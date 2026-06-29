@@ -195,9 +195,8 @@ return [
         if ($c->has('session.encryption.key')) {
             $hex = $c->get('session.encryption.key');
             if (is_string($hex) && $hex !== '') {
-                try {
-                    $key = sodium_hex2bin($hex);
-                } catch (\SodiumException $e) {
+                $key = hex2bin($hex);
+                if ($key === false || strlen($key) !== 32) {
                     throw new \RuntimeException(
                         "'session.encryption.key' must be a hex-encoded 32-byte string (64 hex chars)"
                     );
@@ -210,13 +209,13 @@ return [
 
             if (is_readable($keyFile)) {
                 $key = file_get_contents($keyFile);
-                if ($key === false || strlen($key) !== SODIUM_CRYPTO_SECRETBOX_KEYBYTES) {
+                if ($key === false || strlen($key) !== 32) {
                     throw new \RuntimeException(
                         "Corrupt session encryption key file: $keyFile (delete it to force regeneration; existing sessions will be invalidated)"
                     );
                 }
             } else {
-                $key = random_bytes(SODIUM_CRYPTO_SECRETBOX_KEYBYTES);
+                $key = random_bytes(32);
                 // O_EXCL: only create if it doesn't already exist; lets concurrent workers race safely.
                 $fp = @fopen($keyFile, 'xb');
                 if ($fp !== false) {
