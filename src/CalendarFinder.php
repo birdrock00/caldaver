@@ -98,9 +98,9 @@ class CalendarFinder
             $calendar->setOwner($this->current_principal);
         }
 
-        // Find proxied calendars
-        $group_calendars = $this->client->getProxiedCalendars($this->current_principal);
-        $calendars = array_merge($calendars, $group_calendars);
+        // Find additional proxied calendars
+        $proxiedCalendars = $this->client->getProxiedCalendars($this->current_principal);
+        $calendars = array_merge($calendars, $proxiedCalendars);
 
         if ($this->sharing_enabled) {
             // Add share info to own calendars

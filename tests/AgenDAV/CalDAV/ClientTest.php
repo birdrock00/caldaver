@@ -706,6 +706,205 @@ BODY;
         $this->validateACLRequest($calendar, $acl);
     }
 
+    public function testGetProxiedCalendarsNothingFound()
+    {
+        $body = <<<BODY
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/">
+  <d:response>
+    <d:href>/principals/me/</d:href>
+    <d:propstat>
+    <d:prop>
+        <d:group-membership/>
+        <cs:calendar-proxy-write-for/>
+        <cs:calendar-proxy-read-for/>
+    </d:prop>
+    <d:status>HTTP/1.1 404 Not Found</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>
+BODY;
+        $response = new Response(207, [], Utils::streamFor($body));
+        $client = $this->createCalDAVClient($response);
+
+        $calendars = $client->getProxiedCalendars(new Principal('/principals/me/'));
+
+        $this->assertEmpty($calendars);
+
+        $request = $this->history[0]['request'];
+        $this->assertEquals('PROPFIND', $request->getMethod());
+        $this->assertEquals('/principals/me/', $request->getUri()->getPath());
+        $this->assertEquals(0, (int)$request->getHeaderLine('Depth'));
+        $this->validateBody(
+            $request,
+            $this->xml_generator->propfindBody([
+                '{DAV:}group-membership',
+                '{http://calendarserver.org/ns/}calendar-proxy-write-for',
+                '{http://calendarserver.org/ns/}calendar-proxy-read-for',
+            ])
+        );
+    }
+
+    public function testGetProxiedCalendarsWriteAccess()
+    {
+        $proxy_body = <<<BODY
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/">
+  <d:response>
+    <d:href>/principals/me/</d:href>
+    <d:propstat>
+    <d:prop>
+        <cs:calendar-proxy-write-for>
+        <d:href>/principals/alice/</d:href>
+        </cs:calendar-proxy-write-for>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>
+BODY;
+
+        $client = $this->createCalDAVClientMulti([
+            new Response(207, [], Utils::streamFor($proxy_body)),
+            new Response(207, [], Utils::streamFor($this->buildHomeSetBody('/principals/alice/', '/calendars/alice/'))),
+            new Response(207, [], Utils::streamFor($this->buildCalendarsBody('/calendars/alice/'))),
+        ]);
+
+        $calendars = $client->getProxiedCalendars(new Principal('/principals/me/'));
+
+        $this->assertCount(1, $calendars);
+        $calendar = reset($calendars);
+        $this->assertEquals('/principals/alice/', $calendar->getOwner()->getUrl());
+    }
+
+    public function testGetProxiedCalendarsReadAccess()
+    {
+        $proxy_body = <<<BODY
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/">
+  <d:response>
+    <d:href>/principals/me/</d:href>
+    <d:propstat>
+    <d:prop>
+        <cs:calendar-proxy-read-for>
+        <d:href>/principals/alice/</d:href>
+        </cs:calendar-proxy-read-for>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>
+BODY;
+
+        $client = $this->createCalDAVClientMulti([
+            new Response(207, [], Utils::streamFor($proxy_body)),
+            new Response(207, [], Utils::streamFor($this->buildHomeSetBody('/principals/alice/', '/calendars/alice/'))),
+            new Response(207, [], Utils::streamFor($this->buildCalendarsBody('/calendars/alice/'))),
+        ]);
+
+        $calendars = $client->getProxiedCalendars(new Principal('/principals/me/'));
+
+        $this->assertCount(1, $calendars);
+        $calendar = reset($calendars);
+        $this->assertEquals('/principals/alice/', $calendar->getOwner()->getUrl());
+    }
+
+    public function testGetProxiedCalendarsGroupMembership()
+    {
+        $proxy_body = <<<BODY
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response>
+    <d:href>/principals/me/</d:href>
+    <d:propstat>
+    <d:prop>
+        <d:group-membership>
+        <d:href>/principals/groups/team/</d:href>
+        </d:group-membership>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>
+BODY;
+
+        $client = $this->createCalDAVClientMulti([
+            new Response(207, [], Utils::streamFor($proxy_body)),
+            new Response(207, [], Utils::streamFor($this->buildHomeSetBody('/principals/groups/team/', '/calendars/team/'))),
+            new Response(207, [], Utils::streamFor($this->buildCalendarsBody('/calendars/team/'))),
+        ]);
+
+        $calendars = $client->getProxiedCalendars(new Principal('/principals/me/'));
+
+        $this->assertCount(1, $calendars);
+        $calendar = reset($calendars);
+        $this->assertEquals('/principals/groups/team/', $calendar->getOwner()->getUrl());
+    }
+
+    private function buildHomeSetBody(string $principal_href, string $home_set_href): string
+    {
+        return <<<BODY
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+  <d:response>
+    <d:href>{$principal_href}</d:href>
+    <d:propstat>
+    <d:prop>
+        <cal:calendar-home-set>
+        <d:href>{$home_set_href}</d:href>
+        </cal:calendar-home-set>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>
+BODY;
+    }
+
+    private function buildCalendarsBody(string $home_href): string
+    {
+        $cal_href = rtrim($home_href, '/') . '/work/';
+        return <<<BODY
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/">
+  <d:response>
+    <d:href>{$home_href}</d:href>
+    <d:propstat>
+    <d:prop>
+        <d:resourcetype><d:collection/></d:resourcetype>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>{$cal_href}</d:href>
+    <d:propstat>
+    <d:prop>
+        <d:displayname>Work</d:displayname>
+        <cs:getctag>42</cs:getctag>
+        <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>
+BODY;
+    }
+
+    /**
+    * Create CalDAV client with a sequence of mocked responses
+    */
+    protected function createCalDAVClientMulti(array $responses)
+    {
+        $mock = new MockHandler($responses);
+        $handler_stack = HandlerStack::create($mock);
+        $handler_stack->push(Middleware::history($this->history));
+        $guzzle = new GuzzleClient(['handler' => $handler_stack]);
+        $this->http_client = new HttpClient($guzzle);
+        $xml_toolkit = new Toolkit($this->xml_parser, $this->xml_generator);
+        return new Client($this->http_client, $xml_toolkit, $this->event_parser);
+    }
+
     /**
     * Create CalDAV client using mocked responses
     */

@@ -157,28 +157,35 @@ class Client
         $url = $principal->getUrl();
         $response = $this->propfind($url, 0, $body);
 
-        if (count($response) === 0) {
-            return [];
-        }
-
-        $group_calendars = [];
-        foreach ($response as $href => $properties) {
-            if ($properties === null || count($properties) === 0) {
+        $proxiedCalendars = [];
+        foreach ($response as $propertyValue) {
+            if (!is_array($propertyValue)) {
                 continue;
             }
 
-            foreach ($properties as $resource) {
-                $calendars = $this->getCalendars($resource['value']);
-
-                foreach ($calendars as $calendar) {
-                    $calendar->setOwner(new Principal($resource['value']));
+            foreach ($propertyValue as $resource) {
+                if (!isset($resource['value'])) {
+                    continue;
                 }
 
-                $group_calendars = array_merge($group_calendars, $calendars);
+                $proxyUrl = $resource['value'];
+
+                try {
+                    $homeSet = $this->getCalendarHomeSet(new Principal($proxyUrl));
+                } catch (\AgenDAV\Exception\NotFound $e) {
+                    continue;
+                }
+
+                $calendars = $this->getCalendars($homeSet);
+                foreach ($calendars as $calendar) {
+                    $calendar->setOwner(new Principal($proxyUrl));
+                }
+
+                $proxiedCalendars = array_merge($proxiedCalendars, $calendars);
             }
         }
 
-        return $group_calendars;
+        return $proxiedCalendars;
     }
 
     /**
