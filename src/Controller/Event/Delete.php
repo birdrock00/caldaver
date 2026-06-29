@@ -46,6 +46,12 @@ class Delete extends JSONController
         ResponseInterface $response
     ): ResponseInterface {
         $calendar = $this->client->getCalendarByUrl($input->get('calendar'));
+
+        if (!$calendar->isWritable()) {
+            $translator = $this->container->get('translator');
+            return $this->generateError($response, $translator->trans('messages.error_calendar_readonly'), 403);
+        }
+
         $uid = $input->get('uid');
         $object = $this->client->fetchObjectByUid($calendar, $uid);
         $object->setEtag($input->get('etag'));

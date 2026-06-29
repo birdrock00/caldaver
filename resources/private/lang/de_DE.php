@@ -228,6 +228,7 @@ $translations = [
     'messages.error_network_issues' => 'Es gibt Netzwerkprobleme, versuchen Sie es bitte später nochmal.',
     'messages.error_shareunknownusers' => 'Einige der Benutzer, die Sie angegeben haben existieren nicht.',
     'messages.error_empty_fields' => 'Einige Pflichtfelder sind leer.',
+    'messages.error_calendar_readonly' => 'Kalender ist schreibgeschützt',
 
     'messages.help_defaultcalendar' => 'Neue Einträge werden standardmässig in diesem Kalender angelegt. Geben Sie hier den Kalender an, den Sie am Meisten verwenden.',
     'messages.help_default_view' => 'Default view when you access your calendar',

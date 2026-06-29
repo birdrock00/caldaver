@@ -55,11 +55,12 @@ class ShareTest extends TestCase
         );
     }
 
-    // Just make sure there are no errors
     public function testReplaceOldPropertiesNothingHappens()
     {
-        $share = new Share;
+        // Just make sure there are no errors
+        $this->expectNotToPerformAssertions();
 
+        $share = new Share;
         $share->replaceOldProperties();
     }
 

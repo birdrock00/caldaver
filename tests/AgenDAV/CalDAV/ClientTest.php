@@ -313,6 +313,7 @@ BODY;
             [
             '{DAV:}resourcetype',
             '{DAV:}displayname',
+            '{DAV:}current-user-privilege-set',
             '{http://calendarserver.org/ns/}getctag',
             '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set',
             '{http://apple.com/ns/ical/}calendar-color',
@@ -379,6 +380,7 @@ BODY;
             [
             '{DAV:}resourcetype',
             '{DAV:}displayname',
+            '{DAV:}current-user-privilege-set',
             '{http://calendarserver.org/ns/}getctag',
             '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set',
             '{http://apple.com/ns/ical/}calendar-color',

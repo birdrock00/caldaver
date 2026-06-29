@@ -47,6 +47,12 @@ abstract class Alter extends JSONController
     ): ResponseInterface {
         $timezone = new \DateTimeZone($input->get('timezone'));
         $calendar = $this->client->getCalendarByUrl($input->get('calendar'));
+
+        if (!$calendar->isWritable()) {
+            $translator = $this->container->get('translator');
+            return $this->generateError($response, $translator->trans('messages.error_calendar_readonly'), 403);
+        }
+
         $resource = $this->client->fetchObjectByUid($calendar, $input->get('uid'));
 
         $recurrence_id = null;

@@ -76,6 +76,11 @@ class Save extends JSONController
     {
         $calendar = $this->client->getCalendarByUrl($input->get('calendar'));
 
+        if (!$calendar->isWritable()) {
+            $translator = $this->container->get('translator');
+            return $this->generateError($response, $translator->trans('messages.error_calendar_readonly'), 403);
+        }
+
         $uid = Uuid::generate();
         $object = CalendarObject::generateOnCalendar($calendar, $uid);
         $event = $this->builder->createEvent($uid);
@@ -93,6 +98,11 @@ class Save extends JSONController
     {
         $source_calendar = $this->client->getCalendarByUrl($input->get('original_calendar'));
         $destination_calendar = $this->client->getCalendarByUrl($input->get('calendar'));
+
+        if (!$source_calendar->isWritable() || !$destination_calendar->isWritable()) {
+            $translator = $this->container->get('translator');
+            return $this->generateError($response, $translator->trans('messages.error_calendar_readonly'), 403);
+        }
 
         $uid = $input->get('uid');
         $source_object = $this->client->fetchObjectByUid($source_calendar, $uid);

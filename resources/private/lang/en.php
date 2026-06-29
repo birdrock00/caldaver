@@ -228,6 +228,7 @@ $translations = [
     'messages.error_network_issues' => 'We are having network issues. Please, try again later',
     'messages.error_shareunknownusers' => 'Some of the users you specified do not exist',
     'messages.error_empty_fields' => 'Some required fields are empty',
+    'messages.error_calendar_readonly' => 'Calendar is read-only',
 
     'messages.help_defaultcalendar' => 'New events will be placed in this calendar by default. Set here your most used calendar',
     'messages.help_default_view' => 'Default view when you access your calendar',
