@@ -108,7 +108,8 @@ return [
     // Email attribute name
     'principal.email.attribute' => '{DAV:}email',
 
-    // Calendar sharing
+    // Calendar sharing (deprecated - only works with DAViCal)
+    // For Nextcloud, Baikal and other servers use server-side delegation instead.
     'calendar.sharing' => false,
 
     // Enable iCal feed subscriptions
@@ -118,7 +119,7 @@ return [
     // AgenDAV runs in a local network and may expose internal services (SSRF risk).
     'calendar.subscriptions' => false,
 
-    // Calendar sharing permissions. In case of doubt, do not modify them
+    // Calendar sharing permissions (deprecated - only relevant when calendar.sharing is enabled)
     // These defaults are only useful for DAViCal (http://wiki.davical.org/index.php/Permissions)
     'calendar.sharing.permissions' => [
         'owner' => [

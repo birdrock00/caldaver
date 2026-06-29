@@ -191,12 +191,14 @@ overwritten on upgrades.
 
 .. confval:: calendar.sharing
 
-   Enables calendar sharing between users
+   .. deprecated::
 
-   Note that calendar sharing requires full WebDAV ACL support on your
-   CalDAV server. Sharing has been fully tested only with DAViCal, so it is
-   recommended to disable calendar sharing on other CalDAV servers unless
-   you know what you are doing.
+      This feature is only known to work with DAViCal. On all other CalDAV
+      servers (Nextcloud, Baikal, Radicale, etc.) use server-side delegation
+      instead - see :ref:`delegations`.
+
+   Enables AgenDAV-managed WebDAV ACL sharing between users. Requires full
+   WebDAV ACL support on the CalDAV server.
 
 .. confval:: calendar.subscriptions
 
@@ -205,6 +207,11 @@ overwritten on upgrades.
    of users. Set to ``true`` to enable the subscriptions box in the sidebar.
 
 .. confval:: calendar.sharing.permissions
+
+   .. deprecated::
+
+      Only relevant when ``calendar.sharing`` is enabled. See deprecation
+      note on that setting.
 
    Configures ACL permissions for calendar sharing. The default values will
    work with DAViCal.

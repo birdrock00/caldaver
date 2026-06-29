@@ -16,6 +16,7 @@ Contents:
    :maxdepth: 2
 
    admin/index
+   features/index
    translations
    development/index
    releasenotes
