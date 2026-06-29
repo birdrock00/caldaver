@@ -5,6 +5,7 @@ namespace AgenDAV\XML;
 use Sabre\DAV\Exception\BadRequest;
 use Sabre\DAV\Xml\Property\Href;
 use Sabre\DAV\Xml\Service as XMLService;
+use Sabre\DAVACL\Xml\Property\CurrentUserPrivilegeSet;
 
 /*
  * Copyright (C) Jorge López Pérez <jorge@adobo.org>
@@ -40,6 +41,7 @@ class Parser
         $this->xml = new XMLService();
         $this->xml->elementMap['{DAV:}current-user-principal'] = Href::class;
         $this->xml->elementMap['{urn:ietf:params:xml:ns:caldav}calendar-home-set'] = Href::class;
+        $this->xml->elementMap['{DAV:}current-user-privilege-set'] = CurrentUserPrivilegeSet::class;
     }
 
     /**

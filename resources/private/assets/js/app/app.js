@@ -667,7 +667,7 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
         action: AgenDAVConf.base_app_url + 'events/save',
         method: 'post'
       },
-      calendars: calendar_list(),
+      calendars: calendar_list().filter(function(cal) { return cal.writable; }),
 
       // Dates and times
       start_date: AgenDAVDateAndTime.extractDate(event.start),
@@ -684,9 +684,6 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
       daily: RRule.DAILY
     }
   );
-
-  // Log to console for debugging purposes
-  console.log(event);
 
   var button_save = {
     'text': t('labels', 'save'),
@@ -1716,7 +1713,7 @@ var event_click_callback = function event_click_callback(event,
     { caldata: caldata }
   );
 
-  if ((caldata.is_shared === true || caldata.is_subscribed === true) && caldata.writable === false) {
+  if (caldata.writable === false) {
     event_data.disable_actions = true;
   }
 

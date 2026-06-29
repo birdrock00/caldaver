@@ -157,11 +157,15 @@ class Client
         $url = $principal->getUrl();
         $response = $this->propfind($url, 0, $body);
 
+        $readOnlyProperty = '{http://calendarserver.org/ns/}calendar-proxy-read-for';
+
         $proxiedCalendars = [];
-        foreach ($response as $propertyValue) {
+        foreach ($response as $propertyName => $propertyValue) {
             if (!is_array($propertyValue)) {
                 continue;
             }
+
+            $isWritable = ($propertyName !== $readOnlyProperty);
 
             foreach ($propertyValue as $resource) {
                 if (!isset($resource['value'])) {
@@ -179,6 +183,7 @@ class Client
                 $calendars = $this->getCalendars($homeSet);
                 foreach ($calendars as $calendar) {
                     $calendar->setOwner(new Principal($proxyUrl));
+                    $calendar->setWritable($isWritable);
                 }
 
                 $proxiedCalendars = array_merge($proxiedCalendars, $calendars);
@@ -203,6 +208,7 @@ class Client
             [
             '{DAV:}resourcetype',
             '{DAV:}displayname',
+            '{DAV:}current-user-privilege-set',
             '{http://calendarserver.org/ns/}getctag',
             '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set',
             '{http://apple.com/ns/ical/}calendar-color',
@@ -225,6 +231,14 @@ class Client
 
             if ($properties['{DAV:}resourcetype']->is('{urn:ietf:params:xml:ns:caldav}calendar')) {
                 $calendars[$href] = new Calendar($href, $properties);
+
+                if (isset($properties['{DAV:}current-user-privilege-set'])) {
+                    $privilegeSet = $properties['{DAV:}current-user-privilege-set'];
+                    $isWritable = $privilegeSet->has('{DAV:}all')
+                        || $privilegeSet->has('{DAV:}write')
+                        || $privilegeSet->has('{DAV:}write-content');
+                    $calendars[$href]->setWritable($isWritable);
+                }
             }
         }
 

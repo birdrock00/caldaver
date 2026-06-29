@@ -775,6 +775,7 @@ BODY;
         $this->assertCount(1, $calendars);
         $calendar = reset($calendars);
         $this->assertEquals('/principals/alice/', $calendar->getOwner()->getUrl());
+        $this->assertTrue($calendar->isWritable());
     }
 
     public function testGetProxiedCalendarsReadAccess()
@@ -807,6 +808,7 @@ BODY;
         $this->assertCount(1, $calendars);
         $calendar = reset($calendars);
         $this->assertEquals('/principals/alice/', $calendar->getOwner()->getUrl());
+        $this->assertFalse($calendar->isWritable());
     }
 
     public function testGetProxiedCalendarsGroupMembership()
@@ -839,6 +841,7 @@ BODY;
         $this->assertCount(1, $calendars);
         $calendar = reset($calendars);
         $this->assertEquals('/principals/groups/team/', $calendar->getOwner()->getUrl());
+        $this->assertTrue($calendar->isWritable());
     }
 
     private function buildHomeSetBody(string $principal_href, string $home_set_href): string
