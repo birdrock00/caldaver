@@ -30,6 +30,9 @@
           <input type="radio" name="date_format" {% if date_format == "dmy" %} checked="checked" {% endif %} value="dmy"> {{ "now" | date('d/m/Y') }}
         </label>
         <label class="radio-inline">
+          <input type="radio" name="date_format" {% if date_format == "dmy_dot" %} checked="checked" {% endif %} value="dmy_dot"> {{ "now" | date('d.m.Y') }}
+        </label>
+        <label class="radio-inline">
           <input type="radio" name="date_format" {% if date_format == "mdy" %} checked="checked" {% endif %} value="mdy"> {{ "now" | date('m/d/Y') }}
         </label>
     </div>

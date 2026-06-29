@@ -12,6 +12,7 @@ AgenDAVDateAndTime.momentFormat = {
     '12': 'hh:mm A',
     'ymd': 'YYYY-MM-DD',
     'dmy': 'DD/MM/YYYY',
+    'dmy_dot': 'DD.MM.YYYY',
     'mdy': 'MM/DD/YYYY',
 };
 
@@ -19,6 +20,7 @@ AgenDAVDateAndTime.momentFormat = {
 AgenDAVDateAndTime.datepickerFormat = {
     'ymd': 'yy-mm-dd',
     'dmy': 'dd/mm/yy',
+    'dmy_dot': 'dd.mm.yy',
     'mdy': 'mm/dd/yy',
 };
 
