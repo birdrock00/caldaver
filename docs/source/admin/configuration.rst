@@ -4,11 +4,11 @@ Configuration
 =============
 
 Configuring AgenDAV requires creating a ``settings.php`` file in the
-``web/config/`` directory.
+``config/`` directory.
 
 The quickest way to get started is to copy the provided template::
 
-  $ cp web/config/settings.template.php web/config/settings.php
+  $ cp config/settings.template.php config/settings.php
 
 The template contains the most common settings with sensible defaults and
 inline comments. You only need to set ``csrf.secret``, ``db.options``, and
@@ -25,12 +25,12 @@ overwritten on upgrades.
 .. confval:: site.logo
 
    Image filename which will be used as a logo. Has to be a valid filename
-   placed inside ``web/public/img/`` directory.
+   placed inside ``public/img/`` directory.
 
 .. confval:: site.favicon
 
    Icon filename which will be used as favicon. Has to be placed inside
-   ``web/public/img/``.
+   ``public/img/``.
 
 .. confval:: site.footer
 
@@ -226,7 +226,7 @@ overwritten on upgrades.
 
    Default language to be used on AgenDAV interface.
 
-   Have a look at directory ``web/lang`` for a list of available languages.
+   Have a look at directory ``resources/private/lang/`` for a list of available languages.
 
 .. confval:: defaults.time_format
 

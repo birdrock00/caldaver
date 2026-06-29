@@ -117,12 +117,14 @@ Manual release steps done by project maintainers.
 - Tag the »main« branch with the new version
 - Push branch and tag
 - Update the documentation & website
-- Add release download file to release page ([example file](https://github.com/agendav/agendav/releases/tag/2.2.0))
+- Add release download file to release page
   - Clone the git repository using
     `git clone -b <version> https://github.com/agendav/agendav.git agendav-<version>`
+  - Prepare the build version scripts `nvm use && php-version-pickup use`
   - Run `npm ci && npm run-script dist`
     - Creates build files in `public/dist/css/`, `public/dist/js/`
       and `vendor/`
     - Removes `.git`, `node_modules`
   - Zip directory `tar -czf ../agendav-<version>.tar.gz ../agendav-<version>`
+  - Upload release file ([example file](https://github.com/agendav/agendav/releases/tag/3.2.0))
 - Sip a tea
