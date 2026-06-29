@@ -1,16 +1,34 @@
 Installation
 ============
 
-In this section you will found instructions on how to install AgenDAV.
+AgenDAV is a web frontend for an existing CalDAV server. It does not store
+any calendar data itself - it connects to a CalDAV server and displays your
+calendars and events in a browser interface.
+
+.. _prerequisites:
+
+Prerequisites
+-------------
+
+Before installing AgenDAV, you need a running CalDAV server with at least one
+user account. Popular options:
+
+* `Baïkal <https://github.com/sabre-io/Baikal>`_ - lightweight, easy to set up, PHP-based
+* `Nextcloud <https://nextcloud.com/>`_ - full groupware suite with a built-in CalDAV server
+* `DAViCal <https://www.davical.org/>`_ - full-featured, PHP-based
+* `Radicale <https://radicale.org/>`_ - minimal, Python-based
+
+Once your CalDAV server is running and you have a user account on it, continue
+with the AgenDAV installation below and point it at your CalDAV server URL.
 
 .. _requirements:
 
 Requirements
 ------------
 
-AgenDAV |release| requires the following software to be installed:
+AgenDAV |release| requires the following software to be installed on the server
+where AgenDAV itself runs:
 
-* A CalDAV server
 * A web server
 * PHP >= 8.5.0
 * PHP extensions:
@@ -26,16 +44,9 @@ AgenDAV |release| requires the following software to be installed:
 
 * A database backend
 
-.. warning::
-   Some PHP releases have issues with digest authentication under Windows. If your CalDAV server
-   uses digest authentication and you are hosting AgenDAV on a Windows server, make sure your PHP
-   version is not affected.
-
-   See `PHP bug #70101 <https://bugs.php.net/bug.php?id=70101>`_ for more details.
-
 Most popular database backends are supported, such as MySQL, PostgreSQL or SQLite.
 
-Look for supported databases on this `Doctrine DBAL driver list <http://docs.doctrine-project.org/projects/doctrine-dbal/en/latest/reference/configuration.html#driver>`_.
+Look for supported databases on this `Doctrine DBAL driver list <https://www.doctrine-project.org/projects/doctrine-dbal/en/current/reference/configuration.html#driver>`_.
 
 Download AgenDAV
 ----------------
@@ -44,7 +55,7 @@ AgenDAV |release| can be obtained at `AgenDAV GitHub Project <https://github.com
 
 Uncompress it using ``tar``::
 
- $ tar agendav-...tar.gz
+ $ tar xf agendav-...tar.gz
  $ cd agendav-.../
 
 PHP configuration
@@ -77,8 +88,9 @@ Create a user in MySQL and let it use a new `agendav` database::
  $ mysql --default-character-set=utf8 -uroot -p
  Enter password:
  [...]
- mysql> GRANT ALL PRIVILEGES ON agendav.* TO agendav@localhost IDENTIFIED BY 'yourpassword'
- mysql> CREATE DATABASE agendav CHARACTER SET utf8 COLLATE utf8_general_ci;
+ mysql> CREATE DATABASE agendav CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+ mysql> CREATE USER 'agendav'@'localhost' IDENTIFIED BY 'yourpassword';
+ mysql> GRANT ALL PRIVILEGES ON agendav.* TO 'agendav'@'localhost';
  mysql> FLUSH PRIVILEGES;
  mysql> ^D
 
@@ -120,19 +132,19 @@ Web server configuration
 
 It is recommended to read the `Slim 4 Web Servers guide
 <https://www.slimframework.com/docs/v4/start/web-servers.html>`_ to learn how to configure your preferred web
-server software to serve AgenDAV. Just make sure to point your web server to the ``web/public``
+server software to serve AgenDAV. Just make sure to point your web server to the ``public/``
 subdirectory.
 
 Being Apache one of the most used web servers, a sample configuration is shown below for reference::
 
  <VirtualHost 1.2.3.4:443>
   ServerAdmin admin@email.host
-  DocumentRoot /path/to/agendav/web/public
+  DocumentRoot /path/to/agendav/public
   ServerName agendav.host
   ErrorLog logs/agendav_error_log
   CustomLog logs/agendav_access_log common
 
-  <Directory /path/to/agendav/web/public>
+  <Directory /path/to/agendav/public>
     Options +FollowSymLinks
     AllowOverride All
   </Directory>
@@ -149,7 +161,7 @@ A sample Nginx configuration is shown below::
  server {
      listen 443 ssl;
      server_name agendav.host;
-     root /path/to/agendav/web/public;
+     root /path/to/agendav/public;
 
      location ~ \.php$ {
          try_files      $uri =404;
@@ -175,16 +187,16 @@ You should change the owner and group for all AgenDAV files to the ones your web
 Make sure you allow your webserver user to write on the ``var/`` directory. The following example
 assumes your web server runs as `www-data` user and `www-data` group::
 
-  # chown -R www-data:www-data web/
-  # chmod -R 750 web/var/
+  # chown -R www-data:www-data .
+  # chmod -R 750 var/
 
 Configuration
 -------------
 
-A ready-to-edit template is provided at ``web/config/settings.template.php``. Copy it to
-``web/config/settings.php`` and adjust the values for your setup::
+A ready-to-edit template is provided at ``config/settings.template.php``. Copy it to
+``config/settings.php`` and adjust the values for your setup::
 
-  $ cp web/config/settings.template.php web/config/settings.php
+  $ cp config/settings.template.php config/settings.php
 
 Then follow the :doc:`configuration` section for a description of every option.
 

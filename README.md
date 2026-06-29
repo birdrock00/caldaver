@@ -12,6 +12,21 @@ users to manage their own calendars and shared ones.
 
 ![Screenshot](./docs/screenshot.png)
 
+## Features
+
+- Calendar views - Month, Week, Day, and List
+- Event management - create, edit, duplicate, and delete events
+- Drag and drop - move events to a new time slot or day, resize to adjust duration
+- Recurring events - create and edit repeating events with recurrence rules
+- Reminders - per-event reminders with a configurable default for new events
+- Calendar delegations - access calendars delegated by other users (read or read/write)
+- iCal subscriptions - subscribe to external iCal feeds
+- User preferences - each user may set language, timezone, week start, hide weekends and working hours
+- Auto-refresh - calendar data refreshes automatically every 5 minutes
+- Multi-language - localized UI with fallback to English
+- Multiple CalDAV backends - works with Baikal, DAViCal, Radicale, Nextcloud, and others
+- Multiple database backends - MySQL, PostgreSQL, SQLite
+
 ## Requirements
 
 AgenDAV requires:

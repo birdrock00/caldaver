@@ -3,146 +3,149 @@
 Upgrading
 =========
 
-Before starting this process, **make sure you have a backup** of your current
-AgenDAV directory, specially the ``config/`` directory, and a dump of your
-database schema and contents.
+General upgrade procedure
+--------------------------
 
-Please, do not continue unless you have both backups.
+Follow these steps for every upgrade, regardless of version. Version-specific
+steps (if any) are listed in the sections below - check those before starting.
 
-Read all the :ref:`releasenotes` starting at the version you are currently using, because some
-important changes may have happened. Apply those changes after updating the files from AgenDAV.
+1. **Back up your data**
 
-Make sure your system meets the requirements before upgrading. Read the :ref:`requirements` section.
+   Back up the ``config/`` directory and take a dump of your database. Do not
+   continue without both backups.
 
-Upgrading from 2.x.x
---------------------
+2. **Download the new release**
 
-The directory layout changed in this release. Three manual steps are required:
+   Download the new release from `GitHub <https://github.com/agendav/agendav/releases>`_
+   and extract it next to your current installation::
 
-1. **Web server document root** - change the document root from ``web/public/``
-   to ``public/``.
+     $ tar xf agendav-X.Y.Z.tar.gz
+     $ cd agendav-X.Y.Z/
 
-2. **Configuration file** - move your ``web/config/settings.php`` to
-   ``config/settings.php``.
+3. **Restore your configuration**
 
-3. **Database connection** - Doctrine DBAL 4 removed the ``url`` shorthand.
-   Replace the ``url`` key in ``db.options`` with explicit parameters::
+   Copy your existing settings file into the new directory::
 
-     'db.options' => [
-         'driver'   => 'pdo_mysql',
-         'host'     => 'localhost',
-         'dbname'   => 'agendav',
-         'user'     => 'agendav',
-         'password' => 'secret',
-     ],
+     $ cp /path/to/old_agendav/config/settings.php config/settings.php
 
-Upgrading from 1.x.x
---------------------
+4. **Install dependencies**
 
-If you are upgrading AgenDAV from 1.x.x, make sure you have the latest 1.x release
-installed.
+   ::
 
-The just follow the steps below. You will also have to update your web server configuration (see :ref:`webserver`).
+     $ composer install --no-dev
 
-.. _filesupgrade:
+5. **Fix directory permissions**
 
-Upgrade AgenDAV code
---------------------
+   ::
 
-a) Updating from a tar.gz file
-******************************
+     # chown -R www-data:www-data .
+     # chmod -R 750 var/
 
-After downloading the new tar.gz file and uncompressing it, copy your
-configuration files from the old directory::
+6. **Run database migrations**
 
-  $ cp -a /path/to/old_agendav/config/settings.php \
-    /path/to/new/agendav/config/
+   ::
 
-This will only work if you are upgrading from AgenDAV 2.x, as older releases
-used different configuration files.
+     $ php bin/agendavcli migrations:migrate
 
-b) Updating from git
-********************
+7. **Clear caches and sessions**
 
-If you downloaded AgenDAV from the git repository at GitHub then you can
-checkout latest stable release from the ``master`` branch, or an specific
-version using its tag.
+   ::
 
-Just pull latest changes and checkout the release you want. For example,
-checking out AgenDAV 2.0.0 can be achieved with::
+     $ php bin/agendavcli cache:purge
 
-  $ git pull
-  [...]
-  $ git checkout 2.0.0
+   To clear only caches without ending active sessions::
 
-Next step is downloading latest AgenDAV dependencies using Composer. If you
-already have Composer installed, just run::
+     $ php bin/agendavcli cache:clear
 
- $ composer install
+8. **Review new settings**
 
-If you are upgrading from AgenDAV 1.2.x, you will need to install Composer.
-Follow the instructions you'll find in the installation section.
-
-.. _dbupgrade:
-
-Database upgrade
-----------------
-
-The database upgrade process included in AgenDAV lets you
-apply the latest schema changes without having to deal with ``.sql`` files
-and with no need to check which files you should apply to your current
-version.
-
-Follow the guide at :ref:`configuration` to create a new ``settings.php`` file inside
-``config/`` which contains at least the database connection details.
-
-Once you have your database configuration prepared, run the provided ``bin/agendavcli`` script this
-way::
-
-  $ php bin/agendavcli migrations:migrate
-
-Clear sessions and caches
--------------------------
-
-Run the following command to remove all active sessions and clear all caches::
-
-  $ php bin/agendavcli cache:purge
-
-If you only want to clear the template and database cache without affecting
-active sessions, use::
-
-  $ php bin/agendavcli cache:clear
-
-Finishing the upgrade from AgenDAV 1.2.x (shares)
--------------------------------------------------
-
-If you were using calendar sharing, there is an additional step required to complete the upgrade.
-The schema upgrading process from AgenDAV 1.2.x can't handle the upgrade for the ``shares`` table.
-The old table schema makes hard to apply a clean migration, so you have to run a query to adapt the
-shares data to the new expected format.
-
-The following queries will change the ``shares`` table for a DAViCal server, but can be adapted for
-other CalDAV servers.
+   Check the :doc:`configuration` section and ``config/default.settings.php``
+   for any new optional settings introduced in the release (new features,
+   new CalDAV options, etc.).
 
 
-MySQL
-*****
+Version-specific steps
+-----------------------
 
-Run the following SQL queries::
+Upgrading from 2.x to 3.x
+**************************
 
-    UPDATE `shares` SET owner = CONCAT('/caldav.php/', owner, '/'),
-    calendar = CONCAT(owner, calendar, '/'),
-    `with` = CONCAT('/caldav.php/', `with`, '/');
+3.0 contains several breaking changes that require manual steps in addition
+to the general procedure above.
 
-    UPDATE `shares` SET options = 'a:0:{}' WHERE options = '';
+**PHP version**
 
-PostgreSQL
-**********
+PHP 8.5 or later is now required. Verify your server version before upgrading::
 
-Run the following SQL queries::
+  $ php --version
 
-    UPDATE shares SET owner = '/caldav.php/' || owner || '/',
-    calendar = '/caldav.php/' || owner || '/' || calendar || '/',
-    "with" = '/caldav.php/' || "with" || '/';
+**Web server document root**
+
+The ``web/`` subdirectory was removed. Change your web server document root
+from ``web/public/`` to ``public/``. See :ref:`webserver` for updated
+configuration examples.
+
+**Configuration file location**
+
+Move your settings file from the old path to the new one::
+
+  $ mv web/config/settings.php config/settings.php
+
+You only need to store settings which differ from defaults in ``config/default.settings.php``.
+You may copy and adapt the ``config/settings.template.php`` file instead of moving your old settings file if you prefer.
+
+**Database connection configuration**
+
+The ``url`` shorthand in ``db.options`` is no longer supported. Replace it
+with explicit keys::
+
+  'db.options' => [
+      'driver'   => 'pdo_mysql',
+      'host'     => 'localhost',
+      'dbname'   => 'agendav',
+      'user'     => 'agendav',
+      'password' => 'secret',
+  ],
+
+See ``config/default.settings.php`` for all available options.
+
+**Clear the var/ directory**
+
+The internal cache format changed. Delete the contents of ``var/`` before
+starting the new version::
+
+  $ rm -rf var/*
+
+
+Upgrading from 1.x to 2.x
+**************************
+
+AgenDAV 2.0 was a complete rewrite. The configuration format changed
+entirely - you will need to create a new ``config/settings.php`` from
+scratch using ``config/settings.template.php`` as a starting point.
+
+Make sure you are running the latest 1.x release before upgrading.
+
+**Calendar shares migration**
+
+If you were using calendar sharing, the ``shares`` table requires a manual
+data migration after running the database migrations. The queries below assume
+a DAViCal server - adjust the URL prefix for other CalDAV servers.
+
+MySQL::
+
+    UPDATE `shares`
+    SET owner    = CONCAT('/caldav.php/', owner, '/'),
+        calendar = CONCAT(owner, calendar, '/'),
+        `with`   = CONCAT('/caldav.php/', `with`, '/');
 
     UPDATE `shares` SET options = 'a:0:{}' WHERE options = '';
+
+PostgreSQL::
+
+    UPDATE shares
+    SET owner    = '/caldav.php/' || owner || '/',
+        calendar = '/caldav.php/' || owner || '/' || calendar || '/',
+        "with"   = '/caldav.php/' || "with" || '/';
+
+    UPDATE shares SET options = 'a:0:{}' WHERE options = '';
