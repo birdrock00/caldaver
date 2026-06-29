@@ -90,7 +90,8 @@ $translations = [
     'labels.newcalendar' => 'Nouveau calendrier',
     'labels.modifycalendar' => 'Modifier le calendrier',
     'labels.deletecalendar' => 'Supprimer le calendrier',
-
+    'labels.unsubscribe' => 'Se désabonner',
+    
     'labels.createevent' => 'Créer un événement',
     'labels.editevent' => 'Éditer un événement',
     'labels.deleteevent' => 'Supprimer l\'événement',
@@ -104,9 +105,12 @@ $translations = [
     'labels.close' => 'Fermer',
     'labels.save' => 'Enregistrer',
     'labels.create' => 'Créer',
+    'labels.create_calendar' => 'Nouveau calendrier',
     'labels.subscribe' => 'S\'abonner',
+    'labels.subscribe_ical' => 'S\'abonner a un flux iCal',
     'labels.login' => 'Se connecter',
     'labels.logout' => 'Se déconnecter',
+    'labels.duplicate' => 'Dupliquer',
     'labels.modify' => 'Modifier',
     'labels.cancel' => 'Annuler',
     'labels.yes' => 'Oui',
@@ -130,9 +134,14 @@ $translations = [
 
     'labels.preferences' => 'Préférences',
     'labels.return' => 'Retour',
-
+    'labels.save_and_return' => 'Sauvegarder et retourner au calendrier',
+    'labels.discard_changes' => 'Annuler',
+    
     'labels.defaultcalendar' => 'Calendrier par défaut',
     'labels.default_view' => 'Vue par défaut',
+    'labels.hide_weekends' => 'Masquer les weekends',
+    'labels.working_hours' => 'Heures ouvrables',
+    'labels.default_reminder' => 'Rappel par défaut',
 
     'labels.toggleallcalendars' => 'Tout afficher/masquer',
 
@@ -181,6 +190,7 @@ $translations = [
 
 // Messages
     'messages.error_auth' => 'Nom d\'utilisateur ou mot de passe invalide',
+    'messages.error_no_caldav' => 'La connexion a réussi mais le serveur ne semble pas être un serveur CalDAV',
     'messages.error_denied' => 'Le serveur a refusé votre requête (permission refusée)',
 
     'messages.info_confirmcaldelete' => 'Êtes-vous sûr(e) de vouloir suppimer le calendrier suivant?',
@@ -218,9 +228,12 @@ $translations = [
     'messages.error_network_issues' => 'Erreur de communication avec le serveur. Veuillez réessayer ultérieurement.',
     'messages.error_shareunknownusers' => 'Certains des utilisateurs que vous avez spécifié n\'existent pas',
     'messages.error_empty_fields' => 'Certains champs requis sont vides',
+    'messages.error_calendar_readonly' => 'Calendrier en lecture seule',
 
     'messages.help_defaultcalendar' => 'Par défaut, les nouveaux événements seront placés dans ce calendrier. Choisissez votre calendrier le plus utilisé.',
     'messages.help_default_view' => 'Vue par défaut ouverte lors de l\'accès à votre calendrier',
+    'messages.help_working_hours' => 'Limitez la plage horaire affichée dans les vues Semaine et Jour. Laissez les deux champs vides pour afficher la journée entière.',
+    'messages.help_default_reminder' => 'Une fois cette option activée, ce rappel sera automatiquement renseigné pour les nouveaux événements. Laissez le champ nombre vide pour désactiver cette fonction.',
     'messages.help_timezone' => 'Choisissez votre fuseau horaire. Cela modifiera l\'affichage des évènements existants et les nouveaux évènements seront créés avec ce fuseau horaire.',
     'messages.help_list_days' => 'Choisir combien de jours consécutifs seront affichés dans la vue "liste"',
 
