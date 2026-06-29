@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.3.0] - 2026-06-29
+
+- FEATURE Display delegated / proxied calendars (#40) - Thanks to @tomabrafix
+- FEATURE Handle read-only calendars - hide action buttons and prevent writes
+- FEATURE Add DD.MM.YYYY date format option (#349)
+- FEATURE Add cache:clear and cache:purge CLI commands
+- FEATURE Replace preference action buttons
+- FEATURE Replace ext-sodium with ext-openssl for password encryption (#345)
+- FEATURE Show distinct error when CalDAV server URL is not a CalDAV endpoint
+- FEATURE Replace inline JS config with JSON to satisfy strict CSP policies (#358)
+- FEATURE Drop calendar-access requirement in authentication
+- BUGFIX Fix SSO/reverse-proxy setups broken by separate jssettings.js request - Thanks to @madtibo
+
 ## [3.2.0] - 2026-06-09
 
 - FEATURE Add duplicate event action
