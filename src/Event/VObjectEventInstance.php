@@ -368,6 +368,9 @@ class VObjectEventInstance implements EventInstance
     */
     public function setRepeatRule($rrule)
     {
+        if (strncasecmp($rrule, 'RRULE:', 6) === 0) {
+            $rrule = substr($rrule, 6);
+        }
         $this->setProperty('RRULE', $rrule);
     }
 
