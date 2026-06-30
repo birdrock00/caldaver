@@ -82,7 +82,17 @@ class Client
     **/
     public function setAuthentication($username, $password, $type = 'basic')
     {
-        $this->options['auth'] = [$username, $password, $type];
+        if ($type === 'digest') {
+            // With CURLAUTH_DIGEST, cURL first sends the request with an empty body to get
+            // the server's auth challenge. SabreDAV >= 3.2 tries to parse that empty body
+            // and returns 500 by design however (see sabre-io/dav#932).
+            // When we use the CURLAUTH_ANY option in Guzzle instead, then cURL still picks the correct
+            // scheme eventually and goes on but without the empty-body probe (#191).
+            $this->options['curl'][\CURLOPT_HTTPAUTH] = \CURLAUTH_ANY;
+            $this->options['curl'][\CURLOPT_USERPWD] = $username . ':' . $password;
+        } else {
+            $this->options['auth'] = [$username, $password, $type];
+        }
     }
 
     /**

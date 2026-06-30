@@ -121,6 +121,31 @@ class ClientTest extends TestCase
         );
     }
 
+    public function testDigestAuthBypassesGuzzleAuthOptions()
+    {
+        $guzzle = new GuzzleClient();
+        $client = new Client($guzzle);
+        $client->setAuthentication('user', 'pass', 'digest');
+
+        $options = (new \ReflectionProperty(Client::class, 'options'))->getValue($client);
+
+        $this->assertSame(\CURLAUTH_ANY, $options['curl'][\CURLOPT_HTTPAUTH]);
+        $this->assertSame('user:pass', $options['curl'][\CURLOPT_USERPWD]);
+        $this->assertArrayNotHasKey('auth', $options);
+    }
+
+    public function testBasicAuthUsesGuzzleAuthOptions()
+    {
+        $guzzle = new GuzzleClient();
+        $client = new Client($guzzle);
+        $client->setAuthentication('user', 'pass', 'basic');
+
+        $options = (new \ReflectionProperty(Client::class, 'options'))->getValue($client);
+
+        $this->assertSame(['user', 'pass', 'basic'], $options['auth']);
+        $this->assertArrayNotHasKey('curl', $options);
+    }
+
     protected function createClient(array $mocked_responses)
     {
         $mock = new MockHandler($mocked_responses);
