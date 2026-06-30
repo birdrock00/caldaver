@@ -22,6 +22,7 @@ namespace AgenDAV\Controller\Event;
  */
 
 use AgenDAV\Controller\JSONController;
+use AgenDAV\Exception\PermissionDenied;
 use AgenDAV\CalDAV\Resource\Calendar;
 use AgenDAV\DateHelper;
 use AgenDAV\Event\FullCalendarEvent;
@@ -77,7 +78,13 @@ class Listing extends JSONController
         if ($calendar->isSubscribed()) {
             $objects = $this->client->fetchObjectsOnSubscribedCalendar($calendar);
         } elseif (!$input->has('uid')) {
-            $objects = $this->client->fetchObjectsOnCalendar($calendar, $start_string, $end_string);
+            try {
+                $objects = $this->client->fetchObjectsOnCalendar($calendar, $start_string, $end_string);
+            } catch (PermissionDenied $e) {
+                // When a (delegated) calendar is readable but denies access to events,
+                // then prevent a verbose error and return an empty calendar events object instead
+                return $this->serializeFullCalendarEvents([], $timezone, $response);
+            }
         } else {
             $object = $this->client->fetchObjectByUid($calendar, $input->get('uid'));
             $objects = [$object];
