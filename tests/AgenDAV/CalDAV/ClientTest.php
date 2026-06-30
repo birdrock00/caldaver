@@ -402,6 +402,57 @@ BODY;
         );
     }
 
+    public function testGetCalendarsFiltersNoReadPrivilege()
+    {
+        $body = <<<BODY
+<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/">
+  <d:response>
+    <d:href>/calendars/toto/</d:href>
+    <d:propstat>
+    <d:prop>
+        <d:resourcetype><d:collection/></d:resourcetype>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/calendars/toto/work/</d:href>
+    <d:propstat>
+    <d:prop>
+        <d:displayname>Work</d:displayname>
+        <cs:getctag>10</cs:getctag>
+        <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>
+        <d:current-user-privilege-set>
+        <d:privilege><d:read/></d:privilege>
+        </d:current-user-privilege-set>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+  <d:response>
+    <d:href>/calendars/toto/private/</d:href>
+    <d:propstat>
+    <d:prop>
+        <d:displayname>Private</d:displayname>
+        <cs:getctag>20</cs:getctag>
+        <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>
+        <d:current-user-privilege-set/>
+    </d:prop>
+    <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>
+BODY;
+        $response = new Response(207, [], Utils::streamFor($body));
+        $client = $this->createCalDAVClient($response);
+        $calendars = $client->getCalendars('/calendars/toto/');
+
+        $this->assertCount(1, $calendars);
+        $this->assertArrayHasKey('/calendars/toto/work/', $calendars);
+        $this->assertArrayNotHasKey('/calendars/toto/private/', $calendars);
+    }
+
     public function testCreateCalendar()
     {
         $response = new Response(201);

@@ -230,14 +230,26 @@ class Client
             }
 
             if ($properties['{DAV:}resourcetype']->is('{urn:ietf:params:xml:ns:caldav}calendar')) {
-                $calendars[$href] = new Calendar($href, $properties);
-
-                if (isset($properties['{DAV:}current-user-privilege-set'])) {
+                if (array_key_exists('{DAV:}current-user-privilege-set', $properties)) {
+                    // In case of proxied calendars the original owner may have blocked access to a specific calendar
+                    // for the current user. That's why we need to check for empty privilege sets or read-access before.
                     $privilegeSet = $properties['{DAV:}current-user-privilege-set'];
+                    if ($privilegeSet === null) {
+                        continue;
+                    }
+                    $isReadable = $privilegeSet->has('{DAV:}all') || $privilegeSet->has('{DAV:}read');
+                    if (!$isReadable) {
+                        continue;
+                    }
+                    // Check for write access to show/hide event action buttons later (add/modify/duplicate/delete)
                     $isWritable = $privilegeSet->has('{DAV:}all')
                         || $privilegeSet->has('{DAV:}write')
                         || $privilegeSet->has('{DAV:}write-content');
+                    $calendars[$href] = new Calendar($href, $properties);
                     $calendars[$href]->setWritable($isWritable);
+                } else {
+                    // No privilege set returned by CALDAV server - include the calendar as-is
+                    $calendars[$href] = new Calendar($href, $properties);
                 }
             }
         }
