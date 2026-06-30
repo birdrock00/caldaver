@@ -26,17 +26,16 @@ implement it.
 
 ## Translation
 
-AgenDAV uses [Transifex](https://www.transifex.com/adobo/agendav/) for translations.
-
-Have a look at [Transifex documentation](http://docs.transifex.com/) for more information about
-adding a new language or upadting an existing translation.
+Translation files are PHP files in `resources/private/lang/`. The English file
+`en.php` is the source of truth - compare against it when adding or updating a
+translation. To add a new language, copy `en.php` to `<locale>.php` and translate
+the string values, keeping the PHP array key names unchanged.
 
 ## Documentation
 
 Documentation is automatically generated and placed on https://agendav.readthedocs.io/.
-Updating the documentation requires some [Sphinx](http://sphinx-doc.org/) knowledge.
 
-Have a look at the `docs/` directory.
+All documentation is written in reStructuredText format and stored in the `docs/source/` directory.
 
 ## Contributing code
 
