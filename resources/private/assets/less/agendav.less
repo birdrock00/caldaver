@@ -132,11 +132,13 @@ div.panel-body .buttons {
 
 
 .calendar_list {
-  ul, li {
+  ul {
     cursor: default;
   }
 
   li {
+    cursor: pointer;
+
     width: inherit;
     display: block;
     text-overflow: ellipsis;
@@ -297,10 +299,6 @@ div.selecthelper {
   filter: ~"alpha(opacity=50)";
   opacity: 0.5;
   zoom: 1;
-}
-
-.fc-button {
-  cursor: default !important;
 }
 
 .fc-event {
