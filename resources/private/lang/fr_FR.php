@@ -91,7 +91,7 @@ $translations = [
     'labels.modifycalendar' => 'Modifier le calendrier',
     'labels.deletecalendar' => 'Supprimer le calendrier',
     'labels.unsubscribe' => 'Se désabonner',
-    
+
     'labels.createevent' => 'Créer un événement',
     'labels.editevent' => 'Éditer un événement',
     'labels.deleteevent' => 'Supprimer l\'événement',
@@ -136,7 +136,7 @@ $translations = [
     'labels.return' => 'Retour',
     'labels.save_and_return' => 'Sauvegarder et retourner au calendrier',
     'labels.discard_changes' => 'Annuler',
-    
+
     'labels.defaultcalendar' => 'Calendrier par défaut',
     'labels.default_view' => 'Vue par défaut',
     'labels.hide_weekends' => 'Masquer les weekends',

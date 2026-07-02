@@ -131,6 +131,7 @@ $translations = [
     'labels.access' => 'Zugriff',
     'labels.readonly' => 'Nur Lesen',
     'labels.readandwrite' => 'Lesen und Schreiben',
+    'labels.calendar_not_readable' => 'Dieser Kalender konnte nicht gelesen werden - der Zugriff wurde möglicherweise entzogen',
 
     'labels.preferences' => 'Einstellungen',
     'labels.return' => 'Zurück',

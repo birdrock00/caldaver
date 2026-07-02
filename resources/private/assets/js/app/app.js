@@ -1314,8 +1314,13 @@ var generate_event_source = function generate_event_source(calendar, is_subscrib
         is_subscribed: is_subscribed
       },
       error: function (jqXHR, textStatus, errorThrown) {
-        show_error(t('messages', 'error_interfacefailure'),
-            t('messages', 'error_loadevents', { '%cal' : calendar }));
+        if (jqXHR.status === 403) {
+          mark_calendar_warning($('.calendar_list [data-calendar-url="' + calendar + '"]'),
+              t('labels', 'calendar_not_readable'));
+        } else {
+          show_error(t('messages', 'error_interfacefailure'),
+              t('messages', 'error_loadevents', { '%cal' : calendar }));
+        }
       }
   };
 
@@ -2052,6 +2057,19 @@ var toggle_calendar = function toggle_calendar(calendar_obj) {
   } else {
     hide_calendar(calendar_obj);
   }
+};
+
+// Show warning - Grays out a calendar and shows a warning icon with a given tooltip message
+var mark_calendar_warning = function mark_calendar_warning(calendar_obj, message) {
+  hide_calendar(calendar_obj);
+
+  var icon = calendar_obj.find('i.calendar_warning');
+  if (icon.length === 0) {
+    icon = $('<i>').addClass('calendar_warning fa fa-exclamation-triangle');
+    calendar_obj.find('span.icons').prepend(icon);
+  }
+  icon.attr('title', message);
+  calendar_obj.attr('title', message);
 };
 
 // Gets csrf token value

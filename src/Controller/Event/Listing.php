@@ -81,9 +81,11 @@ class Listing extends JSONController
             try {
                 $objects = $this->client->fetchObjectsOnCalendar($calendar, $start_string, $end_string);
             } catch (PermissionDenied $e) {
-                // When a (delegated) calendar is readable but denies access to events,
-                // then prevent a verbose error and return an empty calendar events object instead
-                return $this->serializeFullCalendarEvents([], $timezone, $response);
+                $this->container->get('monolog')->warning(sprintf(
+                    'Calendar %s is readable but access to events was denied',
+                    $input->get('calendar')
+                ));
+                return $response->withStatus(403);
             }
         } else {
             $object = $this->client->fetchObjectByUid($calendar, $input->get('uid'));
