@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.3.1] - 2026-07-02
+
+- BUGFIX Remove dead Transifex translations, document manual translation process (#370)
+- BUGFIX Add missing french translations (#369) - Thanks to @adri-M
+- BUGFIX Skip blocked proxied calendars (#368)
+- BUGFIX Skip blocked calendar events (#368)
+- BUGFIX Show warning icon on unreadable delegated calendars (#368) - Thanks to @adri-M
+- BUGFIX Strip redundant RRULE in recurring events (#367)
+- BUGFIX Replace empty-body probe in digest authentication (#191, #364)
+- BUGFIX Change cursor on all action links
+
 ## [3.3.0] - 2026-06-29
 
 - FEATURE Display delegated / proxied calendars (#40) - Thanks to @tomabrafix

@@ -93,14 +93,11 @@ All notable changes made between each release are documented in the
 
 ### New Releases
 
-Manual release steps done by project maintainers.
+Manual release steps done by project maintainers. The base PHP version and
+docker/smoke-test prerequisites are the same as described in
+[Contributing code](#contributing-code) above.
 
 - Checkout latest »development« branch and rebase against »main«
-- Use the projects base PHP version, stored in the
-  [.php-version](https://packagist.org/packages/webit-de/php-version-pickup)
-  file (or run `php-version-pickup use`)
-- Create test build runing `npm ci && npm run-script build`
-- Run code quality tools
 - Compare the »development« branch to »main«
   - Add a list of noteworthy features and bugfixes to CHANGELOG.md
   - Describe breaking changes in CHANGELOG.md
@@ -109,18 +106,21 @@ Manual release steps done by project maintainers.
   - `docs/source/conf.py`
   - `package.json`
   - `src/Version.php`
-- Run `bash docker/smoke-test.sh` to verify the stack
+- Run `composer lint` (eclint + php-cs-fixer) to check code style
+- Run `bash docker/smoke-test.sh` to verify the stack; this already builds
+  the frontend assets as part of bringing the stack up
 - Create a release commit
   ([example commit](https://github.com/agendav/agendav/commit/7d2f1bba00deb090943f14bf9c47c4a6ac4d1387))
 - Merge »development« branch to »main«
 - Tag the »main« branch with the new version
 - Push branch and tag
-- Update the documentation & website
-- Add release download file to release page
+- Update the documentation
+  - Run a new release in [ReadTheDocs](https://readthedocs.org/projects/agendav/builds/)
+- Build and upload the release download file
   - Clone the git repository using
     `git clone -b <version> https://github.com/agendav/agendav.git agendav-<version>`
   - Prepare the build version scripts `nvm use && php-version-pickup use`
-  - Run `npm ci && npm run-script dist`
+  - Run `npm ci && npm run dist`
     - Creates build files in `public/dist/css/`, `public/dist/js/`
       and `vendor/`
     - Removes `.git`, `node_modules`
