@@ -1437,3 +1437,321 @@ body.calendar-empty #calendar_view::after {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
+
+// Etar calendar surface. Every selector is doubly guarded by the calendar page
+// body class and phone breakpoint: desktop Calendar, Contacts, and Mail cannot
+// inherit any of these rules.
+@media (max-width: 900px) {
+  body.caldaver-calendar-page {
+    color: #333;
+    background: #fafafa;
+
+    // Etar's compact Material toolbar (56dp plus the device status inset).
+    .caldaver-topbar.navbar {
+      min-height: ~"calc(56px + env(safe-area-inset-top))";
+      padding: 0;
+      background: #41c3b1;
+
+      .container-fluid {
+        min-height: ~"calc(56px + env(safe-area-inset-top))";
+      }
+
+      .navbar-brand { height: 56px; }
+
+      #mobile_calendar_toolbar_date {
+        font-size: 20px;
+        font-weight: 500;
+      }
+
+      #mobile_calendar_toolbar_day {
+        color: rgba(255, 255, 255, .78);
+        font-size: 13px;
+      }
+    }
+
+    .calendar-shell {
+      min-height: ~"calc(100vh - 56px - env(safe-area-inset-top))";
+      min-height: ~"calc(100dvh - 56px - env(safe-area-inset-top))";
+    }
+
+    // Etar has one app toolbar and a FAB; Caldaver's shared application tabs,
+    // quick chips and experimental calendar action bar are not part of Etar.
+    #mobile_bottom_bar,
+    .caldaver-bottom-tabs,
+    .calendar-quick-chips,
+    #mobile_fab_add,
+    .mobile-drawer-toggle {
+      display: none !important;
+    }
+
+    #content {
+      padding-bottom: 0 !important;
+    }
+
+    #shortcut_add_event.create-event-button {
+      right: ~"calc(16px + env(safe-area-inset-right))";
+      bottom: ~"calc(16px + env(safe-area-inset-bottom))";
+      width: 56px;
+      min-width: 56px;
+      height: 56px;
+      color: transparent;
+      background: #1dc1ab;
+      border: 0;
+      border-radius: 50%;
+      box-shadow: 0 3px 5px -1px rgba(0, 0, 0, .2), 0 6px 10px 0 rgba(0, 0, 0, .14), 0 1px 18px 0 rgba(0, 0, 0, .12);
+
+      i { color: #fff; }
+
+      &:active { background: #19aa97; }
+    }
+
+    #calendar_view {
+      color: #333;
+      background: #fff;
+      font-family: Roboto, Arial, sans-serif;
+    }
+
+    // Etar agenda day bars: 48dp high with 12sp weekday and 24sp date.
+    #calendar_view .fc-list-heading td {
+      min-height: 48px;
+      padding: 4px 16px 0;
+      background: #fff;
+      border-color: #bbb;
+    }
+
+    #calendar_view .fc-list-heading-main {
+      color: #666;
+      font-size: 12px;
+      line-height: 16px;
+      text-transform: none;
+    }
+
+    #calendar_view .fc-list-heading-alt {
+      color: #666;
+      font-size: 24px;
+      font-weight: 400;
+      line-height: 28px;
+    }
+
+    // Etar agenda rows are a minimum 64dp and use a 24dp calendar colour chip.
+    #calendar_view .fc-list-item {
+      display: grid;
+      min-height: 64px;
+      grid-template-columns: 48px minmax(0, 1fr);
+      padding: 8px 0;
+      background: #fff !important;
+      border: 0;
+      border-bottom: 1px solid #bbb;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    #calendar_view .fc-list-item-marker {
+      grid-column: 1;
+      grid-row: 1 / span 2;
+      padding: 0 8px 0 16px;
+      background: transparent !important;
+      border: 0;
+
+      .fc-event-dot {
+        width: 24px;
+        height: 24px;
+        margin: 0;
+        border-radius: 2px;
+      }
+    }
+
+    #calendar_view .fc-list-item-title {
+      grid-column: 2;
+      grid-row: 1;
+      padding: 0 16px 0 0;
+      color: #333;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 22px;
+    }
+
+    #calendar_view .fc-list-item-time {
+      grid-column: 2;
+      grid-row: 2;
+      padding: 0 16px 0 0;
+      color: #666;
+      font-size: 14px;
+      line-height: 18px;
+    }
+
+    // Etar month palette and dimensions from full_month_header/month resources.
+    #calendar_view .fc-month-view {
+      background: #f2f2f2;
+    }
+
+    #calendar_view .fc-month-view .fc-day-header {
+      height: 26px;
+      padding: 5px 6px;
+      color: #757575;
+      background: #fff;
+      border: 0;
+      font-size: 12px;
+      font-weight: 400;
+      text-align: right;
+    }
+
+    // Etar month_focus_month_bgcolor: focused-month cells are white; only
+    // adjacent-month cells use the gray fill applied further below.
+    #calendar_view .fc-month-view .fc-day,
+    #calendar_view .fc-month-view .fc-day-top {
+      background: #fff;
+      border-color: #dedede;
+    }
+
+    // Etar's month resources use a translucent green wash for today, a
+    // slightly darker fill for days outside the focused month, teal week
+    // numbers, and muted other-month dates.
+    #calendar_view .fc-month-view .fc-today {
+      // Etar's Android ARGB #25a2ff00 == 14.5% alpha over lime-green.
+      background: #25a2ff00 !important;
+      background: rgba(162, 255, 0, .145) !important;
+    }
+
+    // Etar indicates today with the cell wash above, not Caldaver's circular
+    // blue date badge. Cover both FullCalendar 3 and legacy DOM shapes.
+    #calendar_view .fc-month-view td.fc-day-number.fc-today,
+    #calendar_view .fc-month-view td.fc-day-top.fc-today > .fc-day-number {
+      display: inline;
+      width: auto;
+      height: auto;
+      padding: 4px 6px;
+      color: #555 !important;
+      background: transparent !important;
+      border-radius: 0;
+      font-weight: 400;
+      line-height: normal;
+    }
+
+    #calendar_view .fc-month-view .fc-other-month,
+    #calendar_view .fc-month-view td.fc-other-month {
+      background: #eee !important;
+    }
+
+    #calendar_view .fc-month-view .fc-other-month .fc-day-number,
+    #calendar_view .fc-month-view td.fc-other-month > .fc-day-number {
+      color: #939497 !important;
+      opacity: 1;
+    }
+
+    #calendar_view .fc-month-view .fc-week-number,
+    #calendar_view .fc-month-view .fc-week-number a {
+      color: #41c3b1 !important;
+      font-weight: 500;
+    }
+
+    #calendar_view .fc-month-view .fc-day-number {
+      color: #555;
+      font-size: 14px;
+      font-weight: 400;
+      text-align: right;
+      // Etar day numbers are plain text; keep Caldaver's day links but drop
+      // the browser link underline.
+      text-decoration: none !important;
+    }
+
+    // Etar renders timed month events as flat text with a narrow calendar-color
+    // rail. FullCalendar emits .fc-time only for timed day-grid events.
+    #calendar_view .fc-month-view .fc-day-grid-event:has(.fc-time) {
+      padding: 1px 2px 1px 4px;
+      color: #333 !important;
+      background: transparent !important;
+      border: 0 !important;
+      border-left: 3px solid var(--caldaver-fc-event-color, #41c3b1) !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+
+    #calendar_view .fc-month-view .fc-day-grid-event:has(.fc-time) .fc-content,
+    #calendar_view .fc-month-view .fc-day-grid-event:has(.fc-time) .fc-time,
+    #calendar_view .fc-month-view .fc-day-grid-event:has(.fc-time) .fc-title {
+      color: #333 !important;
+      text-shadow: none;
+    }
+
+    // All-day and multi-day month events are Etar's compact, rectangular solid
+    // bars. They deliberately have no card outline, rounding, or shadow.
+    #calendar_view .fc-month-view .fc-day-grid-event:not(:has(.fc-time)) {
+      min-height: 18px;
+      padding: 1px 3px;
+      color: #fff !important;
+      background: var(--caldaver-fc-event-color, #41c3b1) !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      line-height: 16px !important;
+    }
+
+    #calendar_view .fc-month-view .fc-day-grid-event:not(:has(.fc-time)) .fc-content,
+    #calendar_view .fc-month-view .fc-day-grid-event:not(:has(.fc-time)) .fc-title {
+      color: #fff !important;
+      font-size: 12px;
+      line-height: 16px;
+      text-shadow: none;
+    }
+
+    // Etar day/week grids use 1px #ccc rules and #666 hour labels.
+    #calendar_view .fc-agenda-view .fc-slats td,
+    #calendar_view .fc-agenda-view .fc-widget-header,
+    #calendar_view .fc-agenda-view .fc-widget-content {
+      border-color: #ccc;
+    }
+
+    #calendar_view .fc-agenda-view .fc-axis {
+      color: #666;
+      background: #eee;
+      font-size: 12px;
+    }
+
+    // Etar's compact overflow popup, anchored below the toolbar overflow icon.
+    .etar-calendar-view-popup {
+      position: fixed;
+      top: ~"calc(52px + env(safe-area-inset-top))";
+      right: ~"calc(8px + env(safe-area-inset-right))";
+      z-index: 2700;
+      width: 208px;
+      padding: 8px 0;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 3px 5px -1px rgba(0, 0, 0, .2), 0 6px 10px 0 rgba(0, 0, 0, .14), 0 1px 18px 0 rgba(0, 0, 0, .12);
+    }
+
+    .etar-calendar-view-popup[hidden] { display: none; }
+
+    .etar-calendar-view {
+      display: flex;
+      width: 100%;
+      min-height: 48px;
+      align-items: center;
+      gap: 32px;
+      padding: 0 24px;
+      color: #666;
+      background: transparent;
+      border: 0;
+      border-radius: 0;
+      font-size: 14px;
+      font-weight: 500;
+      text-align: left;
+      text-decoration: none;
+    }
+
+    .etar-calendar-view i {
+      width: 24px;
+      color: #666;
+      font-size: 22px;
+      text-align: center;
+    }
+
+    .etar-calendar-view.active {
+      color: #1dc1ab;
+      background: #e6f8f5;
+
+      i { color: #1dc1ab; }
+    }
+  }
+}

@@ -125,6 +125,15 @@ wordmark, no footer).
 ### Mobile / Android
 
 - Capacitor 8 wrapper around `web/public` (no native UI of its own)
+- The mobile Calendar interface uses and adapts source code and UI concepts
+  from [Etar Calendar](https://github.com/Etar-Group/Etar-Calendar), while the
+  desktop Calendar and the Contacts and Mail interfaces remain Caldaver's own.
+  Etar is copyright 2005-2013 The Android Open Source Project, copyright 2013
+  Dominik Schürmann, and copyright 2015-present The Etar Project. Etar is
+  licensed under GPLv3 except where its source identifies Apache-2.0 material;
+  see [`LICENSES/ETAR-GPL-3.0.txt`](./LICENSES/ETAR-GPL-3.0.txt),
+  [`LICENSES/ETAR-APACHE-2.0.txt`](./LICENSES/ETAR-APACHE-2.0.txt), and
+  [`LICENSES/ETAR-NOTICE.md`](./LICENSES/ETAR-NOTICE.md).
 - First launch prompts for the Caldaver instance URL; the URL is stored on
   the device and used on subsequent launches
 - User menu exposes a **Change instance** action that clears the saved URL

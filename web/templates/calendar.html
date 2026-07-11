@@ -61,6 +61,15 @@
     <i class="fa fa-refresh" aria-hidden="true"></i>
   </div>
 
+  {# Etar view overflow. Kept outside the existing section/calendar selector so
+     that selector's appearance and calendar-account toggles remain unchanged. #}
+  <div id="etar_calendar_view_popup" class="etar-calendar-view-popup" role="menu" aria-label="Calendar view" hidden>
+    <button type="button" class="etar-calendar-view" data-etar-view="agendaDay" role="menuitemradio" aria-checked="false"><i class="fa fa-calendar-o" aria-hidden="true"></i><span>Day</span></button>
+    <button type="button" class="etar-calendar-view" data-etar-view="agendaWeek" role="menuitemradio" aria-checked="false"><i class="fa fa-columns" aria-hidden="true"></i><span>Week</span></button>
+    <button type="button" class="etar-calendar-view" data-etar-view="month" role="menuitemradio" aria-checked="false"><i class="fa fa-th" aria-hidden="true"></i><span>Month</span></button>
+    <button type="button" class="etar-calendar-view" data-etar-view="customizable_list" role="menuitemradio" aria-checked="false"><i class="fa fa-list-ul" aria-hidden="true"></i><span>Agenda</span></button>
+  </div>
+
   {# [B5] Universal "Create event" FAB. Lives at the page top level (not the
      sidebar) so it stays reachable as a fixed floating action button on every
      viewport. app.js binds #shortcut_add_event by id. #}

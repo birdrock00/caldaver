@@ -208,9 +208,8 @@ $(document).ready(function() {
       var new_height = calendar_height();
       $(this).fullCalendar('option', 'height', new_height);
       $(this).fullCalendar('option', 'header', calendar_header_for_viewport());
-      if (is_mobile_viewport() && view.name !== 'customizable_list') {
-        $(this).fullCalendar('changeView', 'customizable_list');
-      }
+      // Mobile now exposes Etar's Day / Week / Month / Agenda choices. Keep the
+      // selected view across rotation instead of forcing Agenda on every resize.
       sync_mobile_calendar_chrome(view);
       add_refresh_button();
     },
@@ -611,8 +610,12 @@ var setup_mobile_calendar_chrome = function setup_mobile_calendar_chrome() {
 
   $('#mobile_calendar_more_action').on('click', function(e) {
     e.preventDefault();
-    $('.mobile-section-menu').prop('open', true);
-    $('.topbar-menu').attr('aria-expanded', 'true');
+    var $popup = $('#etar_calendar_view_popup');
+    if ($popup.length > 0 && is_mobile_viewport()) {
+      var open = $popup.prop('hidden');
+      $popup.prop('hidden', !open);
+      $(this).attr('aria-expanded', open ? 'true' : 'false');
+    }
   });
 
   sync_mobile_calendar_chrome();
@@ -631,8 +634,30 @@ var sync_mobile_calendar_chrome = function sync_mobile_calendar_chrome(view) {
     return;
   }
 
-  $('#mobile_calendar_toolbar_date').text(date.format('MMM D, YYYY'));
-  $('#mobile_calendar_toolbar_day').text(date.format('dddd'));
+  var view_name = view && view.name;
+  if (!view_name) {
+    try { view_name = $calendar.fullCalendar('getView').name; } catch (e) { view_name = ''; }
+  }
+
+  // CalendarToolbarHandler in Etar shows Month + Year in Month/Week and a
+  // full date + weekday subtitle in Day/Agenda. This markup is mobile-only;
+  // desktop Calendar and the other application sections never render it.
+  if (is_mobile_viewport() && (view_name === 'month' || view_name === 'agendaWeek')) {
+    $('#mobile_calendar_toolbar_date').text(date.format('MMMM YYYY'));
+    $('#mobile_calendar_toolbar_day').text('');
+  } else {
+    $('#mobile_calendar_toolbar_date').text(date.format('MMM D, YYYY'));
+    $('#mobile_calendar_toolbar_day').text(date.format('dddd'));
+  }
+
+  if (is_mobile_viewport()) {
+    $('.etar-calendar-view').each(function() {
+      var active = $(this).attr('data-etar-view') === view_name;
+      $(this).toggleClass('active', active)
+        .attr('aria-pressed', active ? 'true' : 'false')
+        .attr('aria-checked', active ? 'true' : 'false');
+    });
+  }
 };
 
 var insert_mobile_previous_events_row = function insert_mobile_previous_events_row(view) {

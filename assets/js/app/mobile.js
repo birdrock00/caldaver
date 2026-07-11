@@ -88,7 +88,8 @@
 
   var VIEW_KEY = 'caldaver_mobile_view';
   // The list of views we cycle through on phones, in toggle order.
-  var MOBILE_VIEWS = ['customizable_list', 'month', 'agendaDay'];
+  // Etar exposes all four primary views in its navigation drawer.
+  var MOBILE_VIEWS = ['agendaDay', 'agendaWeek', 'month', 'customizable_list'];
 
   // ---------------------------------------------------------------------------
   // [B8] Visual "haptic" tap feedback: toggle an .is-tapping class on press so
@@ -205,6 +206,7 @@
     }
     lsSet(VIEW_KEY, name);
     updateViewButtonLabel(name);
+    syncEtarChrome(name);
   }
 
   function cycleView() {
@@ -239,6 +241,30 @@
     if ($label.length > 0) {
       $label.text(viewLabel(name || currentViewName()));
     }
+  }
+
+  function syncEtarChrome(name) {
+    var viewName = name || currentViewName() || 'customizable_list';
+    var date = fc('getDate');
+    var title = '';
+    var subtitle = '';
+
+    if (date && typeof date.format === 'function') {
+      if (viewName === 'month' || viewName === 'agendaWeek') {
+        title = date.format('MMMM YYYY');
+      } else {
+        title = date.format('MMM D, YYYY');
+        subtitle = date.format('dddd');
+      }
+    }
+    $('#mobile_calendar_toolbar_date').text(title);
+    $('#mobile_calendar_toolbar_day').text(subtitle);
+    $('.etar-calendar-view').each(function() {
+      var active = $(this).attr('data-etar-view') === viewName;
+      $(this).toggleClass('active', active)
+        .attr('aria-pressed', active ? 'true' : 'false')
+        .attr('aria-checked', active ? 'true' : 'false');
+    });
   }
 
   function restoreSavedView() {
@@ -431,63 +457,27 @@
   }
 
   // ---------------------------------------------------------------------------
-  // [B9] Collapse the sidebar / calendar list into a toggling drawer on narrow
-  // screens. We add a drawer toggle button (reusing app.js's set_sidebar_collapsed
-  // so the calendar re-renders correctly) and a scrim that closes it.
+  // Wire Etar's four view choices in the calendar overflow. The existing
+  // section/calendar selector is deliberately neither queried nor mutated.
   // ---------------------------------------------------------------------------
   function wireSidebarDrawer() {
-    var $sidebar = $('#sidebar');
-    if ($sidebar.length === 0) {
+    var $popup = $('#etar_calendar_view_popup');
+    if ($popup.length === 0) {
       return;
     }
 
-    // Start collapsed on mobile.
-    setSidebar(false);
-
-    // Scrim behind the open drawer.
-    var $scrim = $('#mobile_drawer_scrim');
-    if ($scrim.length === 0) {
-      $scrim = $('<div/>', {
-        id: 'mobile_drawer_scrim',
-        'class': 'mobile-drawer-scrim'
-      }).appendTo('body');
-      $scrim.on('click', function() { setSidebar(false); });
-    }
-
-    // Toggle button (floating, top-left) to open the calendar-list drawer.
-    var $toggle = $('#mobile_drawer_toggle');
-    if ($toggle.length === 0) {
-      $toggle = $('<button/>', {
-        type: 'button',
-        id: 'mobile_drawer_toggle',
-        'class': 'mobile-drawer-toggle',
-        'aria-label': 'Calendars',
-        title: 'Calendars'
-      })
-        .append('<i class="fa fa-list-ul" aria-hidden="true"></i>')
-        .appendTo('body');
-      addTapFeedback($toggle);
-      $toggle.on('click', debounceTap(function(e) {
-        e.preventDefault();
-        setSidebar(!$('body').hasClass('mobile-drawer-open'));
-      }, 300));
-    }
-  }
-
-  function setSidebar(open) {
-    var $sidebar = $('#sidebar');
-    $sidebar.addClass('mobile-drawer');
-    $('body').toggleClass('mobile-drawer-open', open);
-
-    // The drawer's open/closed state is driven purely by the injected CSS
-    // (body.mobile-drawer-open #sidebar). Clear any inline display app.js may
-    // have set so the CSS rule wins.
-    $sidebar.css('display', '');
-
-    // Re-render FullCalendar after the layout change so it sizes correctly.
-    if (open && calendarReady()) {
-      window.setTimeout(function() { fc('render'); }, 0);
-    }
+    $popup.find('[data-etar-view]').on('click', function() {
+      applyView($(this).attr('data-etar-view'));
+      $popup.prop('hidden', true);
+      $('#mobile_calendar_more_action').attr('aria-expanded', 'false');
+    });
+    $(document).on('click.etarCalendarViews', function(e) {
+      if ($(e.target).closest('#etar_calendar_view_popup, #mobile_calendar_more_action').length === 0) {
+        $popup.prop('hidden', true);
+        $('#mobile_calendar_more_action').attr('aria-expanded', 'false');
+      }
+    });
+    syncEtarChrome();
   }
 
   // ---------------------------------------------------------------------------
