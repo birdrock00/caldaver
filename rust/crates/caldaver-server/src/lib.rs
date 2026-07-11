@@ -31,6 +31,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::time::Duration;
 use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use uuid::Uuid;
 
@@ -457,7 +458,18 @@ pub fn build_router(state: AppState) -> Router {
             get(|| async { Json(json!({"ok": true, "backend": "rust"})) }),
         )
         .fallback_service(
-            ServeDir::new(static_root).fallback(get(not_found_page).with_state(state.clone())),
+            // Static assets are served under stable, unversioned URLs, so
+            // clients must revalidate (If-Modified-Since -> 304) instead of
+            // heuristically caching stale CSS/JS across releases.
+            tower::ServiceBuilder::new()
+                .layer(SetResponseHeaderLayer::if_not_present(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("no-cache"),
+                ))
+                .service(
+                    ServeDir::new(static_root)
+                        .fallback(get(not_found_page).with_state(state.clone())),
+                ),
         )
         .layer(TraceLayer::new_for_http())
         .with_state(state)
@@ -4546,6 +4558,31 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn static_assets_require_revalidation() {
+        let Some(state) = test_state().await else {
+            return;
+        };
+        let app = build_router(state);
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/dist/css/caldaver.css")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CACHE_CONTROL)
+                .and_then(|value| value.to_str().ok()),
+            Some("no-cache"),
+            "unversioned static asset URLs must revalidate so releases are not hidden by heuristic client caches"
+        );
     }
 
     #[tokio::test]
