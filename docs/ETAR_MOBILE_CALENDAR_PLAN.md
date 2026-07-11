@@ -291,3 +291,11 @@ Caldaver implementation files likely involved:
 6. Update the "Progress log", statuses, known failures, artifact names, commit,
    workflow run, and release verification in this document after every major
    milestone.
+- 2026-07-11: Post-release, the user still saw the old UI: static assets are
+  served at unversioned URLs with only Last-Modified, so client WebView and
+  browser caches heuristically kept the previous CSS/JS. Fixed by sending
+  `Cache-Control: no-cache` on all static responses (commit `0964ca88`, Rust
+  tests 113/113 with a new regression test). Released as `2026-07-11-234812`
+  and rolled out to the user's instance; the public route now serves the new
+  CSS with the revalidation header. Clients that cached assets before this fix
+  need one manual cache clear; afterwards releases propagate automatically.
