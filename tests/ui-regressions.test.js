@@ -402,7 +402,10 @@ test('blank credentials preserve stored secrets during account edits', () => {
   assert.match(compactRust(server), /id != 0 && form\.get\("password"\)\.is_none_or\(\|value\| value\.trim\(\)\.is_empty\(\)\)/);
   assert.match(compactRust(server), /state\.storage\.mail_account\(owner, id\)\.await/);
   assert.match(compactRust(server), /state\.storage\.dav_account_by_id\(owner, id\)\.await/);
-  assert.match(server, /Ok\(Some\(_\)\) => return Err\(json_error\(StatusCode::BAD_REQUEST, "Account type cannot be changed"\)\)/);
+  assert.match(
+    compactRust(server),
+    /Ok\(Some\(_\)\) => \{\s*return Err\(json_error\(\s*StatusCode::BAD_REQUEST, "Account type cannot be changed",?\s*\)\);\s*\}/
+  );
   assert.match(storage, /pub async fn dav_account_by_id/);
   assert.match(mailAccountJs, /password\.required = !editingStoredAccount/);
 });
