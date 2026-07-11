@@ -270,6 +270,11 @@ Caldaver implementation files likely involved:
   shell loads the user's server instance, which has not yet been redeployed
   with the new Docker image; the new mobile UI appears once that instance
   updates.
+- 2026-07-11: The user authorized redeploying their server. Its deployment
+  manifest was pinned to the immutable `2026-07-11-222043` image tag and
+  applied; the replacement pod became ready and was verified to serve the new
+  Etar mobile CSS and view-popup markup. The Android app now receives the new
+  UI from the updated instance.
 
 ## Resume checklist for another LLM
 
