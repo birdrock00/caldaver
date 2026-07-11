@@ -164,7 +164,7 @@ Caldaver implementation files likely involved:
      screenshots, Git history additions, and release notes for leaks.
    - Add README attribution to Etar and retain Etar GPLv3 plus applicable AOSP
      Apache-2.0 notices/licenses under `LICENSES/`.
-7. **Release** — in progress.
+7. **Release** — complete.
    - Review final diff and generated assets; ensure no unrelated changes.
    - Commit on `master`, push `origin` (`birdrock00/caldaver`).
    - Dispatch `.github/workflows/daily-release.yml` with an Etar mobile calendar
@@ -257,6 +257,19 @@ Caldaver implementation files likely involved:
   scan again, and installed and cold-launched (~1.5s, crash-free logcat) on the
   API 36 emulator. Phone validation remains deferred to the CI release-signed
   APK per the signature policy above.
+- 2026-07-11: Released. Commit `b4780f21` pushed to `origin/master`; workflow
+  run 29170341043 finished with all five jobs green (metadata, Docker image,
+  Android APK, iOS ipa, GitHub releases). Dated release `2026-07-11-222043`
+  titled "Etar-style mobile calendar" and the `latest` release both carry
+  `caldaver-android-2026-07-11-222043.apk` (3,853,181 bytes, sha256
+  `b7f01bf11c797748e01bdf191b972f4527db48583adfb7118228a2e793bb06f8`), verified
+  downloadable.
+- 2026-07-11: The release-signed APK installed over the phone's existing app
+  with `adb install -r` (data preserved) and cold-launched cleanly in ~0.8s.
+  The phone still renders the pre-update calendar UI because the Capacitor
+  shell loads the user's server instance, which has not yet been redeployed
+  with the new Docker image; the new mobile UI appears once that instance
+  updates.
 
 ## Resume checklist for another LLM
 
