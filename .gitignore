@@ -44,3 +44,6 @@ secrets/
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# QA artifacts (screenshots may contain personal calendar data) — never commit
+tests/qa-artifacts/
