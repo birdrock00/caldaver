@@ -1,10 +1,11 @@
 const { test, expect } = require('@playwright/test');
 
-const baseURL = process.env.CALDAVER_BASE_URL || 'https://caldaver.ky87.club';
+const baseURL = process.env.CALDAVER_BASE_URL;
 const username = process.env.CALDAVER_USERNAME;
 const password = process.env.CALDAVER_PASSWORD;
 
-test.skip(!username || !password, 'CALDAVER_USERNAME and CALDAVER_PASSWORD required');
+test.skip(!baseURL || !username || !password,
+  'CALDAVER_BASE_URL, CALDAVER_USERNAME and CALDAVER_PASSWORD required');
 
 function attachMailNetworkRecorder(page) {
   const log = [];

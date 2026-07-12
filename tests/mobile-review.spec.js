@@ -1,7 +1,7 @@
 /*
  * Caldaver mobile UI review script.
  *
- * Drives the live instance at CALDAVER_BASE_URL (default: https://caldaver.ky87.club/)
+ * Drives the live instance at CALDAVER_BASE_URL (required, no default)
  * with an iPhone-12/13/14-style viewport (390x844, DPR 3, mobile UA), then also
  * a 768x1024 tablet and a dark-mode mobile pass. Takes a Playwright screenshot
  * for every major surface, captures console errors and network failures, and
@@ -22,7 +22,10 @@ const { chromium, devices, request: pwRequest } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = process.env.CALDAVER_BASE_URL || 'https://caldaver.ky87.club';
+const BASE_URL = process.env.CALDAVER_BASE_URL;
+if (!BASE_URL) {
+  throw new Error('CALDAVER_BASE_URL is required for this live-instance review script.');
+}
 const USERNAME = process.env.CALDAVER_USERNAME;
 const PASSWORD = process.env.CALDAVER_PASSWORD;
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR ||

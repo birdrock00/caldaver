@@ -6,7 +6,10 @@ const { chromium, devices } = require('@playwright/test');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = process.env.CALDAVER_BASE_URL || 'https://caldaver.ky87.club';
+const BASE_URL = process.env.CALDAVER_BASE_URL;
+if (!BASE_URL) {
+  throw new Error('CALDAVER_BASE_URL is required for this live-instance review script.');
+}
 const USERNAME = process.env.CALDAVER_USERNAME;
 const PASSWORD = process.env.CALDAVER_PASSWORD;
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR ||
