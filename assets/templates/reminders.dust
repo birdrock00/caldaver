@@ -1,3 +1,5 @@
+<input type="hidden" name="reminders_json" value="[]" />
+
 <p class="text-center" id="no_reminders">
   {@i18n type="messages" name="info_noreminders"/}
 </p>

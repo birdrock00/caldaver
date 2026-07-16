@@ -1207,6 +1207,7 @@ mod tests {
             location: "Office".to_string(),
             description: "Stored in Postgres".to_string(),
             timezone: crate::DEFAULT_TIMEZONE.to_string(),
+            reminders: vec![],
         }
     }
 
