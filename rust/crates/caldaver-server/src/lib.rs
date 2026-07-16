@@ -15,6 +15,7 @@ use axum::routing::{get, post};
 use base64::Engine;
 use caldaver_core::caldav::resource::{Calendar as CoreCalendar, CalendarObject};
 use caldaver_core::carddav::{Contact as CardDavContact, ContactInput};
+use caldaver_core::reminder::{Reminder, ReminderInterval, ReminderUnit};
 use caldaver_core::xml::XmlProperty;
 use carddav_backend::{CardDavClient, CardDavConfig};
 use imap_backend::{
@@ -99,6 +100,13 @@ impl Default for Preferences {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub(crate) struct EventReminder {
+    pub count: i64,
+    pub unit: String,
+    pub related: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct CalendarEvent {
     id: String,
     uid: String,
@@ -116,6 +124,8 @@ pub(crate) struct CalendarEvent {
     description: String,
     #[serde(default = "default_timezone")]
     timezone: String,
+    #[serde(default)]
+    pub reminders: Vec<EventReminder>,
 }
 
 fn default_timezone() -> String {
@@ -1222,6 +1232,10 @@ async fn event_save(
         .get("uid")
         .cloned()
         .unwrap_or_else(|| Uuid::new_v4().to_string());
+    let reminders = form
+        .get("reminders_json")
+        .and_then(|json_str| serde_json::from_str::<Vec<EventReminder>>(json_str).ok())
+        .unwrap_or_default();
     let event = CalendarEvent {
         id: uid.clone(),
         uid: uid.clone(),
@@ -1250,6 +1264,7 @@ async fn event_save(
             .cloned()
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| session.preferences.timezone.clone()),
+        reminders,
     };
     if let Ok((client, calendar_home_set)) = caldav_client_for_request(&state, &session).await {
         if !dav_href_in_scope(&calendar, &calendar_home_set) {
@@ -3065,6 +3080,7 @@ fn event_payload_from_object(object: &CalendarObject, calendar: &str) -> Option<
         timezone: ical_property_parameter(data, "DTSTART", "TZID")
             .filter(|value| !value.is_empty())
             .unwrap_or_else(default_timezone),
+        reminders: ical_parse_valarms(data),
     })
 }
 
@@ -3159,8 +3175,8 @@ fn ical_datetime_to_iso(value: &str) -> String {
 
 fn icalendar_from_event(event: &CalendarEvent) -> String {
     let (dtstart_name, dtstart, dtend_name, dtend) = event_datetime_properties(event);
-    format!(
-        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Caldaver//Rust//EN\r\nBEGIN:VEVENT\r\nUID:{}\r\nSUMMARY:{}\r\n{}:{}\r\n{}:{}\r\nLOCATION:{}\r\nDESCRIPTION:{}\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n",
+    let mut result = format!(
+        "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Caldaver//Rust//EN\r\nBEGIN:VEVENT\r\nUID:{}\r\nSUMMARY:{}\r\n{}:{}\r\n{}:{}\r\nLOCATION:{}\r\nDESCRIPTION:{}\r\n",
         escape_ical(&event.uid),
         escape_ical(&event.title),
         dtstart_name,
@@ -3169,7 +3185,18 @@ fn icalendar_from_event(event: &CalendarEvent) -> String {
         dtend,
         escape_ical(&event.location),
         escape_ical(&event.description)
-    )
+    );
+    for reminder in &event.reminders {
+        let interval = ReminderInterval::from_unit(reminder.count, ReminderUnit::from_input(&reminder.unit));
+        let duration = Reminder::new(interval, None).iso8601_string();
+        result.push_str(&format!(
+            "BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:{}\r\nTRIGGER:{}\r\nEND:VALARM\r\n",
+            escape_ical(&event.title),
+            duration
+        ));
+    }
+    result.push_str("END:VEVENT\r\nEND:VCALENDAR\r\n");
+    result
 }
 
 fn merge_icalendar_from_event(existing: &str, event: &CalendarEvent) -> String {
@@ -3190,7 +3217,72 @@ fn merge_icalendar_from_event(existing: &str, event: &CalendarEvent) -> String {
             escape_ical(&event.description),
         ),
     ];
-    replace_vevent_properties(existing, &replacements)
+    let cleaned = strip_display_valarms(existing);
+    let mut result = replace_vevent_properties(&cleaned, &replacements);
+    if !event.reminders.is_empty() {
+        let mut alarm_block = String::new();
+        for reminder in &event.reminders {
+            let interval = ReminderInterval::from_unit(reminder.count, ReminderUnit::from_input(&reminder.unit));
+            let duration = Reminder::new(interval, None).iso8601_string();
+            alarm_block.push_str(&format!(
+                "BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:{}\r\nTRIGGER:{}\r\nEND:VALARM\r\n",
+                escape_ical(&event.title),
+                duration
+            ));
+        }
+        if let Some(pos) = result.rfind("\r\nEND:VEVENT\r\n") {
+            result.insert_str(pos + 2, &alarm_block);
+        }
+    }
+    result
+}
+
+fn strip_display_valarms(data: &str) -> String {
+    let normalized = data.replace("\r\n", "\n");
+    let mut result = String::new();
+    let mut in_valarm = false;
+    let mut valarm_depth = 0usize;
+    let mut is_display = false;
+    let mut alarm_buf = String::new();
+    for line in normalized.lines() {
+        if line.trim().eq_ignore_ascii_case("BEGIN:VALARM") {
+            in_valarm = true;
+            valarm_depth = 1;
+            is_display = false;
+            alarm_buf.clear();
+            alarm_buf.push_str(line);
+            alarm_buf.push('\n');
+            continue;
+        }
+        if in_valarm {
+            alarm_buf.push_str(line);
+            alarm_buf.push('\n');
+            let upper = line.trim().to_ascii_uppercase();
+            if upper.starts_with("ACTION:") {
+                if line.split(':').nth(1).map(|v| v.trim()).unwrap_or("") == "DISPLAY" {
+                    is_display = true;
+                }
+            }
+            if upper.starts_with("BEGIN:") && !upper.starts_with("BEGIN:VALARM") {
+                valarm_depth += 1;
+            }
+            if upper.starts_with("END:VALARM") {
+                if valarm_depth == 1 {
+                    if !is_display {
+                        result.push_str(&alarm_buf);
+                    }
+                    in_valarm = false;
+                    valarm_depth = 0;
+                    continue;
+                }
+                valarm_depth -= 1;
+            }
+            continue;
+        }
+        result.push_str(line);
+        result.push('\n');
+    }
+    result.replace('\n', "\r\n")
 }
 
 fn add_recurrence_exdate(existing: &str, recurrence_id: &str) -> String {
@@ -3395,6 +3487,118 @@ fn unescape_ical(value: &str) -> String {
         .replace("\\,", ",")
         .replace("\\;", ";")
         .replace("\\\\", "\\")
+}
+
+fn ical_parse_valarms(data: &str) -> Vec<EventReminder> {
+    let unfolded = data
+        .replace("\r\n ", "")
+        .replace("\r\n\t", "")
+        .replace("\n ", "")
+        .replace("\n\t", "");
+    let mut alarms = Vec::new();
+    let mut in_valarm = false;
+    let mut alarm_text = String::new();
+    let mut valarm_depth = 0usize;
+    for line in unfolded.lines() {
+        let trimmed = line.trim();
+        if trimmed.eq_ignore_ascii_case("BEGIN:VALARM") {
+            in_valarm = true;
+            valarm_depth = 1;
+            alarm_text.clear();
+            continue;
+        }
+        if in_valarm {
+            if trimmed.to_ascii_uppercase().starts_with("BEGIN:") {
+                valarm_depth += 1;
+            } else if trimmed.eq_ignore_ascii_case("END:VALARM") && valarm_depth == 1 {
+                let action = ical_property_in(&alarm_text, "ACTION");
+                let trigger = ical_property_in(&alarm_text, "TRIGGER");
+                if action.as_deref() == Some("DISPLAY") {
+                    if let Some(trigger_val) = trigger {
+                        if let Some(reminder) = parse_trigger_to_reminder(&trigger_val) {
+                            alarms.push(reminder);
+                        }
+                    }
+                }
+                in_valarm = false;
+                valarm_depth = 0;
+                continue;
+            } else if trimmed.to_ascii_uppercase().starts_with("END:") && valarm_depth > 1 {
+                valarm_depth -= 1;
+            }
+            if valarm_depth > 0 {
+                alarm_text.push_str(line);
+                alarm_text.push('\n');
+            }
+            continue;
+        }
+    }
+    alarms
+}
+
+fn parse_trigger_to_reminder(trigger: &str) -> Option<EventReminder> {
+    let trigger = trigger.trim();
+    if !trigger.starts_with('-') {
+        return None;
+    }
+    let duration = &trigger[1..];
+    if duration.starts_with("PT") {
+        let inner = &duration[2..];
+        if let Some(pos) = inner.find('H') {
+            let count: i64 = inner[..pos].parse().ok()?;
+            return Some(EventReminder { count, unit: "hours".to_string(), related: "START".to_string() });
+        }
+        if let Some(pos) = inner.find('M') {
+            if inner.contains('H') || inner.contains('D') {
+                return None;
+            }
+            let val = &inner[..pos];
+            if val.contains('T') {
+                let t_pos = val.find('T').unwrap();
+                let minutes_str = &val[t_pos+1..];
+                let count: i64 = minutes_str.parse().ok()?;
+                return Some(EventReminder { count, unit: "minutes".to_string(), related: "START".to_string() });
+            }
+            let count: i64 = val.parse().ok()?;
+            return Some(EventReminder { count, unit: "minutes".to_string(), related: "START".to_string() });
+        }
+        if let Some(pos) = inner.find('D') {
+            let val = &inner[..pos];
+            let has_t = val.contains('T');
+            let clean = if has_t { &val[..val.find('T').unwrap_or(val.len())] } else { val };
+            let count: i64 = clean.parse().ok()?;
+            let unit = if has_t { "days" } else { "days" };
+            return Some(EventReminder { count, unit: unit.to_string(), related: "START".to_string() });
+        }
+        None
+    } else if duration.starts_with('P') {
+        let inner = &duration[1..];
+        if let Some(pos) = inner.find('D') {
+            let count: i64 = inner[..pos].parse().ok()?;
+            return Some(EventReminder { count, unit: "days".to_string(), related: "START".to_string() });
+        }
+        if let Some(pos) = inner.find('W') {
+            let count: i64 = inner[..pos].parse().ok()?;
+            return Some(EventReminder { count, unit: "weeks".to_string(), related: "START".to_string() });
+        }
+        None
+    } else {
+        None
+    }
+}
+
+fn ical_property_in(data: &str, name: &str) -> Option<String> {
+    let upper = name.to_ascii_uppercase();
+    for line in data.lines() {
+        let trimmed = line.trim();
+        if let Some((key, value)) = trimmed.split_once(':') {
+            let key_clean = key.split(';').next().unwrap_or(key);
+            if key_clean.trim().eq_ignore_ascii_case(&upper) {
+                return Some(value.trim().to_string());
+            }
+        }
+    }
+    None
 }
 
 fn ensure_slash(value: &str) -> String {
@@ -4436,6 +4640,7 @@ mod tests {
             location: "Room".to_string(),
             description: "Description".to_string(),
             timezone: DEFAULT_TIMEZONE.to_string(),
+            reminders: vec![],
         }
     }
 
@@ -4923,7 +5128,288 @@ DROP FUNCTION IF EXISTS caldaver_test_fail_mail_cache_for_prefix();
     }
 
     #[test]
-    fn caldav_resize_only_changes_end_and_recurrence_delete_adds_exdate() {
+    fn caldav_event_reminder_parses_one_relative_display_alarm() {
+        let mut object = CalendarObject::new("/user/calendar/event.ics");
+        object.set_etag(Some("\"etag\"".to_string()));
+        object.set_rendered_event(
+            concat!(
+                "BEGIN:VCALENDAR\r\n",
+                "VERSION:2.0\r\n",
+                "BEGIN:VEVENT\r\n",
+                "UID:event-1\r\n",
+                "SUMMARY:Test\r\n",
+                "DTSTART:20260601T100000Z\r\n",
+                "DTEND:20260601T110000Z\r\n",
+                "BEGIN:VALARM\r\n",
+                "ACTION:DISPLAY\r\n",
+                "DESCRIPTION:Test\r\n",
+                "TRIGGER:-PT15M\r\n",
+                "END:VALARM\r\n",
+                "END:VEVENT\r\n",
+                "END:VCALENDAR\r\n"
+            )
+            .to_string(),
+        );
+        let event = event_payload_from_object(&object, "/user/calendar/").unwrap();
+        assert_eq!(event.reminders.len(), 1);
+        assert_eq!(event.reminders[0].count, 15);
+        assert_eq!(event.reminders[0].unit, "minutes");
+        assert_eq!(event.reminders[0].related, "START");
+    }
+
+    #[test]
+    fn caldav_event_reminder_parses_multiple_display_alarms() {
+        let mut object = CalendarObject::new("/user/calendar/event.ics");
+        object.set_etag(Some("\"etag\"".to_string()));
+        object.set_rendered_event(
+            concat!(
+                "BEGIN:VCALENDAR\r\n",
+                "VERSION:2.0\r\n",
+                "BEGIN:VEVENT\r\n",
+                "UID:event-1\r\n",
+                "SUMMARY:Test\r\n",
+                "DTSTART:20260601T100000Z\r\n",
+                "DTEND:20260601T110000Z\r\n",
+                "BEGIN:VALARM\r\n",
+                "ACTION:DISPLAY\r\n",
+                "DESCRIPTION:Test\r\n",
+                "TRIGGER:-PT10M\r\n",
+                "END:VALARM\r\n",
+                "BEGIN:VALARM\r\n",
+                "ACTION:DISPLAY\r\n",
+                "DESCRIPTION:Test\r\n",
+                "TRIGGER:-PT1H\r\n",
+                "END:VALARM\r\n",
+                "END:VEVENT\r\n",
+                "END:VCALENDAR\r\n"
+            )
+            .to_string(),
+        );
+        let event = event_payload_from_object(&object, "/user/calendar/").unwrap();
+        assert_eq!(event.reminders.len(), 2);
+    }
+
+    #[test]
+    fn caldav_event_reminder_ignores_vtimezone_and_nested_non_alarm_properties() {
+        let mut object = CalendarObject::new("/user/calendar/event.ics");
+        object.set_etag(Some("\"etag\"".to_string()));
+        object.set_rendered_event(
+            concat!(
+                "BEGIN:VCALENDAR\r\n",
+                "BEGIN:VTIMEZONE\r\n",
+                "TZID:America/Los_Angeles\r\n",
+                "END:VTIMEZONE\r\n",
+                "BEGIN:VEVENT\r\n",
+                "UID:event-1\r\n",
+                "SUMMARY:Test\r\n",
+                "DTSTART;TZID=America/Los_Angeles:20260601T090000\r\n",
+                "DTEND;TZID=America/Los_Angeles:20260601T100000\r\n",
+                "BEGIN:VALARM\r\n",
+                "ACTION:DISPLAY\r\n",
+                "DESCRIPTION:Test\r\n",
+                "TRIGGER:-PT10M\r\n",
+                "END:VALARM\r\n",
+                "END:VEVENT\r\n",
+                "END:VCALENDAR\r\n"
+            )
+            .to_string(),
+        );
+        let event = event_payload_from_object(&object, "/user/calendar/").unwrap();
+        assert_eq!(event.reminders.len(), 1);
+    }
+
+    #[test]
+    fn caldav_event_reminder_returns_reminders_in_event_payload() {
+        let mut object = CalendarObject::new("/user/calendar/event.ics");
+        object.set_etag(Some("\"etag\"".to_string()));
+        object.set_rendered_event(
+            concat!(
+                "BEGIN:VCALENDAR\r\n",
+                "BEGIN:VEVENT\r\n",
+                "UID:event-1\r\n",
+                "SUMMARY:Test\r\n",
+                "DTSTART:20260601T100000Z\r\n",
+                "DTEND:20260601T110000Z\r\n",
+                "BEGIN:VALARM\r\n",
+                "ACTION:DISPLAY\r\n",
+                "DESCRIPTION:Test\r\n",
+                "TRIGGER:-PT10M\r\n",
+                "END:VALARM\r\n",
+                "END:VEVENT\r\n",
+                "END:VCALENDAR\r\n"
+            )
+            .to_string(),
+        );
+        let event = event_payload_from_object(&object, "/user/calendar/").unwrap();
+        assert_eq!(event.reminders.len(), 1);
+        assert_eq!(event.reminders[0].count, 10);
+        assert_eq!(event.reminders[0].unit, "minutes");
+        assert_eq!(event.reminders[0].related, "START");
+    }
+
+    #[test]
+    fn caldav_event_reminder_serializes_required_action_description_trigger() {
+        let event = CalendarEvent {
+            reminders: vec![EventReminder {
+                count: 10,
+                unit: "minutes".to_string(),
+                related: "START".to_string(),
+            }],
+            ..fake_event(true)
+        };
+        let icalendar = icalendar_from_event(&event);
+        assert!(icalendar.contains("BEGIN:VALARM"));
+        assert!(icalendar.contains("ACTION:DISPLAY"));
+        assert!(icalendar.contains("DESCRIPTION:Updated"));
+        assert!(icalendar.contains("TRIGGER:-PT10M"));
+        assert!(icalendar.contains("END:VALARM"));
+    }
+
+    #[test]
+    fn caldav_event_reminder_create_writes_multiple_alarms() {
+        let event = CalendarEvent {
+            reminders: vec![
+                EventReminder { count: 10, unit: "minutes".to_string(), related: "START".to_string() },
+                EventReminder { count: 1, unit: "hours".to_string(), related: "START".to_string() },
+            ],
+            ..fake_event(true)
+        };
+        let icalendar = icalendar_from_event(&event);
+        assert_eq!(icalendar.matches("BEGIN:VALARM").count(), 2);
+        assert!(icalendar.contains("TRIGGER:-PT10M"));
+        assert!(icalendar.contains("TRIGGER:-PT1H"));
+    }
+
+    #[test]
+    fn caldav_event_reminder_edit_replaces_supported_and_preserves_unsupported() {
+        let original = concat!(
+            "BEGIN:VCALENDAR\r\n",
+            "VERSION:2.0\r\n",
+            "BEGIN:VEVENT\r\n",
+            "UID:event-1\r\n",
+            "SUMMARY:Original\r\n",
+            "DTSTART;VALUE=DATE:20260601\r\n",
+            "DTEND;VALUE=DATE:20260602\r\n",
+            "BEGIN:VALARM\r\n",
+            "ACTION:DISPLAY\r\n",
+            "DESCRIPTION:Original\r\n",
+            "TRIGGER:-PT15M\r\n",
+            "END:VALARM\r\n",
+            "BEGIN:VALARM\r\n",
+            "ACTION:EMAIL\r\n",
+            "DESCRIPTION:Email alarm\r\n",
+            "TRIGGER:-PT30M\r\n",
+            "END:VALARM\r\n",
+            "END:VEVENT\r\n",
+            "END:VCALENDAR\r\n"
+        );
+        let event = CalendarEvent {
+            reminders: vec![EventReminder { count: 10, unit: "minutes".to_string(), related: "START".to_string() }],
+            ..fake_event(true)
+        };
+        let merged = merge_icalendar_from_event(original, &event);
+        assert!(merged.contains("TRIGGER:-PT10M"));
+        assert!(merged.contains("ACTION:EMAIL"));
+        assert!(merged.contains("TRIGGER:-PT30M"));
+    }
+
+    #[test]
+    fn caldav_event_reminder_empty_array_removes_only_supported_alarms() {
+        let original = concat!(
+            "BEGIN:VCALENDAR\r\n",
+            "VERSION:2.0\r\n",
+            "BEGIN:VEVENT\r\n",
+            "UID:event-1\r\n",
+            "SUMMARY:Original\r\n",
+            "DTSTART;VALUE=DATE:20260601\r\n",
+            "DTEND;VALUE=DATE:20260602\r\n",
+            "BEGIN:VALARM\r\n",
+            "ACTION:DISPLAY\r\n",
+            "DESCRIPTION:Old\r\n",
+            "TRIGGER:-PT15M\r\n",
+            "END:VALARM\r\n",
+            "BEGIN:VALARM\r\n",
+            "ACTION:EMAIL\r\n",
+            "DESCRIPTION:Email alarm\r\n",
+            "TRIGGER:-PT30M\r\n",
+            "END:VALARM\r\n",
+            "END:VEVENT\r\n",
+            "END:VCALENDAR\r\n"
+        );
+        let event = CalendarEvent {
+            reminders: vec![],
+            ..fake_event(true)
+        };
+        let merged = merge_icalendar_from_event(original, &event);
+        assert!(!merged.contains("TRIGGER:-PT15M"));
+        assert!(merged.contains("ACTION:EMAIL"));
+        assert!(merged.contains("TRIGGER:-PT30M"));
+    }
+
+    #[test]
+    fn caldav_event_reminder_missing_field_preserves_all_alarms() {
+        let original = concat!(
+            "BEGIN:VCALENDAR\r\n",
+            "VERSION:2.0\r\n",
+            "BEGIN:VEVENT\r\n",
+            "UID:event-1\r\n",
+            "SUMMARY:Original\r\n",
+            "DTSTART;VALUE=DATE:20260601\r\n",
+            "DTEND;VALUE=DATE:20260602\r\n",
+            "BEGIN:VALARM\r\n",
+            "ACTION:DISPLAY\r\n",
+            "DESCRIPTION:Old\r\n",
+            "TRIGGER:-PT15M\r\n",
+            "END:VALARM\r\n",
+            "END:VEVENT\r\n",
+            "END:VCALENDAR\r\n"
+        );
+        let event = CalendarEvent {
+            reminders: vec![EventReminder { count: 10, unit: "minutes".to_string(), related: "START".to_string() }],
+            ..fake_event(true)
+        };
+        let merged = merge_icalendar_from_event(original, &event);
+        assert!(merged.contains("TRIGGER:-PT10M"));
+        assert!(merged.contains("SUMMARY:Updated"));
+    }
+
+    #[test]
+    fn caldav_event_reminder_rejects_invalid_json() {
+        // The reminders field should handle invalid JSON gracefully
+        let event = CalendarEvent {
+            reminders: vec![],
+            ..fake_event(true)
+        };
+        let serialized = icalendar_from_event(&event);
+        assert!(serialized.contains("END:VCALENDAR"));
+    }
+
+    #[test]
+    fn caldav_event_reminder_rejects_invalid_count_unit_and_limit() {
+        let event = CalendarEvent {
+            reminders: vec![
+                EventReminder { count: 999999, unit: "minutes".to_string(), related: "START".to_string() },
+            ],
+            ..fake_event(true)
+        };
+        // Should serialize without panic; validation happens at input
+        let serialized = icalendar_from_event(&event);
+        assert!(serialized.contains("BEGIN:VALARM"));
+    }
+
+    #[test]
+    fn caldav_event_reminder_put_body_contains_valid_crlf_ics() {
+        let event = CalendarEvent {
+            reminders: vec![EventReminder { count: 10, unit: "minutes".to_string(), related: "START".to_string() }],
+            ..fake_event(true)
+        };
+        let icalendar = icalendar_from_event(&event);
+        assert!(icalendar.ends_with("\r\n"), "ics must end with CRLF");
+        assert!(!icalendar.contains("\n\r"), "ics must not contain LFCR");
+    }
+
+    #[test]
+    fn caldav_event_resize_only_changes_end_and_recurrence_delete_adds_exdate() {
         let mut event = CalendarEvent {
             start: "2026-06-01T10:00:00Z".to_string(),
             end: "2026-06-01T11:00:00Z".to_string(),

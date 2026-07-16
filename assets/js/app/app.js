@@ -1325,6 +1325,21 @@ var open_event_edit_dialog = function open_event_edit_dialog(event) {
       }
       var event_fields = $('#event_edit_form').serializeObject();
 
+      // Serialize reminders into reminders_json
+      var reminders = [];
+      var counts = event_fields.reminders && event_fields.reminders.count;
+      var units = event_fields.reminders && event_fields.reminders.unit;
+      if (Array.isArray(counts) && Array.isArray(units)) {
+        for (var i = 0; i < counts.length; i++) {
+          reminders.push({
+            count: parseInt(counts[i], 10) || 0,
+            unit: units[i] || 'minutes',
+            related: 'START'
+          });
+        }
+      }
+      event_fields.reminders_json = JSON.stringify(reminders);
+
       event_fields.timezone = event_fields.timezone || calendar_timezone();
 
       send_form({

@@ -1,5 +1,34 @@
 # Changelog
 
+## [3.4.0] - 2026-07-15
+
+### Android calendar reminder notifications
+
+- **FEATURE** — Rust CalDAV backend now fully round-trips `VALARM` DISPLAY
+  reminders through the CalDAV API. New `reminders` field on event responses;
+  `reminders_json` form field accepted on create/edit. Unsupported alarm types
+  (EMAIL, AUDIO, absolute triggers, `RELATED=END`) are preserved byte-for-byte
+  during ordinary edits.
+- **FEATURE** — Android app gains calendar notification support: reads visible
+  calendars from the Android Calendar Provider, classifies due/expired alerts,
+  posts per-calendar high-importance notifications with tap-to-open deep links,
+  and shows an expired-events digest. Supports up to 20 concurrent individual
+  notifications.
+- **FEATURE** — New `CaldaverNotifications` Capacitor plugin exposes
+  `getStatus()`, `requestPermissions()`, `openExactAlarmSettings()`,
+  `openNotificationSettings()`, and `consumePendingReminder()` bridge methods.
+- **PERMISSIONS** — Added `READ_CALENDAR`, `WRITE_CALENDAR`,
+  `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, and
+  `VIBRATE` declarations.
+- **RECEIVER** — `CalendarReminderReceiver` handles `EVENT_REMINDER`,
+  `PROVIDER_CHANGED`, time/date/boot/locale changes, and package-replaced
+  broadcasts with `goAsync()` and a bounded executor.
+- **BACKEND** — 12 new `caldav_event_reminder_*` Rust tests cover parsing,
+  serialization, merge with unsupported alarm preservation, CRLF validation,
+  and empty-array semantics. 6 new Node tests cover frontend reminder
+  round-trip.
+- **TOTAL** — Node 124, Rust 125, Android assemble/test PASS.
+
 ## [3.3.0] - 2026-06-16
 
 Follow-up to the 3.2.0 mobile pass focused on honest mail actions and
