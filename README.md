@@ -11,8 +11,6 @@ container image and a Capacitor-based Android APK, with PostgreSQL as the
 runtime store for sessions, preferences, share state, account credentials, and
 cached mail metadata.
 
-![Caldaver screenshot](./docs/screenshot.png)
-
 The current UI is a clean, mobile-friendly shell: a top app bar with a section
 menu, an application sidebar (Calendar / Contacts / Mail), a Shared Calendars
 panel with a `+` button to add new shared calendars, a fixed blue **Create
