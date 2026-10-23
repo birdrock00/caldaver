@@ -156,69 +156,12 @@ jobs:
           path: build/android-apk/*.apk
           if-no-files-found: error
 
-  ios:
-    name: Publish iOS .ipa
-    runs-on: macos-latest
-    needs: prepare
-    timeout-minutes: 45
-    continue-on-error: true
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: package-lock.json
-
-      - name: Install Node dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Build frontend assets
-        run: npm run build
-
-      - name: Add iOS platform
-        run: npx cap add ios
-
-      - name: Sync web assets to iOS
-        run: npx cap sync ios
-
-      - name: Build unsigned iOS .app
-        working-directory: ios/App
-        run: |
-          set -euo pipefail
-          xcodebuild \
-            -project App.xcodeproj \
-            -scheme App \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            EXPANDED_CODE_SIGN_IDENTITY="" \
-            build
-
-      - name: Package iOS .ipa (unsigned, for AltStore/SideStore sideload)
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p build/ios-payload
-          cp -R ios/App/build/Build/Products/Release-iphoneos/App.app build/ios-payload/Payload/
-          (cd build/ios-payload && zip -r ../../caldaver-ios-${{ needs.prepare.outputs.release_tag }}.ipa Payload/)
-          ls -lh caldaver-ios-*.ipa
-
-      - name: Upload iOS .ipa artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: caldaver-ios-ipa
-          path: caldaver-ios-*.ipa
-          if-no-files-found: error
-
+  # The iOS .ipa needs a capacity-constrained GitHub-hosted macOS runner. When
+  # GitHub cannot hand one out the job ends `cancelled`, which continue-on-error
+  # does NOT cover, so building it here used to mark the whole daily release run
+  # failed even though the image, the APK and both releases were fine. It now
+  # lives in ios-ipa.yml, which runs after this workflow and attaches the .ipa
+  # to the dated and latest releases (with retries and a no-op fast path).
   release:
     name: Publish GitHub releases
     runs-on: ubuntu-latest
@@ -226,7 +169,6 @@ jobs:
       - prepare
       - docker
       - android
-      - ios
     if: always()
 
     steps:
@@ -240,13 +182,6 @@ jobs:
         with:
           name: caldaver-android-apk
           path: build/android-apk
-
-      - name: Download iOS .ipa artifact
-        continue-on-error: true
-        uses: actions/download-artifact@v4
-        with:
-          name: caldaver-ios-ipa
-          path: build/ios
 
       - name: Publish release and latest git tags
         shell: bash
@@ -273,9 +208,7 @@ jobs:
             echo "- Docker image date alias: \`${{ needs.prepare.outputs.image_repo }}:${{ needs.prepare.outputs.date_tag }}\`"
             echo "- Docker image: \`${{ needs.prepare.outputs.image_repo }}:latest\`"
             echo "- Android APK: attached to this release"
-            if [ -d build/ios ] && [ -n "$(ls -A build/ios/*.ipa 2>/dev/null)" ]; then
-              echo "- iOS .ipa: attached to this release (unsigned; sign with your free Apple ID via AltStore or SideStore to install)"
-            fi
+            echo "- iOS .ipa: attached by the 'iOS IPA' workflow right after this release (unsigned; sign with your free Apple ID via AltStore or SideStore to install)"
             echo "- Source code: GitHub-generated source archives for this tag"
             echo
             echo "## Changes"
@@ -319,15 +252,14 @@ jobs:
               --notes-file "${{ steps.notes.outputs.notes_file }}" \
               --latest=false
           fi
-          assets="$(gh release view "${{ needs.prepare.outputs.release_tag }}" --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$\|^caldaver-ios-.*\.ipa$' || true)"
+          # Only APK assets are managed here - the iOS IPA workflow owns the
+          # .ipa asset, so a release run can never drop it.
+          assets="$(gh release view "${{ needs.prepare.outputs.release_tag }}" --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$' || true)"
           while IFS= read -r asset; do
             [ -n "$asset" ] || continue
             gh release delete-asset "${{ needs.prepare.outputs.release_tag }}" "$asset" --yes
           done <<< "$assets"
           gh release upload "${{ needs.prepare.outputs.release_tag }}" build/android-apk/*.apk --clobber
-          if [ -d build/ios ] && [ -n "$(ls -A build/ios/*.ipa 2>/dev/null)" ]; then
-            gh release upload "${{ needs.prepare.outputs.release_tag }}" build/ios/*.ipa --clobber
-          fi
 
       - name: Publish latest GitHub release
         env:
@@ -342,12 +274,9 @@ jobs:
             --title "CalDaver latest" \
             --notes-file "${{ steps.notes.outputs.notes_file }}" \
             --latest
-          assets="$(gh release view latest --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$\|^caldaver-ios-.*\.ipa$' || true)"
+          assets="$(gh release view latest --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$' || true)"
           while IFS= read -r asset; do
             [ -n "$asset" ] || continue
             gh release delete-asset latest "$asset" --yes
           done <<< "$assets"
           gh release upload latest build/android-apk/*.apk --clobber
-          if [ -d build/ios ] && [ -n "$(ls -A build/ios/*.ipa 2>/dev/null)" ]; then
-            gh release upload latest build/ios/*.ipa --clobber
-          fi

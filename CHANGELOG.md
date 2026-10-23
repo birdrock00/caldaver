@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased]
+
+### CI — release pipeline
+
+- **FIX** — The daily release no longer fails because GitHub could not provide
+  a macOS runner. The unsigned iOS `.ipa` build moved to its own best-effort
+  `iOS IPA` workflow (`.github/workflows/ios-ipa.yml`): it runs after every
+  `Daily release` run, retries on the Intel macOS runner pool when the arm64
+  pool never acquires a machine, and retries on two off-peak schedules. Every
+  attempt starts with a ~10 s Ubuntu gate that exits green when the current
+  releases already carry the `.ipa`, so an unavailable Mac now delays the sideload
+  archive instead of reddening the Docker/Android release.
+- **FIX** — The published `.ipa` was malformed: `Payload/` held the flattened
+  contents of `App.app` instead of the `Payload/App.app` bundle, so AltStore,
+  SideStore and installation services could not use it. Packaging now stages the
+  bundle with `ditto` and the build fails if the archive does not contain
+  `Payload/App.app/Info.plist` or has entries outside `Payload/App.app/`.
+- **CI** — New reusable `./.github/actions/ios-ipa` composite action builds the
+  Capacitor app once per runner pool and names the artifact after the release
+  tag; the `iOS IPA` workflow attaches it to the dated and `latest` releases and
+  prunes `.ipa` assets from older tags.
+
 ## [3.4.0] - 2026-07-15
 
 ### Android calendar reminder notifications

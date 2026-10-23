@@ -298,12 +298,15 @@ launches. The user menu's **Change instance** action (visible on Android
 only) clears the saved URL and returns to setup.
 
 CI also produces a release APK. Each dated release attaches
-`caldaver-android-<release-tag>.apk` to the matching GitHub release.
+`caldaver-android-<release-tag>.apk` to the matching GitHub release, plus an
+unsigned `caldaver-ios-<release-tag>.ipa` (see
+[Releases](#releases)) that can be signed and installed with AltStore or
+SideStore.
 
 ## Releases
 
 The [daily release workflow](.github/workflows/daily-release.yml) runs
-nightly at `17:10 UTC` and can also be triggered manually. Each run
+nightly at `10:17 UTC` and can also be triggered manually. Each run
 publishes a coordinated artifact set from the same commit:
 
 | Artifact | Tag / Location |
@@ -311,11 +314,23 @@ publishes a coordinated artifact set from the same commit:
 | Git tag | `YYYY-MM-DD-HHMMSS` (unique) and `latest` (force-updated) |
 | Docker image | `ghcr.io/caldaver-app/caldaver:YYYY-MM-DD-HHMMSS`, `…:YYYY-MM-DD`, `…:latest` |
 | Android APK | `caldaver-android-<release-tag>.apk` attached to the GitHub release |
+| iOS `.ipa` | `caldaver-ios-<release-tag>.ipa` attached to the dated and `latest` releases |
 | Source archives | GitHub-generated `tar.gz` / `zip` for the release tag |
 | Release notes | Auto-generated list of commits since the previous dated release |
 
 This means every container release also produces a matching APK release and
 a GitHub release entry describing what changed.
+
+The `.ipa` needs a GitHub-hosted macOS runner, which is capacity-constrained:
+GitHub sometimes cannot hand one out and cancels the job (`The job was not
+acquired by Runner of type hosted even after multiple attempts`). Building it is
+therefore a separate best-effort workflow,
+[iOS IPA](.github/workflows/ios-ipa.yml), which runs after every daily release
+and again on two off-peak schedules, retries on the other macOS runner pool,
+and does nothing when the releases already carry the current `.ipa`. A Mac
+runner outage delays the `.ipa` but can no longer fail a Docker/Android
+release. The archive is unsigned: sign it with a free Apple ID through AltStore
+or SideStore to install it.
 
 ## Tech Stack
 
