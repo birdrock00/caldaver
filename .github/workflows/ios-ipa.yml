@@ -13,10 +13,15 @@ name: iOS IPA
 #
 # So the .ipa build lives here instead:
 #   * it runs right after every Daily release run (workflow_run),
-#   * it retries on a second macOS runner pool and on two off-peak schedules,
+#   * it retries on the other macOS runner pool when the primary pool never
+#     hands out a machine, and on two off-peak schedules,
 #   * every attempt is idempotent - the gate is a ~10 s Ubuntu job that exits
 #     green when the current releases already carry the .ipa,
 #   * and a capacity cancellation here can never fail a Docker/Android release.
+#
+# Both macOS build jobs use `continue-on-error: true`, so a run of this
+# workflow is red only when no .ipa could be delivered at all, which is what
+# the failed `Attach .ipa to GitHub releases` job then reports.
 #
 # The artifact is unsigned. Sign it with a free Apple ID via AltStore or
 # SideStore to install it.
@@ -35,12 +40,14 @@ on:
     inputs:
       force:
         description: "Rebuild and re-attach the .ipa even if the releases already have one"
-        required: false
+        required:
+          false
         type: boolean
         default: false
       build_runner:
         description: "Primary macOS runner label (the other pool is used as fallback)"
-        required: false
+        required:
+          false
         type: choice
         options:
           - macos-latest
@@ -53,6 +60,9 @@ permissions:
 concurrency:
   group: ios-ipa
   cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
 
 jobs:
   gate:
@@ -133,11 +143,25 @@ jobs:
           ref: refs/tags/${{ needs.gate.outputs.release_tag }}
           fetch-depth: 1
 
+      # The release tag predates .github/actions/ios-ipa and a local action is
+      # read from the workspace, so borrow the CI helpers from the commit that is
+      # actually running this workflow.
+      - name: Take CI helpers from the running commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f .github/actions/ios-ipa/action.yml ]; then
+            git fetch --depth=1 origin "$GITHUB_SHA" \
+              || git fetch --no-tags origin "$GITHUB_SHA"
+            git checkout "$GITHUB_SHA" -- .github
+          fi
+
       - name: Build and package the .ipa
         id: ipa
         uses: ./.github/actions/ios-ipa
         with:
           release_tag: ${{ needs.gate.outputs.release_tag }}
+          node_version: ${{ env.NODE_VERSION }}
 
       - name: Upload iOS .ipa artifact
         uses: actions/upload-artifact@v4
@@ -153,7 +177,9 @@ jobs:
       - gate
       - build_primary
     # always(): build_primary may have been cancelled by GitHub because no macOS
-    # runner of that pool was ever acquired, which still must not lose the .ipa.
+    # runner of its pool was ever acquired, and that must not lose the .ipa.
+    # Note `continue-on-error` makes a *failed* primary build look 'success'
+    # here, so this job only covers runner-pool outages, not build errors.
     if: >-
       always() && needs.gate.outputs.needed == 'true' &&
       needs.build_primary.result != 'success'
@@ -168,11 +194,25 @@ jobs:
           ref: refs/tags/${{ needs.gate.outputs.release_tag }}
           fetch-depth: 1
 
+      # The release tag predates .github/actions/ios-ipa and a local action is
+      # read from the workspace, so borrow the CI helpers from the commit that is
+      # actually running this workflow.
+      - name: Take CI helpers from the running commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f .github/actions/ios-ipa/action.yml ]; then
+            git fetch --depth=1 origin "$GITHUB_SHA" \
+              || git fetch --no-tags origin "$GITHUB_SHA"
+            git checkout "$GITHUB_SHA" -- .github
+          fi
+
       - name: Build and package the .ipa
         id: ipa
         uses: ./.github/actions/ios-ipa
         with:
           release_tag: ${{ needs.gate.outputs.release_tag }}
+          node_version: ${{ env.NODE_VERSION }}
 
       - name: Upload iOS .ipa artifact
         uses: actions/upload-artifact@v4
@@ -188,9 +228,7 @@ jobs:
       - gate
       - build_primary
       - build_fallback
-    if: >-
-      always() && needs.gate.outputs.needed == 'true' &&
-      (needs.build_primary.result == 'success' || needs.build_fallback.result == 'success')
+    if: always() && needs.gate.outputs.needed == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -207,16 +245,33 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ needs.gate.outputs.release_tag }}
           IPA_NAME: ${{ needs.gate.outputs.ipa_name }}
+          PRIMARY: ${{ needs.build_primary.result }}
+          FALLBACK: ${{ needs.build_fallback.result }}
         shell: bash
         run: |
           set -euo pipefail
           repo="$GITHUB_REPOSITORY"
+          mkdir -p build/ios
           ipa="$(find build/ios -maxdepth 2 -type f -name 'caldaver-ios-*.ipa' | head -n 1)"
+
           if [ -z "$ipa" ]; then
-            echo "::error::no built .ipa found in build/ios"
-            find build/ios -type f || true
+            {
+              echo "## iOS .ipa could not be published"
+              echo
+              echo "- Target release: \`$RELEASE_TAG\`"
+              echo "- Primary macOS build: \`$PRIMARY\`"
+              echo "- Fallback macOS build: \`$FALLBACK\`"
+              echo
+              echo "No .ipa artifact was produced, so \`$IPA_NAME\` is not attached to"
+              echo "\`$RELEASE_TAG\` / \`latest\`. GitHub could not provide a macOS"
+              echo "runner, or the iOS build itself failed. The scheduled retries of this"
+              echo "workflow pick it up; the Docker image, the Android APK and both"
+              echo "GitHub releases are unaffected."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::no .ipa artifact was produced (primary: $PRIMARY, fallback: $FALLBACK)"
             exit 1
           fi
+
           echo "Publishing $ipa ($(stat -c %s "$ipa") bytes)"
 
           for tag in "$RELEASE_TAG" latest; do
@@ -233,42 +288,9 @@ jobs:
             echo "$tag -> $(gh release view -R "$repo" "$tag" --json assets --jq '[.assets[].name] | join(", ")')"
           done
 
-  summary:
-    name: iOS .ipa status
-    needs:
-      - gate
-      - build_primary
-      - build_fallback
-      - attach
-    if: always() && needs.gate.result == 'success'
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Write summary
-        env:
-          NEEDED: ${{ needs.gate.outputs.needed }}
-          IPA_NAME: ${{ needs.gate.outputs.ipa_name }}
-          PRIMARY_RUNNER: ${{ needs.gate.outputs.primary_runner }}
-          FALLBACK_RUNNER: ${{ needs.gate.outputs.fallback_runner }}
-          RELEASE_TAG: ${{ needs.gate.outputs.release_tag }}
-          PRIMARY: ${{ needs.build_primary.result }}
-          FALLBACK: ${{ needs.build_fallback.result }}
-          ATTACH: ${{ needs.attach.result }}
-        shell: bash
-        run: |
-          set -euo pipefail
           {
-            echo "## iOS .ipa pipeline"
+            echo "## iOS .ipa published"
             echo
-            echo "- Target release: \`$RELEASE_TAG\`"
-            echo "- Build required: \`$NEEDED\`"
-            echo "- Primary macOS build (\`$PRIMARY_RUNNER\`): \`$PRIMARY\`"
-            echo "- Fallback macOS build (\`$FALLBACK_RUNNER\`): \`$FALLBACK\`"
-            echo "- Attach to releases: \`$ATTACH\`"
-            if [ "$NEEDED" = "true" ] && [ "$ATTACH" != "success" ]; then
-              echo
-              echo "GitHub could not provide a macOS runner for \`$IPA_NAME\` on this"
-              echo "attempt. The scheduled retries of this workflow will pick it up;"
-              echo "Docker image, Android APK and the GitHub releases are unaffected."
-            fi
+            echo "- \`$IPA_NAME\` attached to \`$RELEASE_TAG\` and \`latest\`"
+            echo "- Built from the \`$RELEASE_TAG\` commit"
           } >> "$GITHUB_STEP_SUMMARY"
