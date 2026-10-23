@@ -156,12 +156,10 @@ jobs:
           path: build/android-apk/*.apk
           if-no-files-found: error
 
-  # The iOS .ipa needs a capacity-constrained GitHub-hosted macOS runner. When
-  # GitHub cannot hand one out the job ends `cancelled`, which continue-on-error
-  # does NOT cover, so building it here used to mark the whole daily release run
-  # failed even though the image, the APK and both releases were fine. It now
-  # lives in ios-ipa.yml, which runs after this workflow and attaches the .ipa
-  # to the dated and latest releases (with retries and a no-op fast path).
+  # Releases ship a Docker image and a signed Android APK only. There is no iOS
+  # build: it needed a capacity-constrained GitHub-hosted macOS runner, whose
+  # queue starvation surfaced as a `cancelled` job (not covered by
+  # continue-on-error) that failed otherwise healthy release runs.
   release:
     name: Publish GitHub releases
     runs-on: ubuntu-latest
@@ -208,7 +206,6 @@ jobs:
             echo "- Docker image date alias: \`${{ needs.prepare.outputs.image_repo }}:${{ needs.prepare.outputs.date_tag }}\`"
             echo "- Docker image: \`${{ needs.prepare.outputs.image_repo }}:latest\`"
             echo "- Android APK: attached to this release"
-            echo "- iOS .ipa: attached by the 'iOS IPA' workflow right after this release (unsigned; sign with your free Apple ID via AltStore or SideStore to install)"
             echo "- Source code: GitHub-generated source archives for this tag"
             echo
             echo "## Changes"
@@ -252,8 +249,6 @@ jobs:
               --notes-file "${{ steps.notes.outputs.notes_file }}" \
               --latest=false
           fi
-          # Only APK assets are managed here - the iOS IPA workflow owns the
-          # .ipa asset, so a release run can never drop it.
           assets="$(gh release view "${{ needs.prepare.outputs.release_tag }}" --json assets --jq '.assets[].name' | grep '^caldaver-android-.*\.apk$' || true)"
           while IFS= read -r asset; do
             [ -n "$asset" ] || continue

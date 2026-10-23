@@ -2,25 +2,26 @@
 
 ## [Unreleased]
 
-### CI — release pipeline
+### CI — releases are Android-only
 
-- **FIX** — The daily release no longer fails because GitHub could not provide
-  a macOS runner. The unsigned iOS `.ipa` build moved to its own best-effort
-  `iOS IPA` workflow (`.github/workflows/ios-ipa.yml`): it runs after every
-  `Daily release` run, retries on the Intel macOS runner pool when the arm64
-  pool never acquires a machine, and retries on two off-peak schedules. Every
-  attempt starts with a ~10 s Ubuntu gate that exits green when the current
-  releases already carry the `.ipa`, so an unavailable Mac now delays the sideload
-  archive instead of reddening the Docker/Android release.
-- **FIX** — The published `.ipa` was malformed: `Payload/` held the flattened
-  contents of `App.app` instead of the `Payload/App.app` bundle, so AltStore,
-  SideStore and installation services could not use it. Packaging now stages the
-  bundle with `ditto` and the build fails if the archive does not contain
-  `Payload/App.app/Info.plist` or has entries outside `Payload/App.app/`.
-- **CI** — New reusable `./.github/actions/ios-ipa` composite action builds the
-  Capacitor app once per runner pool and names the artifact after the release
-  tag; the `iOS IPA` workflow attaches it to the dated and `latest` releases and
-  prunes `.ipa` assets from older tags.
+- **REMOVED** — The iOS `.ipa` is no longer built or published. Releases now
+  consist of the Docker image, the signed Android APK, the git tags and the
+  GitHub-generated source archives.
+- **REASON** — Building an `.ipa` requires a GitHub-hosted macOS runner, which
+  is capacity-constrained. GitHub repeatedly refused to hand one out
+  (`The job was not acquired by Runner of type hosted even after multiple
+  attempts`) and cancelled the job. A `cancelled` job is not covered by
+  `continue-on-error`, so the whole `Daily release` run was reported failed even
+  when the image, the APK and both GitHub releases had succeeded
+  (2026-10-20, -21, -22).
+- **FIXED BEFORE REMOVAL** — The published `.ipa` files were malformed anyway:
+  `Payload/` held the flattened contents of `App.app` instead of the
+  `Payload/App.app` bundle, so AltStore, SideStore and installation services
+  could not use them.
+- **KEEP** — Nothing in the app itself changed: the Capacitor iOS project can
+  still be generated locally with `npx cap add ios`; it is just outside the
+  release pipeline. `@capacitor/ios` and the `ios` block in
+  `capacitor.config.json` are left in place.
 
 ## [3.4.0] - 2026-07-15
 
