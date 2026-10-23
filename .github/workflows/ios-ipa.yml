@@ -293,4 +293,13 @@ jobs:
             echo
             echo "- \`$IPA_NAME\` attached to \`$RELEASE_TAG\` and \`latest\`"
             echo "- Built from the \`$RELEASE_TAG\` commit"
+            echo "- Primary macOS build: \`$PRIMARY\`, fallback macOS build: \`$FALLBACK\`"
+            if [ "$PRIMARY" != "success" ]; then
+              echo
+              echo "The primary macOS runner pool did not deliver a machine"
+              echo "(\`$PRIMARY\`); the fallback pool built this archive instead. The"
+              echo "run is reported as unsuccessful because of that cancelled job, but"
+              echo "the .ipa, the Docker image, the Android APK and both GitHub"
+              echo "releases are all fine."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
