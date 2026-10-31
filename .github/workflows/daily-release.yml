@@ -183,15 +183,60 @@ jobs:
 
       - name: Publish release and latest git tags
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch --tags --force
-          git tag -fa "${{ needs.prepare.outputs.release_tag }}" "$GITHUB_SHA" -m "Caldaver release ${{ needs.prepare.outputs.release_tag }}"
-          git tag -fa latest "$GITHUB_SHA" -m "Caldaver latest release"
-          git push --force origin "refs/tags/${{ needs.prepare.outputs.release_tag }}"
-          git push --force origin "refs/tags/latest"
+
+          # Moving `latest` is the only thing in this workflow that has failed
+          # intermittently (`! [remote rejected] latest -> latest (failed)`, with
+          # no ruleset or tag-protection rule on the repo -- GitHub refuses the
+          # ref update server-side and git names the reason only as "failed").
+          # Two changes make the step tolerant of it:
+          #   * skip the push when origin already points the tag at this exact
+          #     commit, which is the common case on a day with no new code;
+          #   * retry the force-push with backoff, then fall back to the Git
+          #     Data API, which returns the actual rejection message.
+          remote_commit() {
+            # Commit a remote tag ref resolves to. ls-remote peels annotated tags
+            # into an extra "<ref>^{}" line, but only in a patternless listing -
+            # asking for one ref by name returns the tag-object id, which changes
+            # every time the tag is re-created and is useless for this compare.
+            git ls-remote origin | awk -v peel_ref="refs/tags/$1^{}" -v tag_ref="refs/tags/$1" '
+              $2 == peel_ref { peeled = $1 }
+              $2 == tag_ref  { base   = $1 }
+              END { print (peeled != "" ? peeled : base) }'
+          }
+
+          push_moved_tag() {
+            local tag="$1" attempt
+            for attempt in 1 2 3 4 5; do
+              if [ "$(remote_commit "$tag")" = "$GITHUB_SHA" ]; then
+                echo "refs/tags/$tag already points at $GITHUB_SHA on origin, nothing to push"
+                return 0
+              fi
+
+              git tag -fa "$tag" "$GITHUB_SHA" -m "Caldaver release $tag" >/dev/null
+              if git push --force origin "refs/tags/$tag"; then
+                echo "pushed refs/tags/$tag -> $GITHUB_SHA (attempt $attempt)"
+                return 0
+              fi
+
+              echo "::warning title=Tag push rejected::refs/tags/$tag rejected on attempt $attempt/5, retrying"
+              sleep $((attempt * 20))
+              git fetch --tags --force origin || true
+            done
+
+            echo "git push exhausted its retries for $tag, trying the Git Data API for a real error"
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${tag}" \
+              -f sha="$GITHUB_SHA" -F force=true
+          }
+
+          push_moved_tag "${{ needs.prepare.outputs.release_tag }}"
+          push_moved_tag latest
 
       - name: Generate release notes
         id: notes
